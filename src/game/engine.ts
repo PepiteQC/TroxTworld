@@ -22,10 +22,10 @@ import { refreshCsmFrustums, wireCsmTree } from "./csm";
 import { tex } from "./textures";
 import type { Appearance } from "./character";
 import { fleetById, isVehicleId, type VehicleId } from "./fleet";
-import { buildCargoCrate, haulDistance, nearHaul } from "./jobs";
+import { buildCargoCrate, nearHaul } from "./jobs";
 import { workJobAt } from "./tools";
 import { shelterOf, applyMeal, ambientOf } from "./survival";
-import { crimeById, gangById, jobById } from "./rp";
+import { crimeById, jobById } from "./rp";
 import { ENFORCE_SPEED_LIMITS, getPoiAt, getSpeedLimitAt, getSurfaceAt, getTerrainHeight, getZoneName, policeCatchMul, SPAWN, SQ_JAIL, PRISON } from "./worlddata";
 import { prisonSystem, type ChargeId } from "./prison";
 import { zoneSystem } from "./zones";
@@ -693,7 +693,6 @@ export class PortneufEngine {
       this.enterInterior(door);
       return;
     }
-    const ammoId = ammoFor(store.equippedTool);
     const range = harvestRange(store.equippedTool);
     const fauna = this.world.wildlife.nearestHarvestable(this.walker.x, this.walker.z, range);
     if (fauna) this.harvestFauna(fauna.id);
@@ -1907,7 +1906,7 @@ export class PortneufEngine {
     for (const d of this.world.swingDoors) {
       d.leafCenter(this.doorHit);
       d.handleWorld(this.handleHit);
-      const bodyDist = Math.hypot(this.bodyHit.x - this.doorHit.x, this.bodyHit.z - this.doorHit.z);
+      const _bodyDist = Math.hypot(this.bodyHit.x - this.doorHit.x, this.bodyHit.z - this.doorHit.z);
       const handDist = Math.hypot(
         this.handHit.x - this.handleHit.x,
         this.handHit.y - this.handleHit.y,

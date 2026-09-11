@@ -40,6 +40,7 @@ if (meshoptOk) {
   const cores = typeof navigator !== "undefined" ? navigator.hardwareConcurrency || 2 : 2;
   const mobile = typeof window !== "undefined" && Math.min(window.innerWidth, window.innerHeight) < 720;
   if (!mobile && typeof MeshoptDecoder.useWorkers === "function") {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     MeshoptDecoder.useWorkers(Math.min(4, Math.max(1, cores - 1)));
   }
 }

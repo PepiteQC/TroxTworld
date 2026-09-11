@@ -125,9 +125,9 @@ export function tickSurvival(
 
   const heat = felt > 22 ? 1 + (felt - 22) * 0.09 : 1;
   const cold = felt < 0 ? 1 + Math.abs(felt) * 0.022 : 1;
-  let hunger = Math.max(0, prev.hunger - 16 * hours * cold);
-  let thirst = Math.max(0, prev.thirst - 22 * hours * heat);
-  let energy = Math.max(0, prev.energy - (12 + prev.shiver * 2.5) * hours);
+  const hunger = Math.max(0, prev.hunger - 16 * hours * cold);
+  const thirst = Math.max(0, prev.thirst - 22 * hours * heat);
+  const energy = Math.max(0, prev.energy - (12 + prev.shiver * 2.5) * hours);
 
   let insulation = CLO[clothing];
   if (prev.isWet) insulation *= 0.3;

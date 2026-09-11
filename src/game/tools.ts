@@ -122,7 +122,7 @@ export function buildBoiteOutils(): THREE.Group {
   return g;
 }
 
-function buildPistol(): THREE.Group {
+function _buildPistol(): THREE.Group {
   const g = new THREE.Group();
   const slide = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.032, 0.028), steel());
   slide.position.set(0.04, 0.05, 0);

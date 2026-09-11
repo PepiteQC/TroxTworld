@@ -956,7 +956,11 @@ function getArretTex() {
     ctx.beginPath();
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
-      i === 0 ? ctx.moveTo(c + Math.cos(a) * r, c + Math.sin(a) * r) : ctx.lineTo(c + Math.cos(a) * r, c + Math.sin(a) * r);
+      if (i === 0) {
+        ctx.moveTo(c + Math.cos(a) * r, c + Math.sin(a) * r);
+      } else {
+        ctx.lineTo(c + Math.cos(a) * r, c + Math.sin(a) * r);
+      }
     }
     ctx.closePath();
     ctx.fill();

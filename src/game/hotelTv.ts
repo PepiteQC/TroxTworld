@@ -111,7 +111,11 @@ function buildScreenCanvas() {
       ctx.beginPath();
       for (let x = 0; x <= w; x += 16) {
         const yy = ly + Math.sin(x * 0.05 + t * 1.8 + i) * 3;
-        x === 0 ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy);
+        if (x === 0) {
+          ctx.moveTo(x, yy);
+        } else {
+          ctx.lineTo(x, yy);
+        }
       }
       ctx.stroke();
     }

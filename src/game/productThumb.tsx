@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ITEM_ICONS } from "./itemIcons";
 import type { ShopItem } from "./commerce";
 
-export function productSrc(id: string) {
+function productSrc(id: string) {
   return `/products/${id}.jpg`;
 }
 

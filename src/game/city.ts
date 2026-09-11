@@ -345,7 +345,7 @@ function tower(width: number, depth: number, floors: number, lit: number, seed: 
   terrace.position.y = h + 0.55;
   g.add(terrace);
   const rail = matLib.get(0x9ab4c4, 0.15, 0.45);
-  for (const [w, d, ox, oz] of [
+  for (const [w, _d, ox, oz] of [
     [width - 0.8, 0.06, 0, (depth - 0.8) / 2],
     [width - 0.8, 0.06, 0, -(depth - 0.8) / 2],
   ] as Array<[number, number, number, number]>) {

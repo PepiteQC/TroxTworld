@@ -296,7 +296,9 @@ export function buildFromMeta(id: string): THREE.Group | null {
   addBox(g, w, h, d, h / 2, col, def.category === "meubles" ? 0.7 : 0.88);
   if (id === "sofa" || id === "armch" || id === "sofaL") {
     const cloth = tex.cloth("laineTricot", "laineKnitNrm", 1.8, 1.4, 0.9, col, 0.95);
-    g.children[0] && ((g.children[0] as THREE.Mesh).material = cloth);
+    if (g.children[0]) {
+      (g.children[0] as THREE.Mesh).material = cloth;
+    }
     addBox(g, w, 0.45, 0.12, h * 0.7, col - 0x101018);
     g.children[1]!.position.z = -d / 2 + 0.08;
     (g.children[1] as THREE.Mesh).material = cloth;

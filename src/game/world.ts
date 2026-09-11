@@ -8,7 +8,6 @@ import {
   buildDepanneur,
   buildEcole,
   buildEglise,
-  buildHotelVille,
   buildMaisonCanadienne,
   buildPanneauArret,
   buildPanneauVitesse,
@@ -1274,7 +1273,7 @@ function idmAccel(v: number, v0: number, gap: number, deltaV: number) {
   return a * (free - interaction);
 }
 
-function plantCrop(
+function _plantCrop(
   parent: THREE.Group,
   x: number,
   z: number,

@@ -1044,7 +1044,7 @@ export const useGameStore = create<HudState>((set, get) => ({
     const s = get();
     const deed = deedById(s.deedId ?? "");
     if (!deed || s.ownedProps.includes(deed.id)) return false;
-    const { tax, total } = withTax(deed.price);
+    const { total } = withTax(deed.price);
     if (s.cash < total) { set({ notice: "Fonds insuffisants" }); return false; }
     const inv = { ...s.inventory, cle_maison: (s.inventory.cle_maison ?? 0) + 1 };
     set({
@@ -1088,7 +1088,7 @@ export const useGameStore = create<HudState>((set, get) => ({
     if (cur.heat === id) { set({ notice: "Déjà installé" }); return false; }
     let price = spec.price;
     if (id === "thermopompe") price = Math.max(0, price - LOGISVERT);
-    const { tax, total } = withTax(price);
+    const { total } = withTax(price);
     if (price > 0 && s.cash < total) { set({ notice: "Fonds insuffisants" }); return false; }
     const next: HouseState = {
       ...cur,

@@ -1,32 +1,22 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  Beer,
-  Binoculars,
   Briefcase,
   Car,
   Hammer,
   KeyRound,
-  Coffee,
   Compass,
-  Cookie,
-  CupSoda,
   DoorOpen,
   Droplets,
   Flame,
   Footprints,
-  Fuel,
   Leaf,
   Map as MapIcon,
   Moon,
-  Newspaper,
   Pause,
   Play,
-  Plus,
   Radio,
   RotateCcw,
-  Sandwich,
   Shield,
-  Shirt,
   ShoppingBag,
   ShoppingCart,
   Smartphone,
@@ -36,7 +26,6 @@ import {
   Terminal,
   Truck,
   User,
-  Utensils,
   Wallet,
   X,
   Zap,
@@ -628,7 +617,11 @@ function MiniMap() {
       }
       ctx.beginPath();
       road.points.forEach(([px, pz], i) => {
-        i === 0 ? ctx.moveTo(sx(px), sy(pz)) : ctx.lineTo(sx(px), sy(pz));
+        if (i === 0) {
+          ctx.moveTo(sx(px), sy(pz));
+        } else {
+          ctx.lineTo(sx(px), sy(pz));
+        }
       });
       ctx.stroke();
     }
@@ -1112,7 +1105,11 @@ function BigMap() {
       }
       ctx.beginPath();
       road.points.forEach(([px, pz], i) => {
-        i === 0 ? ctx.moveTo(sx(px), sy(pz)) : ctx.lineTo(sx(px), sy(pz));
+        if (i === 0) {
+          ctx.moveTo(sx(px), sy(pz));
+        } else {
+          ctx.lineTo(sx(px), sy(pz));
+        }
       });
       ctx.stroke();
     }

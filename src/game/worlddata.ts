@@ -1051,7 +1051,7 @@ export const MAPLE_LEAVES = [
 
 export const ENFORCE_SPEED_LIMITS = false;
 
-function distToPolyline(x: number, z: number, pts: Array<[number, number]>) {
+function _distToPolyline(x: number, z: number, pts: Array<[number, number]>) {
   let best = Infinity;
   for (let i = 1; i < pts.length; i++) {
     const [ax, az] = pts[i - 1]!;

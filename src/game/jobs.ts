@@ -95,7 +95,7 @@ export function rollBoard(): HaulJob[] {
   const destB = otherVillage(farm.name);
   const cabane = sugarStop();
   const destS = otherVillage(cabane.name);
-  let e1 = exitStop();
+  const e1 = exitStop();
   let e2 = exitStop();
   let guard = 0;
   while (e2.name === e1.name && guard++ < 8) e2 = exitStop();
