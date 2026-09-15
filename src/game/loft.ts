@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { loadGlb } from "./gltf";
+import type { QcMat } from "./materials";
 
 const box = new THREE.Box3();
 const size = new THREE.Vector3();
@@ -39,7 +40,7 @@ export function mountLoft(host: THREE.Group, width: number, depth: number, heigh
         if (!mesh.isMesh) return;
         const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
         for (const raw of mats) {
-          const m = raw as THREE.MeshStandardMaterial;
+          const m = raw as QcMat;
           if (!m || !("emissive" in m)) continue;
           if (m.map && !m.emissiveMap) {
             m.emissiveMap = m.map;

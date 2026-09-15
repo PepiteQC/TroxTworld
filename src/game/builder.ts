@@ -273,12 +273,11 @@ export function buildProp(type: PropId): THREE.Group {
   return g;
 }
 
-const GHOST_MAT = new THREE.MeshStandardMaterial({
+const GHOST_MAT = new THREE.MeshLambertMaterial({
   color: 0xa78bfa,
   transparent: true,
   opacity: 0.38,
   depthWrite: false,
-  roughness: 0.6,
 });
 
 export class PropField {

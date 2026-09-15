@@ -16,7 +16,7 @@ export const WORLD = {
 export const RIVER_Z = 96;
 export const ROAD_138_Z = 4;
 export const A40_Z = -178;
-export const SQ_JAIL = { x: -90, z: -48 };
+export const SQ_JAIL = { x: -176, z: -52 };
 
 export function a40X(km: number) {
   return Math.round((km - 263) * 60);
@@ -53,7 +53,7 @@ const X281 = A40_EXITS[6]!.x;
 const X285 = A40_EXITS[7]!.x;
 
 export const PAPETERIE = { x: X274 - 36, z: 56 };
-export const PRISON = { x: X274 - 80, z: -248 };
+export const PRISON = { x: a40X(274) - 140, z: -580 };
 
 export type RoadKind = "highway" | "regional" | "village" | "rural" | "gravel" | "ramp";
 
@@ -173,9 +173,9 @@ export const VILLAGES: VillageDef[] = [
     center: [X250, 12],
     population: 900,
     roadAngle: -0.04,
-    houseCount: 8,
+    houseCount: 10,
     farmCount: 3,
-    coreRadius: 52,
+    coreRadius: 64,
     description: "Ouest du comté, Chemin du Roy, sortie 250. Moulin à vent de 1674.",
     motto: "Au fil du Roy",
     founded: 1680,
@@ -295,12 +295,12 @@ export const VILLAGES: VillageDef[] = [
   {
     id: "portneuf",
     name: "Portneuf",
-    center: [X261, 10],
+    center: [X261, -20],
     population: 5200,
-    roadAngle: 0.02,
+    roadAngle: 0,
     houseCount: 16,
     farmCount: 3,
-    coreRadius: 88,
+    coreRadius: 100,
     description: "Chef-lieu du comté, sortie 261 de l'A-40. Marina et quai.",
     motto: "La porte du fleuve",
     founded: 1861,
@@ -485,13 +485,8 @@ function wobbleLine(x0: number, z0: number, x1: number, z1: number, steps: numbe
 }
 
 function approach(x: number, z0: number, z1: number): Array<[number, number]> {
-  return [
-    [x, z0],
-    [x, -122],
-    [x, A40_Z],
-    [x, -234],
-    [x, z1],
-  ];
+  const zs = [...new Set([z0, -122, A40_Z, -234, z1])].sort((a, b) => b - a);
+  return zs.map((z) => [x, z] as [number, number]);
 }
 
 function rampsForExit(e: A40Exit): RoadDef[] {
@@ -564,13 +559,15 @@ export function cityStreetHalf(g: Pick<CityGridSpec, "gridSize" | "streetWidth">
 }
 
 /** Aligne une rue du damier sur une route régionale (la chaussée passe ENTRE les lots). */
-function cityAlign(g: CityGridSpec, nsX?: number, ewZ?: number): CityGridSpec {
+function cityAlign(g: CityGridSpec, nsX?: number, ewZ?: number, nsI?: number, ewI?: number): CityGridSpec {
   const pitch = cityPitch(g);
   const total = g.gridSize * pitch;
   const mid = Math.floor(g.gridSize / 2);
+  const iNs = nsI ?? mid;
+  const iEw = ewI ?? mid;
   let [cx, cz] = g.center;
-  if (nsX != null) cx = nsX + total / 2 - mid * pitch;
-  if (ewZ != null) cz = ewZ + total / 2 - mid * pitch;
+  if (nsX != null) cx = nsX - (-total / 2 + iNs * pitch);
+  if (ewZ != null) cz = ewZ - (-total / 2 + iEw * pitch);
   return { ...g, center: [cx, cz] };
 }
 
@@ -627,12 +624,14 @@ export function citySpecialLots(g: CityGridSpec) {
     hotelVille: { col: Math.min(n - 1, mid + 1), row: Math.max(0, mid - 1) },
     depanneur: { col: mid, row: 0 },
     ecole: { col: 0, row: n - 1 },
+    caisse: { col: 0, row: mid },
+    cemetery: { col: Math.max(0, mid - 1), row: Math.min(n - 1, mid + 1) },
   };
 }
 
 export const CITY_GRIDS: CityGridSpec[] = [
   cityAlign({ id: "pontrouge", name: "Pont-Rouge", center: [1120, -340], gridSize: 5, blockSize: 30, streetWidth: 9.5, density: 1.05, seed: 9400 }, 1120, -340),
-  cityAlign({ id: "portneuf", name: "Portneuf", center: [X261, 10], gridSize: 3, blockSize: 28, streetWidth: 9, density: 0.95, seed: 5200 }, X261, 4),
+  cityAlign({ id: "portneuf", name: "Portneuf", center: [X261, -20], gridSize: 3, blockSize: 28, streetWidth: 9, density: 0.95, seed: 5200 }, X261, ROAD_138_Z, undefined, 3),
   cityAlign({ id: "st_raymond", name: "Saint-Raymond", center: [980, -650], gridSize: 3, blockSize: 28, streetWidth: 9, density: 0.9, seed: 10800 }, 980),
   cityAlign({ id: "donnacona", name: "Donnacona", center: [X274, 12], gridSize: 3, blockSize: 26, streetWidth: 8.5, density: 0.88, seed: 7500 }, X274, 4),
 ];
@@ -640,6 +639,28 @@ export const CITY_GRIDS: CityGridSpec[] = [
 export function isCityVillage(name: string) {
   return CITY_GRIDS.some((g) => g.name === name);
 }
+
+/** 2e Rang seigneurial, parallèle au Chemin du Roy, entre le village et l'A-40. */
+export const RANG_2E_Z = -70;
+
+/** Rangs N-S : chaussée à `x`, ferme à l'est du rang, cour sur le 2e Rang. */
+export const RIVER_RANGS: Array<{
+  farmId: string;
+  name: string;
+  village: string;
+  x: number;
+}> = [
+  { farmId: "rang_grondines_ouest", name: "Rang du Chemin du Roy", village: "Grondines", x: -1000 },
+  { farmId: "rang_grondines_est", name: "Rang Sainte-Anne", village: "Grondines", x: -700 },
+  { farmId: "rang_deschambault_ouest", name: "Rang des Pins", village: "Deschambault-Grondines", x: -580 },
+  { farmId: "rang_deschambault_est", name: "Côte de la Traverse", village: "Deschambault-Grondines", x: -410 },
+  { farmId: "rang_portneuf_ouest", name: "Rang de la Pointe", village: "Portneuf", x: -250 },
+  { farmId: "rang_capsante_ouest", name: "Rang Saint-Joseph", village: "Cap-Santé", x: 220 },
+  { farmId: "rang_capsante_est", name: "Rang du Vieux Chemin", village: "Cap-Santé", x: 500 },
+  { farmId: "rang_neuville_ouest", name: "Côte des Écureuils", village: "Neuville", x: 940 },
+];
+
+export const ROAD_JUNCTIONS: Array<{ x: number; z: number; size: number }> = [];
 
 function overlaysStaticRoad(points: Array<[number, number]>, width: number): boolean {
   const a = points[0];
@@ -659,6 +680,21 @@ function overlaysStaticRoad(points: Array<[number, number]>, width: number): boo
   return hits >= 2;
 }
 
+/** Route régionale sous un point (pour caler trottoirs / pads sur la vraie largeur). */
+export function overlayRoadAt(x: number, z: number): RoadDef | null {
+  let best: RoadDef | null = null;
+  let bestD = Infinity;
+  for (const r of ROADS_STATIC) {
+    const h = closestOnPolyline(x, z, r.points);
+    const need = Math.max(2.2, r.width * 0.5);
+    if (h.dist < need && h.dist < bestD) {
+      best = r;
+      bestD = h.dist;
+    }
+  }
+  return best;
+}
+
 function cityGridRoads(g: CityGridSpec): RoadDef[] {
   const n = g.gridSize;
   const pitch = cityPitch(g);
@@ -673,7 +709,12 @@ function cityGridRoads(g: CityGridSpec): RoadDef[] {
     const along = shift + i * pitch;
     const ns: RoadDef = {
       id: `${g.id}_ns_${i}`,
-      name: artery ? `Rue Principale — ${g.name}` : `Rue ${i + 1} N-S — ${g.name}`,
+      name:
+        g.id === "portneuf" && artery
+          ? "Rue de la Station — Portneuf"
+          : artery
+            ? `Rue Principale — ${g.name}`
+            : `Rue ${i + 1} N-S — ${g.name}`,
       kind: "village",
       speed: 50,
       width,
@@ -687,7 +728,12 @@ function cityGridRoads(g: CityGridSpec): RoadDef[] {
     };
     const ew: RoadDef = {
       id: `${g.id}_ew_${i}`,
-      name: artery ? `Boulevard — ${g.name}` : `Rue ${i + 1} E-O — ${g.name}`,
+      name:
+        g.id === "portneuf" && artery
+          ? "Rue Saint-Charles — Portneuf"
+          : artery
+            ? `Boulevard — ${g.name}`
+            : `Rue ${i + 1} E-O — ${g.name}`,
       kind: "village",
       speed: 50,
       width,
@@ -707,8 +753,80 @@ function cityGridRoads(g: CityGridSpec): RoadDef[] {
 
 function villageStreetRoads(): RoadDef[] {
   const city = new Set(CITY_GRIDS.map((g) => g.name));
-  const hasMain = new Set(ROADS_STATIC.filter((r) => r.village).map((r) => r.village));
   const out: RoadDef[] = [];
+  const junc: Array<{ x: number; z: number; size: number }> = [];
+  const r138 = ROADS_STATIC.find((r) => r.id === "r138");
+  const z138At = (x: number) => (r138 ? closestOnPolyline(x, ROAD_138_Z, r138.points).z : ROAD_138_Z);
+  const addJ = (x: number, z: number, size: number) => {
+    junc.push({ x, z, size });
+  };
+  const nsTaken = (x: number) => {
+    for (const r of ROADS_STATIC) {
+      if (r.kind === "highway" || r.kind === "ramp") continue;
+      const h = closestOnPolyline(x, RANG_2E_Z, r.points);
+      if (h.dist < 22) return true;
+    }
+    return false;
+  };
+
+  out.push({
+    id: "rang2e_ouest",
+    name: "2e Rang — Grondines / Deschambault",
+    kind: "rural",
+    speed: 70,
+    width: 6.2,
+    surface: "asphalt",
+    traffic: 1,
+    points: [
+      [-1080, RANG_2E_Z],
+      [-780, RANG_2E_Z],
+      [-500, RANG_2E_Z],
+      [-210, RANG_2E_Z],
+    ],
+  });
+  out.push({
+    id: "rang2e_est",
+    name: "2e Rang — Cap-Santé / Neuville",
+    kind: "rural",
+    speed: 70,
+    width: 6.2,
+    surface: "asphalt",
+    traffic: 1,
+    points: [
+      [40, RANG_2E_Z],
+      [360, RANG_2E_Z],
+      [700, RANG_2E_Z],
+      [1020, RANG_2E_Z],
+    ],
+  });
+
+  for (const rang of RIVER_RANGS) {
+    if (nsTaken(rang.x)) continue;
+    const z0 = z138At(rang.x);
+    out.push({
+      id: `rangns_${rang.farmId}`,
+      name: rang.name,
+      kind: "rural",
+      speed: 50,
+      width: 5.6,
+      surface: "asphalt",
+      village: rang.village,
+      traffic: 0,
+      points: [
+        [rang.x, z0],
+        [rang.x, (z0 + RANG_2E_Z) / 2],
+        [rang.x, RANG_2E_Z],
+      ],
+    });
+    addJ(rang.x, z0, 11.5);
+    addJ(rang.x, RANG_2E_Z, 10.5);
+  }
+
+  for (const x of [-780, -540, -360, 360, 660, 1080]) {
+    addJ(x, RANG_2E_Z, 11);
+    addJ(x, z138At(x), 12);
+  }
+
   for (const v of VILLAGES) {
     if (city.has(v.name)) continue;
     const [cx, cz] = v.center;
@@ -716,49 +834,119 @@ function villageStreetRoads(): RoadDef[] {
     const dirZ = Math.sin(v.roadAngle);
     const px = -dirZ;
     const pz = dirX;
-    const len = v.coreRadius * 1.55;
-    const on138 = v.terrain === "plaine_fleuve" || Math.abs(cz - ROAD_138_Z) < 40;
-    if (!hasMain.has(v.name) && !on138) {
+    const river = v.terrain === "plaine_fleuve" || Math.abs(cz - ROAD_138_Z) < 50;
+    if (river) {
+      const z0 = z138At(cx);
+      const streetZ = z0 - 30;
+      const half = Math.max(62, v.coreRadius * 1.2);
       out.push({
         id: `rue_${v.id}`,
         name: `Rue Principale — ${v.name}`,
         kind: "village",
         speed: 50,
-        width: 6.6,
+        width: 6.4,
         surface: "asphalt",
         village: v.name,
         traffic: 1,
         points: [
-          [cx - dirX * len, cz - dirZ * len],
-          [cx, cz],
-          [cx + dirX * len, cz + dirZ * len],
+          [cx - half, streetZ],
+          [cx, streetZ],
+          [cx + half, streetZ],
         ],
       });
+      addJ(cx, streetZ, 11);
+      let spine = false;
+      for (const r of ROADS_STATIC) {
+        if (r.kind === "highway" || r.kind === "ramp") continue;
+        if (closestOnPolyline(cx, streetZ, r.points).dist < 10) {
+          spine = true;
+          break;
+        }
+      }
+      if (!spine) {
+        out.push({
+          id: `lien_${v.id}`,
+          name: `Côte — ${v.name}`,
+          kind: "village",
+          speed: 50,
+          width: 6,
+          surface: "asphalt",
+          village: v.name,
+          traffic: 0,
+          points: [
+            [cx, z0],
+            [cx, streetZ],
+            [cx, RANG_2E_Z],
+          ],
+        });
+        addJ(cx, z0, 12);
+        addJ(cx, RANG_2E_Z, 10.5);
+      }
+    } else {
+      const hasMain = ROADS_STATIC.some((r) => r.village === v.name);
+      const len = v.coreRadius * 1.55;
+      if (!hasMain) {
+        out.push({
+          id: `rue_${v.id}`,
+          name: `Rue Principale — ${v.name}`,
+          kind: "village",
+          speed: 50,
+          width: 6.6,
+          surface: "asphalt",
+          village: v.name,
+          traffic: 1,
+          points: [
+            [cx - dirX * len, cz - dirZ * len],
+            [cx, cz],
+            [cx + dirX * len, cz + dirZ * len],
+          ],
+        });
+      }
+      const inland = pz > 0 ? -1 : 1;
+      const fl = Math.max(48, v.coreRadius * 0.95);
+      out.push({
+        id: `rang_${v.id}`,
+        name: `Rang — ${v.name}`,
+        kind: "village",
+        speed: 50,
+        width: 5.8,
+        surface: "asphalt",
+        village: v.name,
+        traffic: 0,
+        points: [
+          [cx, cz],
+          [cx + px * inland * fl * 0.45, cz + pz * inland * fl * 0.45],
+          [cx + px * inland * fl, cz + pz * inland * fl],
+        ],
+      });
+      addJ(cx, cz, 11);
     }
-    const end = Math.max(v.coreRadius * 1.25, 56);
-    const inland = pz > 0 ? -1 : 1;
-    const fl = v.coreRadius * 1.2;
-    const jx = cx + dirX * end;
-    const jz = cz + dirZ * end;
-    out.push({
-      id: `rang_${v.id}`,
-      name: `Rang — ${v.name}`,
-      kind: "village",
-      speed: 50,
-      width: 5.8,
-      surface: "asphalt",
-      village: v.name,
-      traffic: 0,
-      points: [
-        [jx, jz],
-        [jx + px * inland * fl, jz + pz * inland * fl],
-      ],
-    });
   }
+
+  ROAD_JUNCTIONS.length = 0;
+  ROAD_JUNCTIONS.push(...junc);
   return out;
 }
 
 const ROADS_STATIC: RoadDef[] = [
+    {
+      id: "r_prison_donnacona",
+      name: "Chemin du Pénitencier — Donnacona",
+      kind: "rural",
+      speed: 70,
+      width: 7.2,
+      surface: "asphalt",
+      village: "Donnacona",
+      points: [
+        [a40X(274), 4],
+        [a40X(274) - 20, -60],
+        [a40X(274) - 50, -178],
+        [a40X(274) - 90, -320],
+        [a40X(274) - 120, -460],
+        [a40X(274) - 140, -530],
+        [a40X(274) - 140, -580],
+      ],
+    },
   {
     id: "r138",
     name: "Route 138 — Chemin du Roy",
@@ -771,7 +959,9 @@ const ROADS_STATIC: RoadDef[] = [
       [X250, 10],
       [X254, 6],
       [X257, 5],
+      [X261 - 80, 4],
       [X261, 4],
+      [X261 + 80, 4],
       [X269, 5],
       [X274, 4],
       [X281, 7],
@@ -887,7 +1077,23 @@ const ROADS_STATIC: RoadDef[] = [
     ],
   },
   { id: "proulx", name: "Route Proulx — Saint-Gilbert", kind: "rural", speed: 70, width: 6.4, surface: "asphalt", village: "Deschambault-Grondines", points: approach(X257, 4, -90) },
-  { id: "r_portneuf", name: "Route de Portneuf — sortie 261", kind: "village", speed: 50, width: 7.6, surface: "asphalt", village: "Portneuf", points: approach(X261, 4, -90) },
+  {
+    id: "r_portneuf",
+    name: "Route de Portneuf — sortie 261",
+    kind: "village",
+    speed: 50,
+    width: 8.4,
+    surface: "asphalt",
+    village: "Portneuf",
+    traffic: 3,
+    points: [
+      [X261, ROAD_138_Z],
+      [X261, -70],
+      [X261, -122],
+      [X261, A40_Z],
+      [X261, -234],
+    ],
+  },
   { id: "rang_donnacona", name: "2e Rang — Donnacona", kind: "village", speed: 50, width: 7.2, surface: "asphalt", village: "Donnacona", points: approach(X274, 4, -88) },
   { id: "r_gravel", name: "Route Gravel — Neuville", kind: "village", speed: 50, width: 6.6, surface: "asphalt", village: "Neuville", points: approach(X285, 4, -80) },
   {
@@ -937,6 +1143,39 @@ const ROADS_STATIC: RoadDef[] = [
     ],
   },
   {
+    id: "quai_portneuf",
+    name: "Chemin du Quai — Portneuf",
+    kind: "village",
+    speed: 50,
+    width: 6.4,
+    surface: "asphalt",
+    village: "Portneuf",
+    traffic: 1,
+    points: [
+      [X261 - 88, 28],
+      [X261 - 36, 50],
+      [X261, 54],
+      [X261 + 42, 58],
+      [X261 + 22, 74],
+    ],
+  },
+  {
+    id: "portneuf_quai_ns",
+    name: "Avenue du Quai — Portneuf",
+    kind: "village",
+    speed: 50,
+    width: 7.2,
+    surface: "asphalt",
+    village: "Portneuf",
+    traffic: 1,
+    points: [
+      [X261, ROAD_138_Z],
+      [X261, 28],
+      [X261, 54],
+      [X261, 76],
+    ],
+  },
+  {
     id: "pont_ns",
     name: "Avenue du Pont",
     kind: "village",
@@ -976,8 +1215,15 @@ export const POIS: PoiDef[] = [
   { id: "alban_grotte", name: "Grotte de la Coulée", type: "grotte", x: -600, z: -550, radius: 20, description: "Réseau creusé dans les escarpements de l'éboulis." },
   { id: "marc_carriere", name: "Carrière de Saint-Marc", type: "industrie", x: -480, z: -200, radius: 40, description: "Fosse calcaire, dumpers et poussière blanche." },
   { id: "desch_moulin", name: "Moulin de Deschambault", type: "moulin", x: -460, z: 72, radius: 22, description: "Vieux moulin face au fleuve." },
-  { id: "portneuf_hotel", name: "Hôtel de ville de Portneuf", type: "institution", x: X261, z: 10, radius: 24, description: "Le cœur administratif du comté, sortie 261." },
+  { id: "portneuf_hotel", name: "Hôtel de ville de Portneuf", type: "institution", x: X261, z: ROAD_138_Z, radius: 24, description: "Le cœur administratif du comté, au croisement de la 138 et de la sortie 261." },
+  { id: "portneuf_marina", name: "Marina de Portneuf", type: "marina", x: X261, z: 74, radius: 28, description: "Quai municipal, hangar et bateaux de pêche sur le Saint-Laurent." },
   { id: "pont_parc", name: "Parc central de Pont-Rouge", type: "park", x: 1120, z: -340, radius: 30, description: "Kiosque, allées et bancs sous les érables." },
+  { id: "pont_cimetiere", name: "Cimetière de Pont-Rouge", type: "cimetiere", x: 1090, z: -372, radius: 24, description: "Cimetière paroissial, stèles de granite et cèdres." },
+  { id: "portneuf_cimetiere", name: "Cimetière de Portneuf", type: "cimetiere", x: X261 - 48, z: -20, radius: 22, description: "Cimetière du chef-lieu, à l'ouest de la grille." },
+  { id: "alban_cimetiere", name: "Cimetière de Saint-Alban", type: "cimetiere", x: -620, z: -500, radius: 22, description: "Cimetière paroissial au pied de l'éboulis." },
+  { id: "casimir_cimetiere", name: "Cimetière de Saint-Casimir", type: "cimetiere", x: -900, z: -250, radius: 22, description: "Stèles face à la gorge de la Sainte-Anne." },
+  { id: "desch_cimetiere", name: "Cimetière de Deschambault", type: "cimetiere", x: -500, z: 40, radius: 20, description: "Cimetière du fleuve, clôture de fer." },
+  { id: "grondines_parc", name: "Parc de Grondines", type: "park", x: X250, z: 28, radius: 18, description: "Carré vert le long du Chemin du Roy." },
   { id: "pont_hotel", name: "Hôtel Pont-Rouge", type: "hotel", x: 1164, z: -340, radius: 22, description: "Descendez du pick-up et entrez par la marquise." },
   { id: "pont_tour", name: "Tour résidentielle", type: "apartment", x: 1120, z: -308, radius: 20, description: "Immeuble avec penthouse. Un 4½ se visite." },
   { id: "raymond_centre", name: "Saint-Raymond", type: "village", x: 980, z: -650, radius: 40, description: "Porte des Laurentides, bout de la 365." },
@@ -990,7 +1236,7 @@ export const POIS: PoiDef[] = [
   { id: "cap_sante_centre", name: "Cap-Santé", type: "village", x: X269, z: 12, radius: 32, description: "Plus vieux village, route 358, sortie 269." },
   { id: "donnacona_centre", name: "Donnacona", type: "village", x: X274, z: 12, radius: 34, description: "Sortie 274, 2e Rang vers l'A-40." },
   { id: "donnacona_papeterie", name: "Papeterie de Donnacona", type: "usine", x: PAPETERIE.x, z: PAPETERIE.z, radius: 48, description: "Ancienne usine à papier sur le Saint-Laurent. Quart, rouleaux, quai de chargement." },
-  { id: "donnacona_prison", name: "Établissement de Donnacona", type: "institution", x: PRISON.x, z: PRISON.z, radius: 52, description: "Pénitencier fédéral à sécurité moyenne. Blocs A–D, cour, tours de garde." },
+  { id: "donnacona_prison", name: "Établissement de Donnacona", type: "institution", x: PRISON.x, z: PRISON.z, radius: 65, description: "Pénitencier fédéral à sécurité maximale isolé en forêt. Blocs A–D, cour grillagée, miradors et barbelés." },
   { id: "neuville_centre", name: "Neuville", type: "village", x: X281, z: 14, radius: 34, description: "Terminus sud de la 365, sortie 281." },
   { id: "faune_laurentides", name: "Orignaux des Laurentides", type: "faune", x: 200, z: -700, radius: 48, description: "Orignaux, loups, ours noir, renards et castors — permis MFFP obligatoire." },
   { id: "portneuf_sq", name: "Poste SQ Portneuf", type: "institution", x: SQ_JAIL.x, z: SQ_JAIL.z, radius: 22, description: "Sûreté du Québec — cellules, constats CSR et relâchement après arrestation." },
@@ -1018,19 +1264,231 @@ export interface SurfaceSample {
   lateralGrip: number;
   rolling: number;
   slipThreshold: number;
+  gripRecovery: number;
   bumpiness: number;
   walkMul: number;
-  particle: "none" | "dust" | "sand";
+  particle: "none" | "dust" | "sand" | "snow" | "spray";
+  particleColor: string;
+  particleRate: number;
+  leavesTracks: boolean;
+  trackOpacity: number;
+  tireSound: string;
+  footstepSound: string;
+  heavyPenalty: number;
 }
 
 export const SURFACES: Record<string, SurfaceSample> = {
-  asphalt: { key: "asphalt", name: "Asphalte", traction: 1, lateralGrip: 1, rolling: 0.013, slipThreshold: 95, bumpiness: 0.04, walkMul: 1, particle: "none" },
-  village: { key: "village", name: "Rue de village", traction: 0.96, lateralGrip: 0.92, rolling: 0.018, slipThreshold: 70, bumpiness: 0.08, walkMul: 1, particle: "none" },
-  gravel: { key: "gravel", name: "Gravelle", traction: 0.72, lateralGrip: 0.48, rolling: 0.04, slipThreshold: 42, bumpiness: 0.28, walkMul: 0.9, particle: "dust" },
-  sand: { key: "sand", name: "Sable", traction: 0.42, lateralGrip: 0.62, rolling: 0.1, slipThreshold: 30, bumpiness: 0.18, walkMul: 0.55, particle: "sand" },
-  grass: { key: "grass", name: "Prairie", traction: 0.62, lateralGrip: 0.7, rolling: 0.045, slipThreshold: 50, bumpiness: 0.16, walkMul: 0.85, particle: "dust" },
-  clay: { key: "clay", name: "Argile de l'éboulis", traction: 0.38, lateralGrip: 0.4, rolling: 0.08, slipThreshold: 28, bumpiness: 0.35, walkMul: 0.5, particle: "dust" },
+  asphalt: {
+    key: "asphalt",
+    name: "Asphalte",
+    traction: 1,
+    lateralGrip: 1,
+    rolling: 0.013,
+    slipThreshold: 95,
+    gripRecovery: 3.2,
+    bumpiness: 0.04,
+    walkMul: 1,
+    particle: "none",
+    particleColor: "#8a7a62",
+    particleRate: 0,
+    leavesTracks: false,
+    trackOpacity: 0.2,
+    tireSound: "tire_asphalt",
+    footstepSound: "step_concrete",
+    heavyPenalty: 1,
+  },
+  village: {
+    key: "village",
+    name: "Rue de village",
+    traction: 0.96,
+    lateralGrip: 0.92,
+    rolling: 0.018,
+    slipThreshold: 70,
+    gripRecovery: 2.8,
+    bumpiness: 0.08,
+    walkMul: 1,
+    particle: "none",
+    particleColor: "#8a7a62",
+    particleRate: 0,
+    leavesTracks: false,
+    trackOpacity: 0.25,
+    tireSound: "tire_asphalt",
+    footstepSound: "step_concrete",
+    heavyPenalty: 1.02,
+  },
+  gravel: {
+    key: "gravel",
+    name: "Gravelle",
+    traction: 0.72,
+    lateralGrip: 0.48,
+    rolling: 0.04,
+    slipThreshold: 42,
+    gripRecovery: 2.1,
+    bumpiness: 0.28,
+    walkMul: 0.9,
+    particle: "dust",
+    particleColor: "#c4b090",
+    particleRate: 8,
+    leavesTracks: true,
+    trackOpacity: 0.45,
+    tireSound: "tire_gravel",
+    footstepSound: "step_gravel",
+    heavyPenalty: 1.15,
+  },
+  dirt: {
+    key: "dirt",
+    name: "Rang de terre",
+    traction: 0.58,
+    lateralGrip: 0.52,
+    rolling: 0.055,
+    slipThreshold: 38,
+    gripRecovery: 1.8,
+    bumpiness: 0.32,
+    walkMul: 0.82,
+    particle: "dust",
+    particleColor: "#8a7a62",
+    particleRate: 10,
+    leavesTracks: true,
+    trackOpacity: 0.55,
+    tireSound: "tire_dirt",
+    footstepSound: "step_dirt",
+    heavyPenalty: 1.22,
+  },
+  sand: {
+    key: "sand",
+    name: "Sable",
+    traction: 0.42,
+    lateralGrip: 0.62,
+    rolling: 0.1,
+    slipThreshold: 30,
+    gripRecovery: 1.4,
+    bumpiness: 0.18,
+    walkMul: 0.55,
+    particle: "sand",
+    particleColor: "#d4c4a0",
+    particleRate: 12,
+    leavesTracks: true,
+    trackOpacity: 0.6,
+    tireSound: "tire_sand",
+    footstepSound: "step_sand",
+    heavyPenalty: 1.45,
+  },
+  grass: {
+    key: "grass",
+    name: "Prairie",
+    traction: 0.62,
+    lateralGrip: 0.7,
+    rolling: 0.045,
+    slipThreshold: 50,
+    gripRecovery: 2.4,
+    bumpiness: 0.16,
+    walkMul: 0.85,
+    particle: "dust",
+    particleColor: "#6a7a52",
+    particleRate: 4,
+    leavesTracks: true,
+    trackOpacity: 0.35,
+    tireSound: "tire_grass",
+    footstepSound: "step_grass",
+    heavyPenalty: 1.18,
+  },
+  clay: {
+    key: "clay",
+    name: "Argile de l'éboulis",
+    traction: 0.38,
+    lateralGrip: 0.4,
+    rolling: 0.08,
+    slipThreshold: 28,
+    gripRecovery: 1.3,
+    bumpiness: 0.35,
+    walkMul: 0.5,
+    particle: "dust",
+    particleColor: "#8a6a52",
+    particleRate: 9,
+    leavesTracks: true,
+    trackOpacity: 0.65,
+    tireSound: "tire_dirt",
+    footstepSound: "step_dirt",
+    heavyPenalty: 1.5,
+  },
+  forest: {
+    key: "forest",
+    name: "Sentier forestier",
+    traction: 0.52,
+    lateralGrip: 0.55,
+    rolling: 0.06,
+    slipThreshold: 36,
+    gripRecovery: 1.9,
+    bumpiness: 0.42,
+    walkMul: 0.72,
+    particle: "dust",
+    particleColor: "#5a4a38",
+    particleRate: 6,
+    leavesTracks: true,
+    trackOpacity: 0.4,
+    tireSound: "tire_dirt",
+    footstepSound: "step_leaves",
+    heavyPenalty: 1.35,
+  },
+  parking: {
+    key: "parking",
+    name: "Béton",
+    traction: 0.94,
+    lateralGrip: 0.96,
+    rolling: 0.016,
+    slipThreshold: 80,
+    gripRecovery: 3,
+    bumpiness: 0.06,
+    walkMul: 1,
+    particle: "none",
+    particleColor: "#8a8a88",
+    particleRate: 0,
+    leavesTracks: false,
+    trackOpacity: 0.15,
+    tireSound: "tire_asphalt",
+    footstepSound: "step_concrete",
+    heavyPenalty: 1.04,
+  },
+  water: {
+    key: "water",
+    name: "Eau",
+    traction: 0.18,
+    lateralGrip: 0.22,
+    rolling: 0.16,
+    slipThreshold: 12,
+    gripRecovery: 0.8,
+    bumpiness: 0.5,
+    walkMul: 0.28,
+    particle: "spray",
+    particleColor: "#a8c4d4",
+    particleRate: 14,
+    leavesTracks: false,
+    trackOpacity: 0.1,
+    tireSound: "tire_water",
+    footstepSound: "step_water",
+    heavyPenalty: 1.8,
+  },
+  ice: {
+    key: "ice",
+    name: "Verglas",
+    traction: 0.28,
+    lateralGrip: 0.22,
+    rolling: 0.01,
+    slipThreshold: 18,
+    gripRecovery: 0.9,
+    bumpiness: 0.03,
+    walkMul: 0.7,
+    particle: "snow",
+    particleColor: "#e8f0f4",
+    particleRate: 5,
+    leavesTracks: true,
+    trackOpacity: 0.25,
+    tireSound: "tire_ice",
+    footstepSound: "step_ice",
+    heavyPenalty: 1.6,
+  },
 };
+
 
 export const SPAWN = { x: -280, z: 4, yaw: -Math.PI / 2 };
 
@@ -1041,7 +1499,7 @@ export const MAPLE_LEAVES = [
   { id: "leaf_pont", name: "Pont de fer", x: -890, z: -180 },
   { id: "leaf_carriere", name: "Carrière Saint-Marc", x: -480, z: -200 },
   { id: "leaf_moulin", name: "Moulin de Deschambault", x: -460, z: 72 },
-  { id: "leaf_hotelville", name: "Hôtel de ville", x: X261, z: 10 },
+  { id: "leaf_hotelville", name: "Hôtel de ville", x: X261, z: ROAD_138_Z },
   { id: "leaf_parc", name: "Parc Pont-Rouge", x: 1120, z: -340 },
   { id: "leaf_raymond", name: "Saint-Raymond", x: 980, z: -650 },
   { id: "leaf_casimir", name: "Saint-Casimir", x: -900, z: -280 },
@@ -1106,6 +1564,12 @@ export function closestOnPolyline(
   return best;
 }
 
+export function roadHalfWidth(road: RoadDef): number {
+  if (road.kind === "highway") return road.width * 0.5 + 5;
+  if (road.kind === "ramp") return road.width * 0.5 + 3.2;
+  return road.width * 0.5;
+}
+
 export function nearestRoadHit(x: number, z: number) {
   let best: { road: RoadDef; x: number; z: number; dist: number; nx: number; nz: number } | null = null;
   for (const road of ROADS) {
@@ -1115,16 +1579,16 @@ export function nearestRoadHit(x: number, z: number) {
   return best;
 }
 
-/** Pousse un point hors de la chaussée (trottoir + cour avant). */
-export function pushOffRoad(x: number, z: number, margin = 8, loops = 10): { x: number; z: number } {
+/** Pousse un point hors de la chaussée (accotement + cour avant). */
+export function pushOffRoad(x: number, z: number, margin = 8, loops = 12): { x: number; z: number } {
   let px = x;
   let pz = z;
   for (let i = 0; i < loops; i++) {
     const hit = nearestRoadHit(px, pz);
     if (!hit) break;
-    const need = hit.road.width * 0.5 + margin;
+    const need = roadHalfWidth(hit.road) + margin;
     if (hit.dist >= need) break;
-    const push = need - hit.dist + 0.6;
+    const push = need - hit.dist + 0.8;
     px += hit.nx * push;
     pz += hit.nz * push;
   }
@@ -1134,7 +1598,7 @@ export function pushOffRoad(x: number, z: number, margin = 8, loops = 10): { x: 
 
 export function onPavement(x: number, z: number, extra = 0): boolean {
   const hit = nearestRoadHit(x, z);
-  return Boolean(hit && hit.dist < hit.road.width * 0.5 + extra);
+  return Boolean(hit && hit.dist < roadHalfWidth(hit.road) + extra);
 }
 
 export function villageAxis(v: VillageDef) {
@@ -1166,7 +1630,7 @@ function secondRoadClearance(x: number, z: number, skipId: string): number {
   let best = Infinity;
   for (const road of ROADS) {
     if (road.id === skipId) continue;
-    const d = closestOnPolyline(x, z, road.points).dist - road.width * 0.5;
+    const d = closestOnPolyline(x, z, road.points).dist - roadHalfWidth(road);
     if (d < best) best = d;
   }
   return best;
@@ -1196,7 +1660,7 @@ export function lotHitsThroughRoad(
   const pad = halfW > 0 ? 2.2 : 0;
   for (const road of ROADS) {
     if (road.id.startsWith(prefix)) continue;
-    const need = road.width * 0.5 + pad;
+    const need = roadHalfWidth(road) + pad;
     for (const [sx, sz] of samples) {
       const h = closestOnPolyline(sx, sz, road.points);
       if (h.dist < need + (halfW > 0 ? 0 : radius)) return true;
@@ -1205,60 +1669,130 @@ export function lotHitsThroughRoad(
   return false;
 }
 
+function villageStreetOf(v: VillageDef): RoadDef | null {
+  return (
+    ROADS.find((r) => r.id === `rue_${v.id}`) ??
+    ROADS.find((r) => r.village === v.name && r.kind === "village" && r.id.startsWith("rue_")) ??
+    ROADS.find((r) => r.village === v.name && r.kind === "village") ??
+    null
+  );
+}
+
 export function villageHouseLots(v: VillageDef): VillageLot[] {
-  const { cx, cz, dirX, dirZ, perpX, perpZ } = villageAxis(v);
+  const street = villageStreetOf(v);
+  const houseR = 8.6;
+  const front = 14.2;
+  const spacing = 30;
   const n = v.houseCount;
-  const spacing = 32;
-  const setback = villageSetback(v);
-  const houseR = 8.2;
-  const inland = inlandSide(v);
   const out: VillageLot[] = [];
-  for (let i = 0; i < n; i++) {
-    const side: 1 | -1 = i % 2 === 0 ? inland : ((-inland) as 1 | -1);
-    const idx = Math.floor(i / 2);
-    const perSide = Math.ceil(n / 2);
-    let along = (idx - (perSide - 1) / 2) * spacing;
-    if (Math.abs(along) < 20) along += Math.sign(along || inland) * 24;
-    let x = cx + dirX * along + perpX * side * setback;
-    let z = cz + dirZ * along + perpZ * side * setback;
-    const p = pushOffRoad(x, z, houseR + 4.2);
-    x = p.x;
-    z = p.z;
-    if (z > RIVER_Z - 26) continue;
+  const tryLot = (x: number, z: number) => {
+    if (z > RIVER_Z - 28) return;
     const hit = nearestRoadHit(x, z);
-    if (!hit) continue;
-    const edge = hit.dist - hit.road.width * 0.5 - houseR;
-    if (edge < 3.4) continue;
-    if (secondRoadClearance(x, z, hit.road.id) < houseR + 4) continue;
+    if (!hit) return;
+    if (hit.road.kind === "highway" || hit.road.kind === "ramp") return;
+    const edge = hit.dist - roadHalfWidth(hit.road) - houseR;
+    if (edge < 4.2) return;
+    if (secondRoadClearance(x, z, hit.road.id) < houseR + 5.5) return;
     out.push({ x, z, yaw: Math.atan2(hit.x - x, hit.z - z) });
+  };
+
+  if (street && street.points.length >= 2) {
+    const a = street.points[0]!;
+    const b = street.points[street.points.length - 1]!;
+    const dx = b[0] - a[0];
+    const dz = b[1] - a[1];
+    const len = Math.hypot(dx, dz) || 1;
+    const dirX = dx / len;
+    const dirZ = dz / len;
+    const perpX = -dirZ;
+    const perpZ = dirX;
+    const inland = perpZ > 0 ? -1 : 1;
+    const hw = roadHalfWidth(street);
+    const [cx, cz] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const riverStreet = Math.abs(cz - ROAD_138_Z) < 55;
+    for (let i = 0; i < n; i++) {
+      const side: 1 | -1 = riverStreet || i % 2 === 0 ? inland : ((-inland) as 1 | -1);
+      const idx = riverStreet ? i : Math.floor(i / 2);
+      const perSide = riverStreet ? n : Math.ceil(n / 2);
+      let along = (idx - (perSide - 1) / 2) * spacing;
+      if (Math.abs(along) < 16) along += Math.sign(along || inland) * 22;
+      tryLot(cx + dirX * along + perpX * side * (hw + front), cz + dirZ * along + perpZ * side * (hw + front));
+    }
+  }
+
+  if (out.length < 3) {
+    const { cx, cz, dirX, dirZ, perpX, perpZ } = villageAxis(v);
+    const setback = villageSetback(v);
+    const inland = inlandSide(v);
+    for (let i = 0; i < n; i++) {
+      const side: 1 | -1 = i % 2 === 0 ? inland : ((-inland) as 1 | -1);
+      const idx = Math.floor(i / 2);
+      const perSide = Math.ceil(n / 2);
+      let along = (idx - (perSide - 1) / 2) * spacing;
+      if (Math.abs(along) < 20) along += Math.sign(along || inland) * 24;
+      const p = pushOffRoad(cx + dirX * along + perpX * side * setback, cz + dirZ * along + perpZ * side * setback, houseR + 6);
+      tryLot(p.x, p.z);
+    }
   }
   return out;
 }
 
-export function villageCivicSpot(v: VillageDef, kind: "church" | "school" | "shop"): VillageLot {
-  const { cx, cz, ang, dirX, dirZ, perpX, perpZ } = villageAxis(v);
-  const side = inlandSide(v);
+export function villageCivicSpot(v: VillageDef, kind: "church" | "school" | "shop" | "caisse" | "cemetery" | "park"): VillageLot {
+  const street = villageStreetOf(v);
   let along = 0;
-  let setback = villageSetback(v) + 12;
   let radius = 10;
   if (kind === "church") {
-    along = -Math.max(36, v.coreRadius * 0.45);
-    setback = villageSetback(v) + 20;
+    along = -Math.max(40, v.coreRadius * 0.5);
+    radius = 16;
+  } else if (kind === "cemetery") {
+    along = -Math.max(40, v.coreRadius * 0.5);
+    radius = 34;
+  } else if (kind === "park") {
+    along = Math.max(12, v.coreRadius * 0.18);
     radius = 16;
   } else if (kind === "shop") {
-    along = Math.max(34, v.coreRadius * 0.4);
-    setback = villageSetback(v) + 10;
+    along = Math.max(38, v.coreRadius * 0.42);
     radius = 10;
+  } else if (kind === "caisse") {
+    along = -Math.max(18, v.coreRadius * 0.22);
+    radius = 14;
   } else {
-    along = Math.max(68, v.coreRadius * 0.88);
-    setback = villageSetback(v) + 20;
+    along = Math.max(70, v.coreRadius * 0.9);
     radius = 12;
   }
+
+  if (street && street.points.length >= 2) {
+    const a = street.points[0]!;
+    const b = street.points[street.points.length - 1]!;
+    const dx = b[0] - a[0];
+    const dz = b[1] - a[1];
+    const len = Math.hypot(dx, dz) || 1;
+    const dirX = dx / len;
+    const dirZ = dz / len;
+    const perpX = -dirZ;
+    const perpZ = dirX;
+    const inland = perpZ > 0 ? -1 : 1;
+    const hw = roadHalfWidth(street);
+    const [mx, mz] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const yard = hw + radius + 8;
+    const raw = {
+      x: mx + dirX * along + perpX * inland * yard,
+      z: mz + dirZ * along + perpZ * inland * yard,
+    };
+    const p = pushOffRoad(raw.x, raw.z, radius + 8);
+    const hit = nearestRoadHit(p.x, p.z);
+    const yaw = hit ? Math.atan2(hit.x - p.x, hit.z - p.z) : Math.atan2(-perpX * inland, -perpZ * inland);
+    return { x: p.x, z: p.z, yaw };
+  }
+
+  const { cx, cz, ang, dirX, dirZ, perpX, perpZ } = villageAxis(v);
+  const side = inlandSide(v);
+  const setback = villageSetback(v) + (kind === "church" ? 18 : kind === "cemetery" ? 40 : kind === "park" ? 22 : 12);
   const raw = {
     x: cx + dirX * along + perpX * side * setback,
     z: cz + dirZ * along + perpZ * side * setback,
   };
-  const p = pushOffRoad(raw.x, raw.z, radius + 5);
+  const p = pushOffRoad(raw.x, raw.z, radius + 8);
   const hit = nearestRoadHit(p.x, p.z);
   const yaw = hit ? Math.atan2(hit.x - p.x, hit.z - p.z) : -ang + (side > 0 ? Math.PI : 0);
   return { x: p.x, z: p.z, yaw };
@@ -1329,9 +1863,11 @@ export function getPoiAt(x: number, z: number): PoiDef | null {
 }
 
 export function getSurfaceAt(x: number, z: number): SurfaceSample {
+  if (z > RIVER_Z - 8) return SURFACES.water!;
   for (const lake of LAKES) {
     const d = Math.hypot(x - lake.x, z - lake.z);
-    if ((d < lake.r + 18 && d > lake.r - 8) || d < lake.r) return SURFACES.sand!;
+    if (d < lake.r - 6) return SURFACES.water!;
+    if (d < lake.r + 18) return SURFACES.sand!;
   }
   if (Math.hypot(x + 620, z + 580) < 120) return SURFACES.clay!;
   const nr = nearestRoad(x, z);
@@ -1341,8 +1877,31 @@ export function getSurfaceAt(x: number, z: number): SurfaceSample {
     if (v && Math.hypot(x - v.center[0], z - v.center[1]) < v.coreRadius * 1.4) return SURFACES.village!;
     return SURFACES.asphalt!;
   }
+  if (z < -380) return SURFACES.forest!;
   return SURFACES.grass!;
 }
+
+export function withIce(s: SurfaceSample, ice: boolean): SurfaceSample {
+  if (!ice || s.key === "water" || s.key === "ice") return s;
+  const iceS = SURFACES.ice!;
+  const glazed = s.key === "asphalt" || s.key === "village" || s.key === "parking";
+  return {
+    ...s,
+    name: glazed ? "Verglas" : `${s.name} · givre`,
+    traction: s.traction * (glazed ? 0.32 : 0.55),
+    lateralGrip: s.lateralGrip * (glazed ? 0.28 : 0.5),
+    slipThreshold: Math.min(s.slipThreshold, iceS.slipThreshold + (glazed ? 0 : 10)),
+    gripRecovery: glazed ? iceS.gripRecovery : s.gripRecovery * 0.55,
+    rolling: glazed ? iceS.rolling : s.rolling,
+    particle: glazed ? "snow" : s.particle,
+    particleColor: glazed ? iceS.particleColor : s.particleColor,
+    particleRate: Math.max(s.particleRate, glazed ? 6 : 2),
+    walkMul: s.walkMul * 0.78,
+    heavyPenalty: s.heavyPenalty * 1.25,
+    tireSound: "tire_ice",
+  };
+}
+
 
 export function getSpeedLimitAt(x: number, z: number): { limit: number; name: string } {
   const v = getVillageAt(x, z);
@@ -1442,3 +2001,5 @@ export function isNearVillage(x: number, z: number, radius: number) {
   }
   return false;
 }
+
+

@@ -1,6 +1,7 @@
 import { A40_EXITS, villageCivicSpot, type VillageDef } from "./worlddata";
+import { getWeapon, weaponAmmo, weaponHarvestRange } from "./weapons";
 
-export type ShopKind = "depanneur" | "food" | "clothing" | "chasse" | "quincaillerie";
+export type ShopKind = "depanneur" | "food" | "clothing" | "chasse" | "quincaillerie" | "sqdc";
 export type BagGroup = "all" | "hunt" | "loot" | "food" | "gear" | "wear";
 export type ShopUse = "eat" | "drink" | "wear" | "tool" | "fuel" | "drug" | "seed";
 
@@ -39,6 +40,10 @@ export interface ShopItem {
   weight: number;
   use?: ShopUse;
   harvest?: boolean;
+  hunger?: number;
+  thirst?: number;
+  /** Âge minimum (SQDC 21, tabac 18). */
+  restricted?: 18 | 21;
 }
 
 export type ShopItemId = ShopItem["id"];
@@ -55,24 +60,42 @@ export interface ShopSpot {
 }
 
 export const CATALOG: ShopItem[] = [
-  { id: "poutine", name: "Poutine extra", price: 9.5, desc: "Frites, sauce brune, fromage en grains.", icon: "utensils", kinds: ["depanneur", "food"], weight: 0.6, use: "eat" },
-  { id: "hotdog", name: "Steamé all-dressed", price: 3.5, desc: "Pain vapeur, choux, moutarde.", icon: "sandwich", kinds: ["depanneur", "food"], weight: 0.25, use: "eat" },
-  { id: "burger", name: "Burger au bacon", price: 14.5, desc: "Chez Ti-Guy, pain brioché.", icon: "sandwich", kinds: ["food"], weight: 0.4, use: "eat" },
-  { id: "pizza", name: "Pointe all-dressed", price: 5.75, desc: "Fromage en grains, pepperoni.", icon: "utensils", kinds: ["food"], weight: 0.28, use: "eat" },
-  { id: "cafe", name: "Café double", price: 2.25, desc: "Brun, comme il faut.", icon: "coffee", kinds: ["depanneur", "food"], weight: 0.2, use: "drink" },
-  { id: "cola", name: "Cola érable", price: 2.5, desc: "Canette froide du frigo.", icon: "cup", kinds: ["depanneur", "food"], weight: 0.35, use: "drink" },
-  { id: "lait", name: "Lait 2 L", price: 4.95, desc: "Québon, sac de plastique.", icon: "cup", kinds: ["depanneur"], weight: 2.1, use: "drink" },
-  { id: "chips", name: "Chips ketchup", price: 2.75, desc: "Le vrai goût d'ici.", icon: "cookie", kinds: ["depanneur"], weight: 0.18, use: "eat" },
-  { id: "biere", name: "Bière en canette", price: 4.5, desc: "Froide, du frigo du fond.", icon: "beer", kinds: ["depanneur"], weight: 0.36, use: "drink" },
+  { id: "poutine", name: "Poutine extra", price: 9.5, desc: "Frites, sauce brune, fromage en grains.", icon: "utensils", kinds: ["depanneur", "food"], weight: 0.6, use: "eat", hunger: 55 },
+  { id: "hotdog", name: "Steamé all-dressed", price: 3.5, desc: "Pain vapeur, choux, moutarde.", icon: "sandwich", kinds: ["depanneur", "food"], weight: 0.25, use: "eat", hunger: 28 },
+  { id: "burger", name: "Burger au bacon", price: 14.5, desc: "Chez Ti-Guy, pain brioché.", icon: "sandwich", kinds: ["food"], weight: 0.4, use: "eat", hunger: 42 },
+  { id: "pizza", name: "Pointe all-dressed", price: 5.75, desc: "Fromage en grains, pepperoni.", icon: "utensils", kinds: ["food"], weight: 0.28, use: "eat", hunger: 32 },
+  { id: "cafe", name: "Café double", price: 2.25, desc: "Brun, comme il faut.", icon: "coffee", kinds: ["depanneur", "food"], weight: 0.2, use: "drink", thirst: 20 },
+  { id: "cola", name: "Cola érable", price: 2.5, desc: "Canette froide du frigo.", icon: "cup", kinds: ["depanneur", "food"], weight: 0.35, use: "drink", thirst: 22, hunger: 4 },
+  { id: "lait", name: "Lait 2 L", price: 4.95, desc: "Québon, sac de plastique.", icon: "cup", kinds: ["depanneur"], weight: 2.1, use: "drink", thirst: 28 },
+  { id: "chips", name: "Chips ketchup", price: 2.75, desc: "Le vrai goût d'ici.", icon: "cookie", kinds: ["depanneur"], weight: 0.18, use: "eat", hunger: 18 },
+  { id: "biere", name: "Bière en canette", price: 4.5, desc: "Froide, du frigo du fond.", icon: "beer", kinds: ["depanneur", "food"], weight: 0.36, use: "drink", thirst: 25, hunger: 5 },
   { id: "loto", name: "Billet Loto-Québec", price: 3, desc: "La poule, c'est mardi.", icon: "newspaper", kinds: ["depanneur"], weight: 0.01 },
-  { id: "tabac", name: "Paquet de cigarettes", price: 16.5, desc: "Derrière le comptoir. 18 ans.", icon: "cookie", kinds: ["depanneur"], weight: 0.02 },
-  { id: "slush", name: "Slush cerise", price: 2.25, desc: "Machine du comptoir, trop sucrée.", icon: "cup", kinds: ["depanneur"], weight: 0.4, use: "drink" },
-  { id: "glace", name: "Barre glacée", price: 2, desc: "Congélateur près de la porte.", icon: "cookie", kinds: ["depanneur"], weight: 0.12, use: "eat" },
-  { id: "pain", name: "Pain blanc", price: 3.5, desc: "Sac de plastique, tranché.", icon: "sandwich", kinds: ["depanneur"], weight: 0.55, use: "eat" },
+  { id: "tabac", name: "Paquet de cigarettes", price: 16.5, desc: "Derrière le comptoir. 18 ans.", icon: "cookie", kinds: ["depanneur"], weight: 0.02, restricted: 18 },
+  { id: "slush", name: "Slush cerise", price: 2.25, desc: "Machine du comptoir, trop sucrée.", icon: "cup", kinds: ["depanneur"], weight: 0.4, use: "drink", thirst: 18 },
+  { id: "glace", name: "Barre glacée", price: 2, desc: "Congélateur près de la porte.", icon: "cookie", kinds: ["depanneur"], weight: 0.12, use: "eat", hunger: 12, thirst: 6 },
+  { id: "pain", name: "Pain blanc", price: 3.5, desc: "Sac de plastique, tranché.", icon: "sandwich", kinds: ["depanneur"], weight: 0.55, use: "eat", hunger: 20 },
   { id: "beurre", name: "Beurre 454 g", price: 6.5, desc: "Frigo, papier d'alu.", icon: "cookie", kinds: ["depanneur"], weight: 0.46 },
-  { id: "sirop", name: "Sirop d'érable 250 ml", price: 22, desc: "Ambré, cabane de Portneuf. Quatre seaux d'eau.", icon: "droplets", kinds: ["depanneur"], harvest: true, weight: 0.35, use: "drink" },
+  { id: "sirop", name: "Sirop d'érable 250 ml", price: 22, desc: "Ambré, cabane de Portneuf. Quatre seaux d'eau.", icon: "droplets", kinds: ["depanneur"], harvest: true, weight: 0.35, use: "drink", hunger: 10 },
   { id: "essence", name: "Essence 20 L", price: 28.4, desc: "Plein pour la 138.", icon: "fuel", kinds: ["depanneur"], weight: 2.4, use: "fuel" },
   { id: "journal", name: "Le Journal de Portneuf", price: 2, desc: "Nouvelles du comté.", icon: "newspaper", kinds: ["depanneur"], weight: 0.12 },
+  { id: "tourtiere", name: "Tourtière", price: 12, desc: "Pâté à la viande du temps des fêtes.", icon: "utensils", kinds: ["food"], weight: 0.7, use: "eat", hunger: 60 },
+  { id: "pouding_chomeur", name: "Pouding chômeur", price: 6, desc: "Gâteau noyé dans le sirop d'érable chaud.", icon: "cookie", kinds: ["food", "depanneur"], weight: 0.28, use: "eat", hunger: 25 },
+  { id: "cretons", name: "Crétons", price: 4, desc: "Pâté de porc épicé, classique du déjeuner.", icon: "sandwich", kinds: ["depanneur", "food"], weight: 0.22, use: "eat", hunger: 20 },
+  { id: "soupe_pois", name: "Soupe aux pois", price: 7, desc: "Pois jaunes et lard salé.", icon: "utensils", kinds: ["food"], weight: 0.45, use: "eat", hunger: 30, thirst: 10 },
+  { id: "pate_chinois", name: "Pâté chinois", price: 10, desc: "Bœuf haché, blé d'Inde, patates pilées.", icon: "utensils", kinds: ["food"], weight: 0.55, use: "eat", hunger: 50 },
+  { id: "viande_fumee", name: "Sandwich viande fumée", price: 11, desc: "Empilé haut, moutarde forte.", icon: "sandwich", kinds: ["food"], weight: 0.38, use: "eat", hunger: 45 },
+  { id: "bagel", name: "Bagel de Montréal", price: 2, desc: "Four à bois, graines de sésame.", icon: "sandwich", kinds: ["depanneur", "food"], weight: 0.12, use: "eat", hunger: 25 },
+  { id: "fromage_grains", name: "Fromage en grains", price: 6, desc: "Frais du jour, doit couiner.", icon: "cookie", kinds: ["depanneur", "food"], weight: 0.2, use: "eat", hunger: 15 },
+  { id: "tarte_sucre", name: "Tarte au sucre", price: 8, desc: "Cassonade et crème, ultra sucrée.", icon: "cookie", kinds: ["food"], weight: 0.32, use: "eat", hunger: 30 },
+  { id: "pomme", name: "Pomme", price: 1, desc: "Variété locale, croquante.", icon: "leaf", kinds: ["depanneur", "food"], weight: 0.18, use: "eat", hunger: 12, thirst: 8 },
+  { id: "banane", name: "Banane", price: 1, desc: "Bonne source de potassium.", icon: "leaf", kinds: ["depanneur"], weight: 0.16, use: "eat", hunger: 14, thirst: 5 },
+  { id: "orange", name: "Orange", price: 1, desc: "Juteuse, riche en vitamine C.", icon: "leaf", kinds: ["depanneur"], weight: 0.18, use: "eat", hunger: 12, thirst: 12 },
+  { id: "carotte", name: "Carotte", price: 1, desc: "Croquante, avec fanes.", icon: "leaf", kinds: ["depanneur"], weight: 0.12, use: "eat", hunger: 8, thirst: 3 },
+  { id: "croissant", name: "Croissant", price: 3, desc: "Pur beurre, feuilleté.", icon: "sandwich", kinds: ["depanneur", "food"], weight: 0.08, use: "eat", hunger: 18 },
+  { id: "eau", name: "Bouteille d'eau", price: 2, desc: "Format 500 ml.", icon: "droplets", kinds: ["depanneur", "food"], weight: 0.52, use: "drink", thirst: 35 },
+  { id: "jus_orange", name: "Jus d'orange", price: 3, desc: "Carton individuel, pur jus.", icon: "cup", kinds: ["depanneur", "food"], weight: 0.28, use: "drink", thirst: 22, hunger: 5 },
+  { id: "barre_chocolat", name: "Barre de chocolat", price: 2, desc: "Énergie rapide, format dépanneur.", icon: "cookie", kinds: ["depanneur"], weight: 0.06, use: "eat", hunger: 15 },
+  { id: "beigne", name: "Beigne glacé", price: 2, desc: "Glaçage rose, café du coin.", icon: "cookie", kinds: ["depanneur", "food"], weight: 0.09, use: "eat", hunger: 20 },
   { id: "medkit", name: "Trousse de premiers soins", price: 32, desc: "Pour les rangs et l'A-40.", icon: "plus", kinds: ["depanneur", "chasse"], weight: 0.8, use: "eat" },
   { id: "veste", name: "Veste carreaux de laine", price: 89, desc: "Portneuf, coupe d'hiver.", icon: "shirt", kinds: ["clothing"], weight: 1.1, use: "wear" },
   { id: "goose", name: "Parka Canada Goose", price: 189, desc: "Duvet, hiver du comté.", icon: "shirt", kinds: ["clothing"], weight: 1.8, use: "wear" },
@@ -97,13 +120,37 @@ export const CATALOG: ShopItem[] = [
   { id: "pistol", name: "Pistolet tactique", price: 280, desc: "Courte portée, PAL restreint.", icon: "crosshair", kinds: ["chasse"], weight: 0.95, use: "tool" },
   { id: "ar15", name: "Fusil d'assaut", price: 3100, desc: "5,56 — prohibé. Marché noir.", icon: "crosshair", kinds: [], weight: 3.2, use: "tool" },
   { id: "ak74", name: "AK-74", price: 2400, desc: "5,45 × 39 — prohibée au Canada. Marché noir.", icon: "crosshair", kinds: [], weight: 3.3, use: "tool" },
+  { id: "glock-19", name: "Glock 19", price: 850, desc: "9 mm, PAL restreinte. Semi-auto.", icon: "crosshair", kinds: ["chasse"], weight: 0.85, use: "tool" },
+  { id: "revolver-357", name: "Revolver .357", price: 780, desc: "Six coups, PAL restreinte.", icon: "crosshair", kinds: ["chasse"], weight: 1.15, use: "tool" },
+  { id: "desert-eagle", name: "Desert Eagle", price: 1600, desc: "Calibre massif. Prohibé au civil.", icon: "crosshair", kinds: [], weight: 1.8, use: "tool" },
+  { id: "fusil-chasse-12", name: "Fusil calibre 12", price: 620, desc: "Double canon, PAL et permis faune.", icon: "crosshair", kinds: ["chasse"], weight: 3.3, use: "tool" },
+  { id: "carabine-30-30", name: "Carabine .30-30", price: 700, desc: "Levier sous garde, cerf du comté.", icon: "crosshair", kinds: ["chasse"], weight: 3.2, use: "tool" },
+  { id: "ar-semi-auto", name: "Carabine AR SQ", price: 3200, desc: "Semi-auto, réservée à la SQ.", icon: "crosshair", kinds: [], weight: 3.1, use: "tool" },
+  { id: "couteau-chasse", name: "Couteau de chasse", price: 45, desc: "Lame fixe, camp et dépeçage.", icon: "axe", kinds: ["chasse"], weight: 0.35, use: "tool" },
+  { id: "batte-baseball", name: "Batte de baseball", price: 25, desc: "Frêne, ligue de village.", icon: "hammer", kinds: ["quincaillerie"], weight: 0.95, use: "tool" },
+  { id: "machette", name: "Machette", price: 60, desc: "Broussailles et érablière.", icon: "axe", kinds: ["quincaillerie", "chasse"], weight: 0.7, use: "tool" },
+  { id: "hache-pompier", name: "Hache de pompier", price: 90, desc: "Tête acier, manche long.", icon: "axe", kinds: ["quincaillerie"], weight: 1.8, use: "tool" },
+  { id: "poing-americain", name: "Poing américain", price: 35, desc: "Arme prohibée. Pas de vitrine.", icon: "gem", kinds: [], weight: 0.28, use: "tool" },
+  { id: "taser", name: "Taser", price: 400, desc: "Cartouche unique. SQ seulement.", icon: "plus", kinds: [], weight: 0.4, use: "tool" },
+  { id: "matraque-sq", name: "Matraque SQ", price: 0, desc: "Dotation Sûreté du Québec.", icon: "hammer", kinds: [], weight: 0.55, use: "tool" },
+  { id: "spray-poivre", name: "Spray au poivre", price: 30, desc: "Autodéfense, derrière le comptoir.", icon: "plus", kinds: ["depanneur"], weight: 0.12, use: "tool" },
+  { id: "flashbang", name: "Grenade assourdissante", price: 0, desc: "Intervention tactique SQ.", icon: "gem", kinds: [], weight: 0.35, use: "tool" },
+  { id: "menottes", name: "Menottes", price: 0, desc: "Acier, double verrou. SQ.", icon: "key", kinds: [], weight: 0.38, use: "tool" },
   { id: "bobomb", name: "Bob-omb", price: 75, desc: "Bombe à mèche. Ne pas allumer au salon.", icon: "gem", kinds: [], weight: 0.8, use: "tool" },
   { id: "ammo_9mm", name: "Munitions 9 mm", price: 18, desc: "Boîte de 12, pistolet.", icon: "crosshair", kinds: ["chasse"], weight: 0.22 },
+  { id: "ammo_357", name: "Munitions .357", price: 28, desc: "Boîte de 6, revolver.", icon: "crosshair", kinds: ["chasse"], weight: 0.24 },
   { id: "ammo_308", name: "Munitions .308", price: 24, desc: "Boîte de 8, carabine.", icon: "crosshair", kinds: ["chasse"], weight: 0.28 },
   { id: "ammo_545", name: "Munitions 5,45", price: 36, desc: "Chargeur AK-74. Illégal.", icon: "crosshair", kinds: [], weight: 0.35 },
   { id: "ammo_12", name: "Cartouches 12 ga", price: 22, desc: "Boîte de 8, pompe.", icon: "crosshair", kinds: ["chasse"], weight: 0.4 },
   { id: "ammo_556", name: "Munitions 5,56", price: 42, desc: "Chargeur d'assaut. Illégal.", icon: "crosshair", kinds: [], weight: 0.38 },
-  { id: "weed", name: "Poche cannabis 3,5 g", price: 32, desc: "SQDC, séché, Portneuf.", icon: "pill", kinds: ["depanneur"], weight: 0.04, use: "drug" },
+  { id: "weed", name: "Poche cannabis 3,5 g", price: 32, desc: "SQDC, séché, Portneuf. 21 ans.", icon: "leaf", kinds: ["sqdc"], weight: 0.04, use: "drug", restricted: 21 },
+  { id: "fleur_indica", name: "Fleur indica 3,5 g", price: 36, desc: "Relaxant, cultivé sous permis. 21 ans.", icon: "leaf", kinds: ["sqdc"], weight: 0.04, use: "drug", restricted: 21 },
+  { id: "fleur_sativa", name: "Fleur sativa 3,5 g", price: 36, desc: "Énergie, étiquette SQDC. 21 ans.", icon: "leaf", kinds: ["sqdc"], weight: 0.04, use: "drug", restricted: 21 },
+  { id: "huile", name: "Huile 30 ml", price: 48, desc: "Comptoir SQDC, compte-gouttes. 21 ans.", icon: "droplets", kinds: ["sqdc"], weight: 0.08, use: "drug", restricted: 21 },
+  { id: "vape", name: "Cartouche vape", price: 42, desc: "510, rechargeable. 21 ans.", icon: "pill", kinds: ["sqdc"], weight: 0.05, use: "drug", restricted: 21 },
+  { id: "preroll", name: "Péroulé", price: 8.5, desc: "Un joint, format unique. 21 ans.", icon: "leaf", kinds: ["sqdc"], weight: 0.02, use: "drug", restricted: 21 },
+  { id: "gelules", name: "Gélules 10 mg", price: 28, desc: "Boîte de 10, dose marquée. 21 ans.", icon: "pill", kinds: ["sqdc"], weight: 0.06, use: "drug", restricted: 21 },
+  { id: "hash", name: "Hash 2 g", price: 22, desc: "Pressé, légal SQDC. 21 ans.", icon: "leaf", kinds: ["sqdc"], weight: 0.02, use: "drug", restricted: 21 },
   { id: "cocaine", name: "Sachet blanc", price: 180, desc: "Illégal. La SQ n'aime pas ça.", icon: "pill", kinds: ["chasse"], weight: 0.02, use: "drug" },
   { id: "identite", name: "Carte d'identité", price: 45, desc: "Photo, comté de Portneuf.", icon: "file", kinds: ["depanneur"], weight: 0.02 },
   { id: "contrat", name: "Contrat notarié", price: 120, desc: "Papier, trombone doré.", icon: "file", kinds: ["depanneur"], weight: 0.08 },
@@ -127,14 +174,20 @@ export const CATALOG: ShopItem[] = [
   { id: "graines_foin", name: "Semence de foin", price: 4, desc: "Prairie, première coupe.", icon: "leaf", kinds: ["quincaillerie"], weight: 0.16, use: "seed" },
   { id: "graines_patate", name: "Plants de patates", price: 7, desc: "Variété des rangs.", icon: "leaf", kinds: ["quincaillerie", "depanneur"], weight: 0.4, use: "seed" },
   { id: "graines_cannabis", name: "Graines de cannabis", price: 48, desc: "Culture interdite au Québec. Saisie SQ.", icon: "pill", kinds: ["chasse"], weight: 0.05, use: "seed" },
-  { id: "mais", name: "Épis de maïs", price: 8, desc: "Récolte du rang.", icon: "leaf", kinds: ["depanneur", "food"], harvest: true, weight: 0.8, use: "eat" },
+  { id: "mais", name: "Épis de maïs", price: 8, desc: "Récolte du rang.", icon: "leaf", kinds: ["depanneur", "food"], harvest: true, weight: 0.8, use: "eat", hunger: 22 },
   { id: "ble", name: "Sac de blé", price: 11, desc: "Grain, moulin du comté.", icon: "leaf", kinds: ["depanneur"], harvest: true, weight: 1.2 },
   { id: "foin", name: "Balle de foin", price: 6, desc: "Première coupe.", icon: "leaf", kinds: ["depanneur"], harvest: true, weight: 1.6 },
-  { id: "patate", name: "Patates du rang", price: 5, desc: "Sac de 5 kg.", icon: "leaf", kinds: ["depanneur", "food"], harvest: true, weight: 1.1, use: "eat" },
-  { id: "lait_rang", name: "Bidon de lait 4 L", price: 7, desc: "Holstein du Chemin du Roy, cru.", icon: "cup", kinds: ["depanneur"], harvest: true, weight: 4.1, use: "drink" },
-  { id: "oeufs", name: "Boîte d'œufs", price: 6, desc: "Poulailler du rang, la douzaine.", icon: "cookie", kinds: ["depanneur", "food"], harvest: true, weight: 0.7, use: "eat" },
+  { id: "patate", name: "Patates du rang", price: 5, desc: "Sac de 5 kg.", icon: "leaf", kinds: ["depanneur", "food"], harvest: true, weight: 1.1, use: "eat", hunger: 18 },
+  { id: "lait_rang", name: "Bidon de lait 4 L", price: 7, desc: "Holstein du Chemin du Roy, cru.", icon: "cup", kinds: ["depanneur"], harvest: true, weight: 4.1, use: "drink", thirst: 30 },
+  { id: "oeufs", name: "Boîte d'œufs", price: 6, desc: "Poulailler du rang, la douzaine.", icon: "cookie", kinds: ["depanneur", "food"], harvest: true, weight: 0.7, use: "eat", hunger: 16 },
   { id: "corde_bois", name: "Corde de bois", price: 45, desc: "Érable et tremble, séchée. Poêle et foyer.", icon: "leaf", kinds: ["quincaillerie", "chasse"], weight: 8.4, use: "fuel" },
   { id: "eau_erable", name: "Seau d'eau d'érable", price: 3, desc: "Coulée, 20 L. Quatre seaux pour un sirop.", icon: "droplets", kinds: [], harvest: true, weight: 2.2 },
+  { id: "lingot", name: "Lingot d'or", price: 420, desc: "Trouvé au bord du Chemin du Roy.", icon: "gem", kinds: [], harvest: true, weight: 0.9 },
+  { id: "cristal_ether", name: "Cristal d'éther", price: 260, desc: "Pierre bleue, chaud au toucher.", icon: "gem", kinds: [], harvest: true, weight: 0.35 },
+  { id: "fiole_ether", name: "Fiole magique", price: 180, desc: "Liquide violet, sent le pin.", icon: "pill", kinds: [], harvest: true, weight: 0.22 },
+  { id: "pepite", name: "Pépite rare", price: 310, desc: "Or des Laurentides.", icon: "gem", kinds: [], harvest: true, weight: 0.4 },
+  { id: "medaille_sq", name: "Médaille SQ", price: 90, desc: "Insigne oublié près du poste.", icon: "key", kinds: [], harvest: true, weight: 0.08 },
+  { id: "cle_rouillee", name: "Clé rouillée", price: 40, desc: "Coffre ou cabanon, qui sait.", icon: "key", kinds: [], harvest: true, weight: 0.06 },
 ];
 
 export const BAG_MAX_KG = 22;
@@ -195,6 +248,36 @@ export const LANDMARK_SHOPS: ShopSpot[] = [
     yaw: Math.PI,
     hours: "7 h – 18 h",
   },
+  {
+    id: "shop_sqdc_portneuf",
+    name: "SQDC Portneuf",
+    villageId: "portneuf",
+    kind: "sqdc",
+    x: A40_EXITS[3]!.x + 108,
+    z: 32,
+    yaw: Math.PI,
+    hours: "10 h – 21 h",
+  },
+  {
+    id: "shop_sqdc_donnacona",
+    name: "SQDC Donnacona",
+    villageId: "donnacona",
+    kind: "sqdc",
+    x: A40_EXITS[5]!.x - 24,
+    z: 42,
+    yaw: Math.PI,
+    hours: "10 h – 21 h",
+  },
+  {
+    id: "shop_sqdc_raymond",
+    name: "SQDC Saint-Raymond",
+    villageId: "saint_raymond",
+    kind: "sqdc",
+    x: 940,
+    z: -548,
+    yaw: 0.55,
+    hours: "10 h – 21 h",
+  },
 ];
 
 export function catalogFor(kind: ShopKind): ShopItem[] {
@@ -206,17 +289,10 @@ export function sellPrice(item: ShopItem): number {
 }
 
 export function bagGroup(item: ShopItem): Exclude<BagGroup, "all"> {
-  if (
-    item.harvest ||
-    item.id === "pistol" ||
-    item.id === "carabine" ||
-    item.id === "ak74" ||
-    item.id === "ar15" ||
-    item.id === "shotgun" ||
-    item.id.startsWith("ammo_")
-  ) {
-    return "hunt";
-  }
+  if (item.harvest || item.id.startsWith("ammo_")) return "hunt";
+  const weapon = getWeapon(item.id);
+  if (weapon && (weapon.category === "poing" || weapon.category === "fusil_chasse")) return "hunt";
+  if (weapon) return "gear";
   if (item.use === "drug" || item.icon === "gem" || item.icon === "file") return "loot";
   if (item.use === "eat" || item.use === "drink") return "food";
   if (item.use === "tool" || item.use === "fuel") return "gear";
@@ -226,20 +302,14 @@ export function bagGroup(item: ShopItem): Exclude<BagGroup, "all"> {
 }
 
 export function ammoFor(id: string | null | undefined): string | null {
-  if (id === "pistol") return "ammo_9mm";
-  if (id === "carabine") return "ammo_308";
-  if (id === "ak74") return "ammo_545";
-  if (id === "shotgun") return "ammo_12";
-  if (id === "ar15") return "ammo_556";
-  return null;
+  if (!id) return null;
+  const ammo = weaponAmmo(id);
+  return ammo ?? null;
 }
 
 export function harvestRange(id: string | null | undefined): number {
-  if (id === "ak74" || id === "ar15") return 12;
-  if (id === "carabine") return 8.5;
-  if (id === "shotgun") return 7.2;
-  if (id === "pistol") return 6.2;
-  return 4.2;
+  if (!id) return 0;
+  return weaponHarvestRange(id);
 }
 
 export function bagValue(inv: Record<string, number>): number {

@@ -17,15 +17,11 @@ export const DEAD_LIE = [
 
 export type DeadPoseId = (typeof DEAD_SIT)[number] | (typeof DEAD_LIE)[number];
 
-const SKIN = new THREE.MeshStandardMaterial({
+const SKIN = new THREE.MeshLambertMaterial({
   color: 0xb89a7a,
-  roughness: 0.88,
-  metalness: 0.02,
 });
-const CLOTH = new THREE.MeshStandardMaterial({
+const CLOTH = new THREE.MeshLambertMaterial({
   color: 0x3a3e46,
-  roughness: 0.9,
-  metalness: 0.04,
 });
 
 const cache = new Map<string, THREE.Group>();

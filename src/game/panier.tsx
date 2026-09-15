@@ -6,9 +6,12 @@ import { useGameStore } from "./store";
 export function CartOverlay() {
   const cart = useGameStore((s) => s.cart);
   const cash = useGameStore((s) => s.cash);
+  const inventory = useGameStore((s) => s.inventory);
   const notice = useGameStore((s) => s.notice);
   const { lines, count, subtotal, tax, total } = cartTotals(cart);
-  const canPay = count > 0 && cash >= total;
+  const gated = lines.find((l) => l.item.restricted);
+  const hasId = (inventory.identite ?? 0) > 0;
+  const canPay = count > 0 && cash >= total && (!gated || hasId);
 
   return (
     <div className="absolute inset-0 z-40 flex items-end justify-center bg-bg/70 px-3 py-4 backdrop-blur-sm sm:items-center">
@@ -82,6 +85,13 @@ export function CartOverlay() {
             <span className="hud-num text-lg">{formatCad(total)}</span>
           </div>
           <p className="text-[11px] text-subtle">Caisse {formatCad(cash)}</p>
+          {gated && (
+            <p className={`text-[11px] ${hasId ? "text-ok" : "text-danger"}`}>
+              {hasId
+                ? `Identité vérifiée · ${gated.item.restricted} ans`
+                : `${gated.item.restricted} ans · pièce d'identité requise`}
+            </p>
+          )}
         </div>
         <div className="mt-4 grid grid-cols-2 gap-2">
           <button

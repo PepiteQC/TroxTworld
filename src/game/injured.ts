@@ -39,18 +39,14 @@ export const INJURED_CLIPS = [
 
 export type InjuredClip = (typeof INJURED_CLIPS)[number];
 
-const SKIN = new THREE.MeshStandardMaterial({
+const SKIN = new THREE.MeshLambertMaterial({
   color: 0xe6ddd2,
-  roughness: 0.7,
-  metalness: 0.04,
   emissive: 0x2a2620,
   emissiveIntensity: 0.22,
   side: THREE.DoubleSide,
 });
-const JOINT = new THREE.MeshStandardMaterial({
+const JOINT = new THREE.MeshLambertMaterial({
   color: 0xa8a198,
-  roughness: 0.62,
-  metalness: 0.08,
   emissive: 0x1c1a16,
   emissiveIntensity: 0.16,
   side: THREE.DoubleSide,

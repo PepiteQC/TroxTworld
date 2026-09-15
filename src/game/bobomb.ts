@@ -8,9 +8,9 @@ const size = new THREE.Vector3();
 let proto: THREE.Group | null = null;
 let inflight: Promise<THREE.Group> | null = null;
 
-const body = new THREE.MeshStandardMaterial({ color: 0x141418, roughness: 0.45, metalness: 0.35 });
-const fuse = new THREE.MeshStandardMaterial({ color: 0xc45a18, roughness: 0.55, metalness: 0.1, emissive: 0xff6a18, emissiveIntensity: 0.35 });
-const eye = new THREE.MeshStandardMaterial({ color: 0xf2f2ea, roughness: 0.4, metalness: 0 });
+const body = new THREE.MeshLambertMaterial({ color: 0x141418 });
+const fuse = new THREE.MeshLambertMaterial({ color: 0xc45a18, emissive: 0xff6a18, emissiveIntensity: 0.35 });
+const eye = new THREE.MeshLambertMaterial({ color: 0xf2f2ea });
 
 function dummyBomb() {
   const g = new THREE.Group();

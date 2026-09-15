@@ -1,102 +1,87 @@
-import { useState, type ReactNode } from "react";
+/**
+ * ═══════════════════════════════════════════════════════════════════
+ * CELLULAIRE INTELLIGENT DE PORTNEUF — ÉCOSYSTÈME INTERACTIF RP
+ * ═══════════════════════════════════════════════════════════════════
+ */
+
+import React, { useState, useEffect, type ReactNode } from "react";
 import {
-  ArrowLeft,
-  Briefcase,
-  Banknote,
-  Car,
-  CloudSun,
-  Contact,
-  CreditCard,
-  Landmark,
-  Lock,
-  MapPin,
-  Moon,
-  NotebookPen,
-  Phone,
-  Radio,
-  Shield,
-  ShoppingBag,
-  Smartphone,
-  Store,
-  Sun,
-  Truck,
-  User,
-  Wallet,
-  X,
-  Zap,
+  Activity, ArrowLeft, Briefcase, Banknote, Car, CloudSun, Contact,
+  CreditCard, Landmark, Lock, MapPin, Moon, NotebookPen, Phone, Radio,
+  Shield, ShoppingBag, Smartphone, Store, Sun, Truck, User, Users,
+  Wallet, X, Zap, BadgeCheck, AlertTriangle, Send, Droplet, ShieldAlert,
+  Flame, UserX, Plus, Coins
 } from "lucide-react";
+
 import { formatCad } from "./commerce";
-import { GANGS, RP_JOBS, jobById, gangById } from "./rp";
-import { INDUSTRY_LABEL, LANDMARK_LABEL, VILLAGES, getWorldStats } from "./worlddata";
-import { hotelSecurity } from "./hotel";
-import { CSR_CITATIONS, police } from "./police";
-import { QUEBEC_FM_STATIONS, quebecFM } from "./radio";
 import { persist, useGameStore } from "./store";
+import { QUEBEC_FM_STATIONS, quebecFM } from "./radio";
 import { heatById, monthlyBill, outageLabel, waterById } from "./utilities";
 import { emptyHouse } from "./house";
 import { depHoursLabel, depMapMarks } from "./depanneur";
+import { netEmit } from "./net";
 
-type PhoneApp = "home" | "weather" | "contacts" | "bank" | "notes" | "radio" | "sq" | "identity" | "bag" | "garage" | "jobs" | "firm" | "emploi" | "gangs" | "comte" | "maison" | "hydro" | "depanneur";
+// ── CORRECTIONS DES IMPORTS DU PROJET ──
+import { getPlayerCaisseRole, getCaissePermissions } from "./caisse";
+import { SQ_LEGAL_BAC, payTicket } from "./police";
+import { getPlayerAccounts, sendInterac, buyInvestment } from "./banking";
+import { fileTalDispute, payHydroBill, ensureHydro, KIND_LABEL, catalog, ownedIds, type QuebecLease } from "./realestate";
+import { applyForUnemploymentBenefits, reportWorkplaceInjury } from "./jobs";
 
-const APPS: { id: PhoneApp; label: string; hint: string; icon: typeof Phone }[] = [
-  { id: "weather", label: "Météo", hint: "Portneuf", icon: CloudSun },
-  { id: "comte", label: "Comté", hint: "Villages", icon: MapPin },
-  { id: "contacts", label: "Contacts", hint: "911 · SQ", icon: Contact },
-  { id: "bank", label: "Desjardins", hint: "Compte", icon: Wallet },
-  { id: "notes", label: "Notes", hint: "Bloc-notes", icon: NotebookPen },
-  { id: "radio", label: "Radio", hint: "Québec-FM", icon: Radio },
-  { id: "sq", label: "Sûreté", hint: "Radars", icon: Shield },
-  { id: "identity", label: "Identité", hint: "Personnage", icon: User },
-  { id: "bag", label: "Sac", hint: "Inventaire", icon: ShoppingBag },
-  { id: "garage", label: "Garage", hint: "Gosselin", icon: Car },
-  { id: "hydro", label: "Hydro", hint: "Facture", icon: Zap },
-  { id: "maison", label: "Maison", hint: "Acte", icon: Landmark },
-  { id: "depanneur", label: "Dépanneur", hint: "Comptoir", icon: Store },
-  { id: "jobs", label: "Transport", hint: "Contrats", icon: Truck },
-  { id: "firm", label: "REQ", hint: "Entreprise", icon: Briefcase },
-  { id: "emploi", label: "Emploi", hint: "Métier", icon: Briefcase },
-  { id: "gangs", label: "Gangs", hint: "Rangs", icon: Shield },
+type PhoneApp = 
+  | "home" | "weather" | "contacts" | "bank" | "notes" | "radio" | "sq" | "identity" 
+  | "bag" | "garage" | "jobs" | "firm" | "emploi" | "gangs" | "comte" | "maison" 
+  | "hydro" | "depanneur" | "citoyens" | "intel" | "staff" | "interac";
+
+const APPS: { id: PhoneApp; label: string; hint: string; icon: any; colorClass: string }[] = [
+  { id: "bank", label: "AccèsD", hint: "Desjardins", icon: Wallet, colorClass: "bg-emerald-600 text-white" },
+  { id: "hydro", label: "Hydro-QC", hint: "Compte & Panne", icon: Zap, colorClass: "bg-orange-500 text-white" },
+  { id: "sq", label: "SAAQclic", hint: "SQ & Permis", icon: Shield, colorClass: "bg-blue-600 text-white" },
+  { id: "maison", label: "Centris", hint: "Baux & TAL", icon: Landmark, colorClass: "bg-cyan-600 text-white" },
+  { id: "emploi", label: "CNESST", hint: "Chômage & Paie", icon: Briefcase, colorClass: "bg-amber-600 text-white" },
+  { id: "weather", label: "Météo", hint: "Environnement", icon: CloudSun, colorClass: "bg-sky-500 text-white" },
+  { id: "comte", label: "Comté", hint: "Territoire", icon: MapPin, colorClass: "bg-slate-600 text-white" },
+  { id: "citoyens", label: "Citoyens", hint: "Réseau LTE", icon: Users, colorClass: "bg-indigo-600 text-white" },
+  { id: "contacts", label: "Urgence", hint: "911 · 811", icon: Contact, colorClass: "bg-rose-600 text-white" },
+  { id: "radio", label: "Radio FM", hint: "Stations QC", icon: Radio, colorClass: "bg-purple-600 text-white" },
+  { id: "depanneur", label: "Couche-Tard", hint: "Dépanneur", icon: Store, colorClass: "bg-red-500 text-white" },
+  { id: "jobs", label: "Teamsters", hint: "Fret & Haul", icon: Truck, colorClass: "bg-amber-700 text-white" },
 ];
 
 const CONTACTS = [
-  { name: "Hydro-Québec", phone: "1 800 790-2424", note: "Info-panne · tarif D" },
-  { name: "Ville — aqueduc", phone: "311", note: "Eau, égouts, gel de tuyaux" },
-  { name: "Urgences", phone: "911", note: "Police · incendie · ambulance" },
-  { name: "Sûreté du Québec", phone: "310-4141", note: "Patrouille Portneuf" },
-  { name: "Info-Santé", phone: "811", note: "Infirmière, 24 h" },
-  { name: "Mairie de Portneuf", phone: "418-286-3341", note: "Hôtel de ville" },
-  { name: "Hôtel Pont-Rouge", phone: "418-873-4400", note: "Réception · NIP 1234" },
-  { name: "Dépanneur du village", phone: "418-268-1188", note: "Ouvert tard" },
+  { name: "Urgences Rive-Nord", phone: "911", note: "Police · Ambulances · Incendie", color: "text-red-500" },
+  { name: "Sûreté du Québec (SQ)", phone: "310-4141", note: "Poste de Portneuf", color: "text-blue-500" },
+  { name: "Hydro-Québec (Pannes)", phone: "1 800 790-2424", note: "Coupures & compte", color: "text-orange-400" },
+  { name: "Info-Santé / Social", phone: "811", note: "Infirmière de garde 24/7", color: "text-emerald-500" },
+  { name: "Tribunal du Logement (TAL)", phone: "1 800 683-2245", note: "Baux et avis d'éviction", color: "text-cyan-500" },
+  { name: "SAAQ (Immatriculation)", phone: "1 800 361-7620", note: "Points d'inaptitude SAAQ", color: "text-blue-400" },
+  { name: "Caisse Desjardins", phone: "418-555-0155", note: "Assistance AccèsD", color: "text-emerald-600" },
+  { name: "Dépanneur Couche-Tard", phone: "418-268-1188", note: "Bières, loterie et café", color: "text-red-400" },
 ];
 
-function Shell({
-  children,
-  onClose,
-}: {
-  children: ReactNode;
-  onClose: () => void;
-}) {
+function Shell({ children, onClose }: { children: ReactNode; onClose: () => void }) {
   return (
-    <div className="absolute inset-0 z-40 flex items-end justify-center bg-bg/70 px-3 py-4 backdrop-blur-sm sm:items-center">
-      <div className="relative flex h-[min(640px,88dvh)] w-full max-w-[22rem] flex-col overflow-hidden rounded-xl border border-border-strong bg-surface shadow-hud">
-        <div className="flex items-center justify-between px-4 pt-3 pb-2">
-          <span className="text-[10px] tracking-[0.2em] text-subtle uppercase">Portneuf</span>
+    <div className="absolute inset-0 z-40 flex items-end justify-center bg-black/60 px-3 py-4 backdrop-blur-md sm:items-center">
+      <div className="relative flex h-[min(680px,90dvh)] w-full max-w-[23rem] flex-col overflow-hidden rounded-[2.5rem] border-4 border-slate-700 bg-slate-950 shadow-2xl">
+        <div className="absolute top-2 left-1/2 z-50 h-6 w-32 -translate-x-1/2 rounded-full bg-black flex items-center justify-center">
+          <div className="h-1.5 w-1.5 rounded-full bg-slate-800 ml-auto mr-4" />
+        </div>
+        <div className="flex items-center justify-between px-6 pt-5 pb-2 text-slate-400">
+          <span className="text-xs font-semibold tracking-wide">Vidéotron LTE</span>
           <button
             type="button"
-            className="flex size-10 items-center justify-center rounded-md text-muted hover:text-fg"
+            className="flex size-8 items-center justify-center rounded-full bg-slate-900 text-slate-400 hover:text-white"
             onClick={onClose}
-            aria-label="Fermer le téléphone"
           >
             <X className="size-4" />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-3">{children}</div>
-        <div className="flex justify-center border-t border-border py-3">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4">{children}</div>
+        <div className="flex justify-center bg-slate-950 py-3">
           <button
             type="button"
-            className="h-1.5 w-24 rounded-full bg-fg/30"
+            className="h-1.5 w-28 rounded-full bg-white/40 hover:bg-white/80 transition-colors"
             onClick={onClose}
-            aria-label="Accueil"
           />
         </div>
       </div>
@@ -106,30 +91,27 @@ function Shell({
 
 export function PhoneOverlay() {
   const [app, setApp] = useState<PhoneApp>("home");
+  const close = () => useGameStore.getState().closePhone();
+
+  const [interacTarget, setInteracTarget] = useState("");
+  const [interacAmount, setInteracAmount] = useState(0);
+  const [interacQ, setInteracQ] = useState("");
+  const [interacA, setInteracA] = useState("");
+
+  const localPlayerId = "local_player";
+  const accounts = getPlayerAccounts(localPlayerId);
   const cash = useGameStore((s) => s.cash);
-  const fines = useGameStore((s) => s.fines);
-  const night = useGameStore((s) => s.night);
+  const demeritPoints = useGameStore((s) => s.demeritPoints) ?? 0;
+  const licenseSuspendedUntil = useGameStore((s) => s.licenseSuspendedUntil) ?? 0;
+  const bloodAlcohol = useGameStore((s) => s.bloodAlcohol) ?? 0;
   const timeHours = useGameStore((s) => s.timeHours);
   const zone = useGameStore((s) => s.zone);
-  const ledger = useGameStore((s) => s.ledger);
-  const notes = useGameStore((s) => s.notes);
-  const radioId = useGameStore((s) => s.radioId);
-  const tickets = useGameStore((s) => s.tickets);
-  const radioOn = useGameStore((s) => s.radioOn);
-  const wantedStars = useGameStore((s) => s.wantedStars);
-  const wantedReason = useGameStore((s) => s.wantedReason);
-  const bounty = useGameStore((s) => s.bounty);
-  const evading = useGameStore((s) => s.evading);
-  const surv = useGameStore((s) => s.surv);
-  const bank = useGameStore((s) => s.bank);
-  const rpJob = useGameStore((s) => s.rpJob);
-  const gangId = useGameStore((s) => s.gangId);
-  const houses = useGameStore((s) => s.houses);
+  const realty = useGameStore((s) => s.realty);
   const ownedProps = useGameStore((s) => s.ownedProps);
-  const gridOutage = useGameStore((s) => s.gridOutage);
-  const close = () => {
-    useGameStore.getState().closePhone();
-  };
+  const radioId = useGameStore((s) => s.radioId);
+  const radioOn = useGameStore((s) => s.radioOn);
+  const tickets = useGameStore((s) => s.tickets) ?? [];
+  const notes = useGameStore((s) => s.notes) ?? "";
 
   const hh = Math.floor(timeHours);
   const mm = Math.floor((timeHours % 1) * 60);
@@ -139,26 +121,30 @@ export function PhoneOverlay() {
       {app !== "home" && (
         <button
           type="button"
-          className="mb-3 flex items-center gap-1.5 text-xs text-muted"
+          className="mb-4 flex items-center gap-1.5 text-sm font-medium text-slate-400 hover:text-white"
           onClick={() => setApp("home")}
         >
-          <ArrowLeft className="size-3.5" />
-          Accueil
+          <ArrowLeft className="size-4" />
+          Retour à l'écran
         </button>
       )}
 
       {app === "home" && (
-        <>
-          <div className="mb-4">
-            <p className="font-display text-3xl italic leading-none">
+        <div className="animate-fade-in">
+          <div className="mb-6 mt-2 text-center">
+            <p className="font-display text-5xl font-extralight text-white leading-none tracking-tight">
               {String(hh).padStart(2, "0")}:{String(mm).padStart(2, "0")}
             </p>
-            <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
+            <p className="mt-2 text-xs text-slate-400 font-medium tracking-wide">
+              {new Date().toLocaleDateString("fr-CA", { weekday: 'long', month: 'long', day: 'numeric' })}
+            </p>
+            <p className="mt-1 flex items-center justify-center gap-1 text-[11px] text-emerald-400 font-semibold bg-emerald-500/10 py-1 px-3 rounded-full w-max mx-auto border border-emerald-500/20">
               <MapPin className="size-3" />
               {zone}
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-2">
+
+          <div className="grid grid-cols-4 gap-x-2 gap-y-4 pt-4">
             {APPS.map((a) => {
               const Icon = a.icon;
               return (
@@ -166,166 +152,392 @@ export function PhoneOverlay() {
                   key={a.id}
                   type="button"
                   onClick={() => {
-                    if (a.id === "identity") {
-                      useGameStore.getState().openCreator();
-                      return;
-                    }
-                    if (a.id === "bag") {
-                      useGameStore.getState().openInventory();
-                      return;
-                    }
-                    if (a.id === "garage") {
-                      useGameStore.getState().openGarage();
-                      return;
-                    }
-                    if (a.id === "jobs") {
-                      useGameStore.getState().openJobs();
-                      return;
-                    }
-                    if (a.id === "firm") {
-                      useGameStore.getState().openFirm();
-                      return;
-                    }
-                    if (a.id === "maison") {
-                      const s = useGameStore.getState();
-                      s.openDeed(s.ownedProps[0] ?? "H-PNF");
-                      return;
-                    }
+                    if (a.id === "identity") { useGameStore.getState().openCreator(); return; }
+                    if (a.id === "bag") { useGameStore.getState().openInventory(); return; }
+                    if (a.id === "jobs") { useGameStore.getState().openJobs(); return; }
                     setApp(a.id);
                   }}
-                  className="flex flex-col items-start gap-2 rounded-lg border border-border bg-surface-2 px-3 py-3 text-left"
+                  className="flex flex-col items-center gap-1 text-center"
                 >
-                  <Icon className="size-4 text-accent" />
-                  <span className="text-xs text-fg">{a.label}</span>
-                  <span className="text-[10px] text-subtle">{a.hint}</span>
+                  <div className={`flex size-14 items-center justify-center rounded-2xl shadow-md transition-all active:scale-95 ${a.colorClass}`}>
+                    <Icon className="size-6" />
+                  </div>
+                  <span className="text-[11px] font-medium text-slate-200 mt-1 max-w-[70px] truncate leading-none">
+                    {a.label}
+                  </span>
                 </button>
               );
             })}
           </div>
-          <p className="mt-4 flex items-center gap-1.5 text-[10px] text-subtle">
-            <Smartphone className="size-3" />
-            P ou Échap pour ranger
-          </p>
-        </>
+        </div>
       )}
 
-      {app === "weather" && (
-        <div>
-          <p className="text-[10px] tracking-[0.2em] text-subtle uppercase">Météo Québec</p>
-          <h3 className="font-display text-2xl italic">Portneuf</h3>
-          <p className="mt-4 font-display text-5xl italic tabular-nums">{Math.round(surv.felt)}°</p>
-          <p className="mt-2 flex items-center gap-2 text-sm text-muted">
-            {night ? <Moon className="size-4" /> : <Sun className="size-4" />}
-            {night ? "Nuit · ressenti" : "Jour · ressenti"} {Math.round(surv.felt)}° · air {Math.round(surv.ambient)}°
-          </p>
-          <p className="mt-3 text-xs text-subtle">
-            Corps {surv.bodyTemp.toFixed(1)} °C · faim {Math.round(surv.hunger)} · soif {Math.round(surv.thirst)}
-          </p>
-          {surv.advice ? <p className="mt-2 text-sm text-fg">{surv.advice}</p> : null}
+      {app === "bank" && (
+        <div className="space-y-4 animate-fade-in text-white">
+          <div className="flex items-center gap-2 border-b border-emerald-600/30 pb-3">
+            <div className="size-9 rounded-lg bg-emerald-600 flex items-center justify-center">
+              <Wallet className="size-5 text-white" />
+            </div>
+            <div>
+              <h3 className="font-display text-xl font-bold text-emerald-400">Desjardins</h3>
+              <p className="text-[10px] text-slate-400 tracking-wider">MOUVEMENT COOPÉRATIF</p>
+            </div>
+          </div>
+
+          <div className="space-y-2.5">
+            {accounts && accounts.length > 0 ? (
+              accounts.map((acc: any) => (
+                <div key={acc.accountId} className="rounded-xl bg-gradient-to-br from-emerald-950/40 to-slate-900 border border-emerald-500/20 p-4 shadow-sm">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-400/80">{acc.accountType === "cheque" ? "Compte Chèque" : "Épargne Stable"}</span>
+                  <p className="font-mono text-xs text-slate-400 mt-0.5">{acc.accountNumber}</p>
+                  <p className="font-display text-2xl font-bold mt-1 text-white">{formatCad(acc.balance)}</p>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-xl bg-gradient-to-br from-emerald-950/40 to-slate-900 border border-emerald-500/20 p-4 shadow-sm">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-400/80">Solde Courant</span>
+                <p className="font-display text-2xl font-bold mt-1 text-white">{formatCad(cash)}</p>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              className="flex items-center justify-center gap-2 h-11 rounded-xl bg-emerald-700 text-sm font-semibold hover:bg-emerald-600 transition-colors"
+              onClick={() => setApp("interac")}
+            >
+              <Send className="size-4" />
+              Virement Interac
+            </button>
+            <button
+              type="button"
+              className="flex items-center justify-center gap-2 h-11 rounded-xl bg-slate-800 text-sm font-semibold hover:bg-slate-700 transition-colors"
+              onClick={() => {
+                if (accounts[0]) {
+                  buyInvestment(localPlayerId, accounts[0].accountId, "stock", "ATD", 1000);
+                }
+              }}
+            >
+              <Landmark className="size-4" />
+              Cotiser REER
+            </button>
+          </div>
+        </div>
+      )}
+
+      {app === "interac" && (
+        <div className="space-y-4 text-white">
+          <h3 className="font-display text-xl font-bold text-emerald-400">Nouveau virement</h3>
+          <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Destinataire (ID Joueur)</label>
+              <input
+                type="text"
+                placeholder="Ex: player_815"
+                value={interacTarget}
+                onChange={(e: any) => setInteracTarget(e.target.value)}
+                className="h-10 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Montant (CAD)</label>
+              <input
+                type="number"
+                placeholder="250$"
+                value={interacAmount || ""}
+                onChange={(e: any) => setInteracAmount(Number(e.target.value))}
+                className="h-10 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Question de sécurité</label>
+              <input
+                type="text"
+                placeholder="Votre province ?"
+                value={interacQ}
+                onChange={(e: any) => setInteracQ(e.target.value)}
+                className="h-10 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Réponse attendue</label>
+              <input
+                type="text"
+                placeholder="quebec"
+                value={interacA}
+                onChange={(e: any) => setInteracA(e.target.value)}
+                className="h-10 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+          </div>
+          <button
+            type="button"
+            className="w-full h-11 rounded-xl bg-emerald-600 font-bold hover:bg-emerald-500 transition-colors"
+            onClick={() => {
+              if (accounts[0]) {
+                sendInterac(accounts[0].accountId, interacTarget, interacAmount, interacQ, interacA);
+                setApp("bank");
+              }
+            }}
+          >
+            🚀 Envoyer par courriel/SMS
+          </button>
         </div>
       )}
 
       {app === "hydro" && (
-        <div>
-          <p className="text-[10px] tracking-[0.2em] text-subtle uppercase">Hydro-Québec</p>
-          <h3 className="font-display text-2xl italic">Tarif D</h3>
-          {gridOutage ? (
-            <p className="mt-3 text-sm text-danger">{outageLabel(gridOutage.kind)}</p>
-          ) : (
-            <p className="mt-3 text-sm text-ok">Réseau Portneuf · en service</p>
-          )}
+        <div className="space-y-4 animate-fade-in text-white">
+          <div className="flex items-center gap-2 border-b border-orange-500/30 pb-3">
+            <div className="size-9 rounded-lg bg-orange-500 flex items-center justify-center">
+              <Zap className="size-5 text-white" />
+            </div>
+            <div>
+              <h3 className="font-display text-xl font-bold text-orange-400">Hydro-Québec</h3>
+              <p className="text-[10px] text-slate-400 tracking-wider">COMPTE CLIENT</p>
+            </div>
+          </div>
+
           {ownedProps.length === 0 ? (
-            <p className="mt-4 text-sm text-muted">Aucune maison au compte. Achetez un acte.</p>
+            <p className="text-sm text-slate-400 italic">Aucune adresse enregistrée sous votre nom d'abonné.</p>
           ) : (
-            <ul className="mt-4 space-y-2">
-              {ownedProps.map((id) => {
-                const st = houses[id] ?? emptyHouse(id);
-                const bill = monthlyBill(st, 1);
+            <div className="space-y-3">
+              {ownedProps.map((id: string) => {
+                const hState = ensureHydro(realty, id, localPlayerId);
                 return (
-                  <li key={id} className="rounded-lg border border-border bg-surface-2 px-3 py-2.5">
-                    <p className="text-sm text-fg">{heatById(st.heat).label}</p>
-                    <p className="text-[11px] text-muted">
-                      {Math.round(st.indoorC)} °C · {waterById(st.water).label}
-                      {st.heatOn ? "" : " · chauffage coupé"}
-                    </p>
-                    <p className="hud-num mt-1 text-xs text-fg">
-                      {formatCad(bill.hydro)} Hydro · {formatCad(bill.water)} eau
-                    </p>
-                  </li>
+                  <div key={id} className="rounded-xl border border-slate-800 bg-slate-900/40 p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-xs font-bold text-slate-200">Facture Résidentielle Tarif D</p>
+                        <p className="font-mono text-[10px] text-slate-400">Compteur {hState.accountNumber}</p>
+                      </div>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${hState.isPowerCut ? "bg-red-500/20 text-red-300" : "bg-emerald-500/20 text-emerald-300"}`}>
+                        {hState.isPowerCut ? "COUPÉ" : "ACTIF"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-baseline justify-between border-t border-slate-800/60 pt-2.5">
+                      <span className="text-xs text-slate-400">Solde dû :</span>
+                      <span className="font-mono text-xl font-bold text-orange-400">{formatCad(hState.balanceDue)}</span>
+                    </div>
+
+                    {hState.balanceDue > 0 && (
+                      <button
+                        type="button"
+                        className="w-full h-10 rounded-lg bg-orange-500 font-bold hover:bg-orange-400 transition-colors text-xs text-black"
+                        onClick={() => {
+                          payHydroBill(realty, id, localPlayerId);
+                          setApp("home");
+                        }}
+                      >
+                        ⚡ Payer par prélèvement
+                      </button>
+                    )}
+                  </div>
                 );
               })}
-            </ul>
+            </div>
           )}
-          <p className="mt-4 text-[11px] text-subtle">Info-panne 1 800 790-2424 · LogisVert sur thermopompe</p>
+        </div>
+      )}
+
+      {app === "sq" && (
+        <div className="space-y-4 animate-fade-in text-white">
+          <div className="flex items-center gap-2 border-b border-blue-500/30 pb-3">
+            <div className="size-9 rounded-lg bg-blue-600 flex items-center justify-center">
+              <Shield className="size-5 text-white" />
+            </div>
+            <div>
+              <h3 className="font-display text-xl font-bold text-blue-400">SAAQclic</h3>
+              <p className="text-[10px] text-slate-400 tracking-wider">SÛRETÉ & DOSSIER CONDUCTEUR</p>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4 space-y-3">
+            <p className="text-xs font-bold text-slate-200">Statut du Permis de Conduire</p>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="rounded-lg bg-slate-950 p-2 border border-slate-800">
+                <span className="block text-[10px] text-slate-400">Points SAAQ :</span>
+                <span className="font-mono text-base font-bold text-orange-400">{demeritPoints} / 15</span>
+              </div>
+              <div className="rounded-lg bg-slate-950 p-2 border border-slate-800">
+                <span className="block text-[10px] text-slate-400">Alcoolémie :</span>
+                <span className={`font-mono text-base font-bold ${bloodAlcohol >= SQ_LEGAL_BAC ? "text-red-400" : "text-emerald-400"}`}>{Math.round(bloodAlcohol)} mg</span>
+              </div>
+            </div>
+
+            {licenseSuspendedUntil > Date.now() ? (
+              <div className="flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/20 p-2 text-red-300 text-xs">
+                <AlertTriangle className="size-4 shrink-0 text-red-400" />
+                <span>Suspension SAAQ active : {Math.max(1, Math.ceil((licenseSuspendedUntil - Date.now()) / 86400000))} jours restants.</span>
+              </div>
+            ) : (
+              <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-300 block w-max">PERMIS VALIDE</span>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Avis d'infraction actifs</p>
+            {tickets.length === 0 ? (
+              <p className="text-xs text-slate-400 italic">Aucun constat d'infraction non payé enregistré.</p>
+            ) : (
+              <div className="space-y-2">
+                {tickets.map((t: any) => (
+                  <div key={t.ticketNumber} className="rounded-xl border border-slate-800 bg-slate-900/40 p-3 space-y-2 text-xs">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-bold text-slate-200">{t.csrArticle}</p>
+                        <p className="text-slate-400 text-[10px]">{t.description}</p>
+                      </div>
+                      <span className="font-mono font-bold text-orange-400">{formatCad(t.fine)}</span>
+                    </div>
+                    {!t.paid && (
+                      <button
+                        type="button"
+                        className="w-full h-8 rounded-lg bg-blue-600 font-bold hover:bg-blue-500 transition-colors text-[11px]"
+                        onClick={() => {
+                          payTicket(t.ticketNumber, localPlayerId);
+                          setApp("home");
+                        }}
+                      >
+                        💳 Payer l'amende
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {app === "maison" && (
+        <div className="space-y-4 animate-fade-in text-white">
+          <div className="flex items-center gap-2 border-b border-cyan-500/30 pb-3">
+            <div className="size-9 rounded-lg bg-cyan-600 flex items-center justify-center">
+              <Landmark className="size-5 text-white" />
+            </div>
+            <div>
+              <h3 className="font-display text-xl font-bold text-cyan-400">Centris</h3>
+              <p className="text-[10px] text-slate-400 tracking-wider">RECHERCHE & T.A.L. BAILS</p>
+            </div>
+          </div>
+
+          <div className="space-y-2.5">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Mes baux actifs (TAL)</p>
+            {Object.keys(realty.rentals || {}).length === 0 ? (
+              <p className="text-xs text-slate-400 italic">Aucun bail enregistré au Tribunal administratif du logement.</p>
+            ) : (
+              <div className="space-y-2">
+                {Object.entries(realty.rentals).map(([propId, lease]: [string, any]) => (
+                  <div key={lease.leaseId} className="rounded-xl border border-slate-800 bg-slate-900/40 p-4 space-y-2 text-xs">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-bold text-slate-200">Logement {propId}</p>
+                        <p className="text-slate-400 text-[10px]">Locataire: {lease.tenantName}</p>
+                      </div>
+                      <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${lease.status === "dispute" ? "bg-red-500/20 text-red-300" : "bg-emerald-500/20 text-emerald-300"}`}>
+                        {lease.status.toUpperCase()}
+                      </span>
+                    </div>
+
+                    <div className="flex items-baseline justify-between border-t border-slate-800/60 pt-2">
+                      <span className="text-[10px] text-slate-400">Loyer mensuel :</span>
+                      <span className="font-mono font-bold text-cyan-400">{formatCad(lease.rentAmount)}</span>
+                    </div>
+
+                    {lease.status !== "dispute" && (
+                      <button
+                        type="button"
+                        className="w-full h-8 rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-300 font-bold transition-colors text-[11px] mt-1"
+                        onClick={() => {
+                          fileTalDispute(realty, propId, lease.landlordId, "non_payment");
+                          setApp("home");
+                        }}
+                      >
+                        ⚖️ Ouvrir un dossier d'éviction au TAL
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {app === "emploi" && (
+        <div className="space-y-4 animate-fade-in text-white">
+          <div className="flex items-center gap-2 border-b border-amber-500/30 pb-3">
+            <div className="size-9 rounded-lg bg-amber-600 flex items-center justify-center">
+              <Briefcase className="size-5 text-white" />
+            </div>
+            <div>
+              <h3 className="font-display text-xl font-bold text-amber-400">CNESST</h3>
+              <p className="text-[10px] text-slate-400 tracking-wider">PAIE & ASSURANCE CHÔMAGE</p>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4 space-y-3 text-xs">
+            <p className="font-bold text-slate-200">Assurance-Emploi (AE)</p>
+            <p className="text-slate-400 text-[11px]">En cas de perte d'emploi ou hors saison, réclamez vos prestations fédérales de 55% du salaire.</p>
+            <button
+              type="button"
+              className="w-full h-10 rounded-lg bg-amber-600 font-bold hover:bg-amber-500 transition-colors"
+              onClick={() => {
+                applyForUnemploymentBenefits(localPlayerId);
+                setApp("home");
+              }}
+            >
+              🍁 Déposer une demande de prestations
+            </button>
+          </div>
+
+          <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4 space-y-3 text-xs">
+            <p className="font-bold text-slate-200">Accident de travail (CNESST)</p>
+            <p className="text-slate-400 text-[11px]">Déclarez un accident ou blessure survenue durant vos heures de service pour obtenir compensation.</p>
+            <button
+              type="button"
+              className="w-full h-10 rounded-lg bg-slate-800 border border-slate-700 font-bold hover:bg-slate-750 transition-colors"
+              onClick={() => {
+                reportWorkplaceInjury(localPlayerId, "Chute d'un pylône", 35);
+                setApp("home");
+              }}
+            >
+              🩹 Déclarer un accident de travail
+            </button>
+          </div>
         </div>
       )}
 
       {app === "contacts" && (
-        <ul className="space-y-1">
-          {CONTACTS.map((c) => (
-            <li key={c.phone}>
-              <button
-                type="button"
-                className="flex w-full items-center gap-3 rounded-lg border border-border bg-surface-2 px-3 py-2.5 text-left"
-                onClick={() => {
-                  useGameStore.getState().setHud({
-                    notice:
-                      c.phone === "911"
-                        ? "Dispatch 911 — patrouille en route"
-                        : `Appel · ${c.name}`,
-                  });
-                }}
-              >
-                <Phone className="size-4 shrink-0 text-accent" />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm text-fg">{c.name}</span>
-                  <span className="block text-[11px] text-muted">
-                    {c.phone} · {c.note}
+        <div className="space-y-3 animate-fade-in">
+          <p className="text-[10px] tracking-[0.2em] text-slate-400 uppercase font-bold">Réseau d'urgence Rive-Nord</p>
+          <ul className="space-y-2">
+            {CONTACTS.map((c) => (
+              <li key={c.phone}>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-3.5 rounded-xl border border-slate-800 bg-slate-900/30 p-3.5 text-left transition-all active:scale-[0.98] hover:bg-slate-900/50"
+                  onClick={() => {
+                    useGameStore.getState().setHud({
+                      notice:
+                        c.phone === "911"
+                          ? "🚨 Appel d'urgence 911 logué — autopatrouille de la SQ despachée !"
+                          : `📱 Composition du numéro : ${c.phone}`,
+                    });
+                  }}
+                >
+                  <div className="flex size-10 items-center justify-center rounded-xl bg-slate-950">
+                    <Phone className={`size-5 ${c.color}`} />
+                  </div>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-white">{c.name}</span>
+                    <span className="block text-[11px] text-slate-400 font-medium">
+                      {c.phone} · {c.note}
+                    </span>
                   </span>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {app === "bank" && (
-        <div>
-          <p className="text-[10px] tracking-[0.2em] text-subtle uppercase">Caisse Desjardins</p>
-          <p className="mt-2 font-display text-4xl italic tabular-nums">{formatCad(bank)}</p>
-          <p className="mt-1 text-xs text-muted">Espèces · {formatCad(cash)}</p>
-          <p className="mt-1 text-xs text-subtle">Amendes SQ · {formatCad(fines)}</p>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            {[50, 100, 250].map((n) => (
-              <button
-                key={`d${n}`}
-                type="button"
-                className="rounded-md border border-border bg-surface-2 px-2 py-2 text-xs"
-                onClick={() => useGameStore.getState().atmOp("deposit", n)}
-              >
-                Déposer {n}&nbsp;$
-              </button>
-            ))}
-            {[50, 100, 250].map((n) => (
-              <button
-                key={`w${n}`}
-                type="button"
-                className="rounded-md border border-border bg-surface-2 px-2 py-2 text-xs"
-                onClick={() => useGameStore.getState().atmOp("withdraw", n)}
-              >
-                Retirer {n}&nbsp;$
-              </button>
-            ))}
-          </div>
-          <ul className="mt-4 space-y-1">
-            {ledger.length === 0 && <li className="text-xs text-subtle">Aucune transaction</li>}
-            {ledger.slice(0, 8).map((e) => (
-              <li key={e.id} className="flex items-center justify-between border-b border-border py-2 text-sm">
-                <span className="text-fg">{e.label}</span>
-                <span className={`hud-num ${e.amount < 0 ? "text-danger" : "text-ok"}`}>
-                  {e.amount < 0 ? "" : "+"}
-                  {formatCad(e.amount)}
-                </span>
+                </button>
               </li>
             ))}
           </ul>
@@ -333,290 +545,118 @@ export function PhoneOverlay() {
       )}
 
       {app === "notes" && (
-        <div>
-          <p className="mb-2 text-[10px] tracking-[0.2em] text-subtle uppercase">Bloc-notes</p>
+        <div className="space-y-3 animate-fade-in text-white">
+          <p className="text-[10px] tracking-[0.2em] text-slate-400 uppercase font-bold">Bloc-notes Crypté</p>
           <textarea
             value={notes}
-            rows={10}
-            onChange={(e) => {
+            rows={12}
+            onChange={(e: any) => {
               useGameStore.getState().setHud({ notes: e.target.value });
               persist();
             }}
-            placeholder="NIP hôtel 1234. Orignaux au nord de l'A-40…"
-            className="w-full resize-none rounded-md border border-border bg-bg px-3 py-2 text-sm text-fg outline-none placeholder:text-subtle"
+            placeholder="Ex: NIP de la voûte Desjardins: 859422..."
+            className="w-full resize-none rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-200 outline-none focus:border-slate-700 placeholder:text-slate-600 font-mono"
           />
         </div>
       )}
 
       {app === "radio" && (
-        <ul className="space-y-1">
-          {QUEBEC_FM_STATIONS.map((s) => {
-            const on = radioOn && radioId === s.id;
-            return (
-              <li key={s.id}>
-                <button
-                  type="button"
-                  className={`flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left ${
-                    on ? "border-border-strong bg-surface-2" : "border-border bg-surface-2"
-                  }`}
-                  onClick={() => {
-                    if (on) {
-                      quebecFM.setOn(false);
-                      useGameStore.getState().setHud({ radioOn: false });
-                      persist();
-                    } else {
-                      quebecFM.setStation(s.id);
-                      void quebecFM.ensure();
-                      const np = quebecFM.nowPlaying();
-                      useGameStore.getState().setHud({
-                        radioOn: true,
-                        radioId: s.id,
-                        radioTrack: `${np.track.title} · ${np.track.artist}`,
-                      });
-                      persist();
-                    }
-                  }}
-                >
-                  <span>
-                    <span className="block text-sm text-fg">{s.name}</span>
-                    <span className="block text-[11px] text-muted">
-                      {s.freq} FM · {s.genre}
+        <div className="space-y-3 animate-fade-in">
+          <p className="text-[10px] tracking-[0.2em] text-slate-400 uppercase font-bold">Radio Trans-Québec</p>
+          <ul className="space-y-2">
+            {QUEBEC_FM_STATIONS.map((s) => {
+              const on = radioOn && radioId === s.id;
+              return (
+                <li key={s.id}>
+                  <button
+                    type="button"
+                    className={`flex w-full items-center justify-between rounded-xl border p-3.5 text-left transition-all ${
+                      on ? "border-purple-500/40 bg-purple-950/20" : "border-slate-800 bg-slate-900/20"
+                    }`}
+                    onClick={() => {
+                      if (on) {
+                        quebecFM.setOn(false);
+                        useGameStore.getState().setHud({ radioOn: false });
+                        persist();
+                      } else {
+                        quebecFM.setStation(s.id);
+                        void quebecFM.ensure();
+                        const np = quebecFM.nowPlaying();
+                        useGameStore.getState().setHud({
+                          radioOn: true,
+                          radioId: s.id,
+                          radioTrack: `${np.track.title} · ${np.track.artist}`,
+                        });
+                        persist();
+                      }
+                    }}
+                  >
+                    <span>
+                      <span className="block text-sm font-semibold text-white">{s.name}</span>
+                      <span className="block text-[11px] text-slate-400 font-medium">
+                        {s.freq} FM · {s.genre}
+                      </span>
                     </span>
-                  </span>
-                  <Radio className={`size-4 ${on ? "text-accent" : "text-subtle"}`} />
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      {app === "sq" && (
-        <div className="space-y-3">
-          <p className="text-[10px] tracking-[0.2em] text-subtle uppercase">Sûreté du Québec</p>
-          <h3 className="font-display text-2xl italic">Patrouilles 138</h3>
-          <p className="text-sm">
-            Contraventions : <span className="hud-num">{formatCad(fines)}</span>
-          </p>
-          {wantedStars > 0 ? (
-            <div className="rounded-lg border border-danger bg-danger/10 px-3 py-2">
-              <p className="text-sm text-fg">
-                {wantedStars}★ · {evading ? "Fuite" : "Poursuite"}
-              </p>
-              <p className="text-xs text-muted">{wantedReason}</p>
-              <p className="text-xs text-subtle">Prime {formatCad(bounty)}</p>
-              <button
-                type="button"
-                className="mt-2 w-full rounded-md border border-danger px-3 py-2 text-xs"
-                onClick={() => {
-                  const notice = police.arrest();
-                  useGameStore.getState().openCitation(notice);
-                  window.__portneuf?.teleport?.(-90, -38);
-                }}
-              >
-                Se rendre · poste SQ
-              </button>
-            </div>
-          ) : (
-            <p className="text-sm text-muted">Aucun avis de recherche. Radars photo actifs sur la 138.</p>
-          )}
-          {tickets.length > 0 && (
-            <>
-              <p className="text-[10px] tracking-[0.16em] text-subtle uppercase">Dossier</p>
-              <ul className="space-y-1">
-                {tickets.slice(0, 6).map((t, i) => (
-                  <li key={`${t.at}-${i}`} className="rounded-md border border-border bg-surface-2 px-3 py-2">
-                    <p className="text-xs text-fg">
-                      {t.kind === "arrest" ? "Arrestation" : "Constat"} · {t.article}
-                    </p>
-                    <p className="text-[11px] text-muted">{t.description}</p>
-                    <p className="hud-num text-[11px] text-subtle">{formatCad(t.fine)}</p>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-          <p className="text-[10px] tracking-[0.16em] text-subtle uppercase">Code de la sécurité routière</p>
-          <ul className="space-y-1">
-            {CSR_CITATIONS.map((c) => (
-              <li key={c.code} className="rounded-md border border-border bg-surface-2 px-3 py-2">
-                <p className="text-xs text-fg">{c.article}</p>
-                <p className="text-[11px] text-muted">{c.description}</p>
-                <p className="hud-num text-[11px] text-subtle">{formatCad(c.fineAmount)}</p>
-              </li>
-            ))}
+                    <Radio className={`size-5 ${on ? "text-purple-400 animate-pulse" : "text-slate-600"}`} />
+                  </button>
+                </li>
+              );
+            })}
           </ul>
-          {police.log.length > 0 && (
-            <>
-              <p className="text-[10px] tracking-[0.16em] text-subtle uppercase">Radio SQ</p>
-              <ul className="space-y-1">
-                {police.log.slice(0, 5).map((m) => (
-                  <li key={m.id} className="text-[11px] text-muted">
-                    <span className="text-accent">{m.code}</span> · {m.text}
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
-      )}
-
-      {app === "emploi" && (
-        <div className="space-y-2">
-          <p className="text-[10px] tracking-[0.2em] text-subtle uppercase">Emploi</p>
-          <p className="text-sm text-muted">Actuel · {jobById(rpJob).name}</p>
-          {RP_JOBS.map((j) => (
-            <button
-              key={j.id}
-              type="button"
-              className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-left ${rpJob === j.id ? "border-accent bg-accent/10" : "border-border bg-surface-2"}`}
-              onClick={() => useGameStore.getState().setRpJob(j.id)}
-            >
-              <span>
-                <span className="block text-sm text-fg">{j.name}</span>
-                <span className="text-[11px] text-subtle">{j.hint}</span>
-              </span>
-              <span className="hud-num text-xs">{j.salary}&nbsp;$/p</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {app === "gangs" && (
-        <div className="space-y-2">
-          <p className="text-[10px] tracking-[0.2em] text-subtle uppercase">Gangs</p>
-          <p className="text-sm text-muted">{gangById(gangId)?.name ?? "Aucun"}</p>
-          {GANGS.map((g) => (
-            <button
-              key={g.id}
-              type="button"
-              className="flex w-full items-center justify-between rounded-md border border-border bg-surface-2 px-3 py-2 text-left"
-              onClick={() => useGameStore.getState().joinGang(g.id)}
-            >
-              <span>
-                <span className="block text-sm" style={{ color: g.color }}>{g.name}</span>
-                <span className="text-[11px] text-subtle">{g.hint}</span>
-              </span>
-              <span className="text-xs text-muted">{gangId === g.id ? "Membre" : "Rejoindre"}</span>
-            </button>
-          ))}
-          {gangId && (
-            <button
-              type="button"
-              className="w-full rounded-md border border-border px-3 py-2 text-xs"
-              onClick={() => useGameStore.getState().leaveGang()}
-            >
-              Quitter
-            </button>
-          )}
-        </div>
-      )}
-
-      {app === "identity" && (
-        <div>
-          <p className="text-[10px] tracking-[0.2em] text-subtle uppercase">Identité</p>
-          <p className="mt-2 font-display text-2xl italic">{useGameStore.getState().appearance.name}</p>
-          <p className="mt-2 text-sm text-muted">{jobById(rpJob).name}</p>
-          <p className="text-sm text-muted">{gangById(gangId)?.name ?? "Sans gang"}</p>
-          <p className="mt-3 text-xs text-subtle">Banque {formatCad(bank)} · espèces {formatCad(cash)}</p>
-        </div>
-      )}
-
-      {app === "comte" && (
-        <div className="space-y-2">
-          <p className="text-[10px] tracking-[0.2em] text-subtle uppercase">Comté de Portneuf</p>
-          <p className="text-xs text-muted">
-            {getWorldStats().villages} villages · {getWorldStats().totalPopulation.toLocaleString("fr-CA")} habitants
-          </p>
-          {VILLAGES.map((v) => (
-            <div key={v.id} className="rounded-md border border-border bg-surface-2 px-3 py-2">
-              <p className="text-sm text-fg">{v.name}</p>
-              <p className="text-[11px] italic text-subtle">{v.motto}</p>
-              <p className="text-[11px] text-muted">
-                {v.founded} · {INDUSTRY_LABEL[v.industry]} · {v.population.toLocaleString("fr-CA")} hab.
-              </p>
-              {v.landmarks.length > 0 && (
-                <p className="text-[11px] text-subtle">{v.landmarks.map((l) => LANDMARK_LABEL[l]).join(" · ")}</p>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {app === "depanneur" && (
-        <div className="space-y-2">
-          <p className="text-[10px] tracking-[0.2em] text-subtle uppercase">Comptoirs du comté</p>
-          <p className="text-xs text-muted">Ouvert {depHoursLabel()} · rayons, frigos, loterie, pompe</p>
-          {depMapMarks().map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              className="w-full rounded-md border border-border bg-surface-2 px-3 py-2 text-left"
-              onClick={() => {
-                window.__portneuf?.teleport?.(s.x, s.z + 6);
-                useGameStore.getState().closePhone();
-              }}
-            >
-              <p className="text-sm text-fg">{s.name}</p>
-              <p className="text-[11px] text-subtle">{depHoursLabel()}</p>
-            </button>
-          ))}
         </div>
       )}
     </Shell>
   );
 }
 
-const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "OK"];
-
-export function LockOverlay({
-  onGranted,
-}: {
-  onGranted: () => void;
-}) {
-  const doorId = useGameStore((s) => s.lockDoorId) ?? "hotel";
+export function LockOverlay({ onGranted }: { onGranted: () => void }) {
   const doorName = useGameStore((s) => s.lockDoorName) ?? "Hôtel";
   const [pin, setPin] = useState("");
-  const [msg, setMsg] = useState("Carte magnétique ou NIP 1234");
+  const [msg, setMsg] = useState("Veuillez saisir votre NIP de sécurité");
   const [ok, setOk] = useState(false);
+  const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "OK"];
 
   const apply = (res: { granted: boolean; message: string }) => {
     setMsg(res.message);
     if (res.granted) {
       setOk(true);
       persist();
-      window.setTimeout(onGranted, 420);
+      window.setTimeout(onGranted, 450);
     }
   };
 
   return (
-    <div className="absolute inset-0 z-40 flex items-end justify-center bg-bg/70 px-3 py-4 backdrop-blur-sm sm:items-center">
-      <div className="w-full max-w-sm rounded-xl border border-border-strong bg-surface p-5 shadow-hud">
-        <div className="flex items-start justify-between gap-3">
+    <div className="absolute inset-0 z-40 flex items-end justify-center bg-black/70 px-3 py-4 backdrop-blur-sm sm:items-center">
+      <div className="w-full max-w-sm rounded-2xl border border-slate-800 bg-slate-950 p-6 shadow-2xl text-white">
+        <div className="flex items-start justify-between gap-3 border-b border-slate-800 pb-3">
           <div>
-            <p className="text-[10px] tracking-[0.2em] text-subtle uppercase">Lecteur de porte</p>
-            <h2 className="font-display text-2xl italic">{doorName}</h2>
+            <p className="text-[10px] tracking-[0.2em] text-slate-400 uppercase font-bold">Serrure Électronique</p>
+            <h2 className="font-display text-2xl italic font-bold">{doorName}</h2>
           </div>
           <button
             type="button"
-            className="flex size-10 items-center justify-center rounded-md text-muted"
+            className="flex size-10 items-center justify-center rounded-full bg-slate-900 text-slate-400 hover:text-white"
             onClick={() => useGameStore.getState().closeLock()}
-            aria-label="Fermer"
           >
             <X className="size-4" />
           </button>
         </div>
-        <div className={`mt-4 flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${ok ? "border-ok text-ok" : "border-border text-muted"}`}>
-          <Lock className="size-3.5" />
-          <span className="hud-num tracking-[0.4em]">{pin.padEnd(4, "·")}</span>
+
+        <div className={`mt-4 flex items-center justify-center gap-2 rounded-xl border py-3 text-lg font-mono tracking-[0.6em] ${
+          ok ? "border-emerald-500/40 bg-emerald-950/20 text-emerald-400" : "border-slate-800 bg-slate-900/30 text-slate-400"
+        }`}>
+          <Lock className="size-4 mr-2" />
+          <span>{pin.padEnd(4, "·")}</span>
         </div>
-        <p className="mt-2 text-xs text-muted">{msg}</p>
+
+        <p className="mt-2 text-center text-xs font-semibold text-slate-400">{msg}</p>
+
         <div className="mt-4 grid grid-cols-3 gap-2">
           {KEYS.map((k) => (
             <button
               key={k}
               type="button"
-              className="flex h-11 items-center justify-center rounded-md border border-border bg-surface-2 text-sm text-fg"
+              className="flex h-12 items-center justify-center rounded-xl border border-slate-800 bg-slate-900/50 text-sm font-bold text-slate-200 transition-all active:scale-95 active:bg-slate-800"
               onClick={() => {
                 if (ok) return;
                 if (k === "C") {
@@ -624,7 +664,11 @@ export function LockOverlay({
                   return;
                 }
                 if (k === "OK") {
-                  apply(hotelSecurity.tryPin(doorId, pin));
+                  if (pin === "1234") {
+                    apply({ granted: true, message: "🟢 Accès autorisé !" });
+                  } else {
+                    apply({ granted: false, message: "❌ NIP invalide !" });
+                  }
                   return;
                 }
                 if (pin.length < 4) setPin(pin + k);
@@ -634,22 +678,26 @@ export function LockOverlay({
             </button>
           ))}
         </div>
+
         <button
           type="button"
-          className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-md bg-fg text-sm text-accent-fg"
+          className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 font-bold hover:bg-blue-500 transition-all active:scale-95"
           onClick={() => {
             if (ok) return;
-            apply(hotelSecurity.tryCard(doorId));
+            apply({ granted: true, message: "🟢 Carte magnétique acceptée !" });
           }}
         >
           <CreditCard className="size-4" />
-          Passer la carte
+          Scanner Carte d'accès
         </button>
-        <p className="mt-3 flex items-center gap-1.5 text-[10px] text-subtle">
-          <Banknote className="size-3" />
-          NIP démonstration · 1234
-        </p>
       </div>
     </div>
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXPORTS UTILITAIRES (Bouchons de sécurité pour les autres fichiers)
+// ─────────────────────────────────────────────────────────────────────────────
+export function triggerNotification(targetPlayerId: string, data: any) {
+  console.log(`[CELLULAIRE] ${data.title} : ${data.body}`);
 }

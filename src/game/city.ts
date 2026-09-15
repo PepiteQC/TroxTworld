@@ -1,14 +1,17 @@
 import * as THREE from "three";
-import { buildPark } from "./landmarks";
+import { buildCemetery, buildPark } from "./park";
 import { matLib, QC_PALETTE } from "./materials";
+import { wireCsm } from "./csm";
 import { makeRng } from "./rng";
 import {
   CITY_ARTERY_MUL,
   CITY_SIDEWALK_W,
   cityLotLocal,
+  citySpecialLots,
   cityToWorld,
   getTerrainHeight,
   lotHitsThroughRoad,
+  overlayRoadAt,
 } from "./worlddata";
 import { finishMap, tex as texLib } from "./textures";
 import {
@@ -25,8 +28,10 @@ import {
 } from "./architecture";
 import { attachScenicHeat, scenicHeat } from "./utilities";
 import { type SwingDoor } from "./door";
+import { buildCaissePopulaire } from "./caisse";
+import { buildIntersectionPad } from "./roads";
 
-export type InteriorKind = "hotel" | "apartment" | "boutique" | "lobby" | "corridor" | "prison" | "home" | "depanneur";
+export type InteriorKind = "hotel" | "apartment" | "boutique" | "lobby" | "corridor" | "prison" | "home" | "depanneur" | "caisse" | "casse" | "sqdc";
 
 export interface CityDoor {
   id: string;
@@ -237,19 +242,12 @@ function building(
   const h = floors * floorH;
   const tex = facadeTex(floors, Math.max(3, Math.floor(width / 3.2)), color, lit, seed, shop, style);
   if (!textures.includes(tex)) textures.push(tex);
-  const rough = style === "pierre" ? 0.92 : style === "clapboard" ? 0.86 : 0.84;
-  const mat = new THREE.MeshStandardMaterial({
+  const mat = new THREE.MeshLambertMaterial({
     map: tex,
-    roughness: rough,
-    metalness: 0.04,
+    color: 0xffffff,
     flatShading: true,
   });
-  const nrmId = style === "clapboard" ? null : style === "brique" ? "betonTrousNrm" : "betonMurNrm";
-  if (nrmId) {
-    mat.normalMap = texLib.map(nrmId, 2.2, floors * 0.7);
-    mat.normalScale = new THREE.Vector2(0.55, 0.55);
-    mat.flatShading = false;
-  }
+  wireCsm(mat);
   const body = new THREE.Mesh(new THREE.BoxGeometry(width, h, depth), mat);
   body.position.y = h / 2;
   body.castShadow = true;
@@ -456,10 +454,12 @@ export function buildCity(cfg: CityConfig): BuiltCity {
     const midX = (a.x + b.x) / 2;
     const midZ = (a.z + b.z) / 2;
     const y = (a.y + b.y) / 2;
+    const over = overlayRoadAt(midX, midZ);
+    const w = over ? over.width : width;
     for (const side of [-1, 1]) {
       const sw = CITY_SIDEWALK_W;
-      const px = midX + Math.cos(ang) * (width / 2 + sw / 2) * side;
-      const pz = midZ - Math.sin(ang) * (width / 2 + sw / 2) * side;
+      const px = midX + Math.cos(ang) * (w / 2 + sw / 2) * side;
+      const pz = midZ - Math.sin(ang) * (w / 2 + sw / 2) * side;
       const walk = new THREE.Mesh(new THREE.BoxGeometry(sw, 0.14, len), sidewalk);
       walk.rotation.y = -ang;
       walk.position.set(px, y + 0.08, pz);
@@ -475,12 +475,37 @@ export function buildCity(cfg: CityConfig): BuiltCity {
     addStreet(toWorld(-cfg.streetWidth, rowOff[i]), toWorld(totalW + cfg.streetWidth, rowOff[i]), w);
   }
 
+  for (let i = 0; i <= n; i++) {
+    for (let j = 0; j <= n; j++) {
+      const p = toWorld(colOff[i], rowOff[j]);
+      const wNs = i === Math.floor(n / 2) ? cfg.streetWidth * CITY_ARTERY_MUL : cfg.streetWidth;
+      const wEw = j === Math.floor(n / 2) ? cfg.streetWidth * CITY_ARTERY_MUL : cfg.streetWidth;
+      const over = overlayRoadAt(p.x, p.z);
+      const size = Math.max(wNs, wEw, over?.width ?? 0) + 1.6;
+      group.add(buildIntersectionPad(p.x, p.z, size));
+    }
+  }
+
   const parkCol = Math.floor(n / 2);
   const parkRow = Math.floor(n / 2);
   const hotelCol = Math.min(n - 1, parkCol + 1);
   const hotelRow = parkRow;
   const towerCol = parkCol;
   const towerRow = Math.max(0, parkRow - 1);
+  const spec = citySpecialLots({
+    id: cfg.id ?? "",
+    name: cfg.villageName,
+    center: cfg.center,
+    gridSize: n,
+    blockSize: cfg.blockSize,
+    streetWidth: cfg.streetWidth,
+    density: cfg.density,
+    seed: cfg.seed,
+  });
+  const caisseCol = spec.caisse.col;
+  const caisseRow = spec.caisse.row;
+  const cemCol = spec.cemetery.col;
+  const cemRow = spec.cemetery.row;
 
   const lampMat = matLib.get(0x3a3e42, 0.55, 0.6);
   const bulbMat = matLib.getEmissive(0xfff0c0, 0xffc870, 0.08);
@@ -503,8 +528,10 @@ export function buildCity(cfg: CityConfig): BuiltCity {
       let doorKind: InteriorKind | null = null;
       let doorName = "";
 
-      if (through || (col === parkCol && row === parkRow)) {
-        mesh = buildPark(lot.w * 0.94, lot.d * 0.94);
+      if (through) {
+        mesh = buildPark(lot.w * 0.94, lot.d * 0.94, cfg.seed + col * 11 + row, true);
+      } else if (col === parkCol && row === parkRow) {
+        mesh = buildPark(lot.w * 0.94, lot.d * 0.94, cfg.seed + col * 11 + row);
       } else if (col === hotelCol && row === hotelRow) {
         const fl = Math.max(5, Math.round(6 * cfg.density));
         mesh = hotel(bw, bd, fl, 0.35, cfg.seed + col * 17 + row, textures, style);
@@ -517,8 +544,21 @@ export function buildCity(cfg: CityConfig): BuiltCity {
         doorName = `Tour ${cfg.villageName}`;
       } else if (parkCol > 0 && col === parkCol - 1 && row === parkRow) {
         mesh = buildEglise(cfg.seed + 11, 0);
+      } else if (
+        col === cemCol &&
+        row === cemRow &&
+        !(col === 0 && row === n - 1) &&
+        !(col === caisseCol && row === caisseRow) &&
+        !(parkCol > 0 && col === parkCol - 1 && row === parkRow)
+      ) {
+        mesh = buildCemetery(lot.w * 0.9, lot.d * 0.9, cfg.seed + 44);
       } else if (col === hotelCol && row === Math.max(0, parkRow - 1) && !(col === towerCol && row === towerRow)) {
         mesh = buildHotelVille();
+      } else if (col === caisseCol && row === caisseRow) {
+        const built = buildCaissePopulaire(cfg.villageName);
+        mesh = built.root;
+        doorKind = "caisse";
+        doorName = `Caisse de ${cfg.villageName}`;
       } else if (cfg.villageName === "Donnacona" && col === 0 && row === 0) {
         mesh = buildSqPoste();
       } else if (col === 0 && row === n - 1) {
@@ -530,9 +570,10 @@ export function buildCity(cfg: CityConfig): BuiltCity {
       } else if (col === n - 1 && row === Math.min(n - 1, parkRow + 1)) {
         mesh = buildQuincaillerie();
       } else if (onArtery && row === n - 1 && col === Math.max(0, parkCol - 1)) {
-        mesh = rng() > 0.45 ? buildBoutique() : buildCasseCroute();
-        doorKind = "boutique";
-        doorName = `Commerce ${cfg.villageName}`;
+        const casse = rng() <= 0.45;
+        mesh = casse ? buildCasseCroute() : buildBoutique();
+        doorKind = casse ? "casse" : "boutique";
+        doorName = casse ? `Casse-croûte ${cfg.villageName}` : `Boutique ${cfg.villageName}`;
       } else if (dc > 0.72 && rng() > 0.35) {
         mesh = duplex(cfg.seed + col * 19 + row * 7);
         attachScenicHeat(mesh, scenicHeat(cfg.seed + col * 19 + row, false), yaw, bw * 0.42, bd * 0.2);
@@ -576,7 +617,7 @@ export function buildCity(cfg: CityConfig): BuiltCity {
         const prompt =
           doorKind === "hotel"
             ? `Entrer · ${doorName}`
-            : doorKind === "depanneur"
+            : doorKind === "depanneur" || doorKind === "caisse" || doorKind === "casse"
               ? `Entrer · ${doorName}`
               : `Entrer · ${doorName}, 4½`;
         doors.push({

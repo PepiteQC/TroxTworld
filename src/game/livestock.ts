@@ -178,7 +178,7 @@ function buildPaddock(w: number, d: number): THREE.Group {
   const trough = new THREE.Mesh(getGeo("box", { w: 1.8, h: 0.35, d: 0.55 }), matLib.get(0x6a6a70, 0.55, 0.35));
   trough.position.set(0, 0.22, d / 2 - 1.2);
   g.add(trough);
-  const water = new THREE.Mesh(getGeo("box", { w: 1.55, h: 0.04, d: 0.38 }), matLib.get(0x3a6a88, 0.15, 0.4));
+  const water = new THREE.Mesh(getGeo("box", { w: 1.55, h: 0.04, d: 0.38 }), matLib.water(0x3a6a88, 0.75));
   water.position.set(0, 0.4, d / 2 - 1.2);
   g.add(water);
   return g;
@@ -187,7 +187,7 @@ function buildPaddock(w: number, d: number): THREE.Group {
 export function mountHerd(parent: THREE.Group): Stock[] {
   const stock: Stock[] = [];
   for (const farm of legalFarmsteads()) {
-    const pad = farmToWorld(farm.x, farm.z, farm.yaw, -22, 2);
+    const pad = farmToWorld(farm.x, farm.z, farm.yaw, 16, -14);
     const padW = 16;
     const padD = 14;
     const paddock = buildPaddock(padW, padD);
@@ -223,7 +223,7 @@ export function mountHerd(parent: THREE.Group): Stock[] {
       });
     }
 
-    const coopPos = farmToWorld(farm.x, farm.z, farm.yaw, 8, 9);
+    const coopPos = farmToWorld(farm.x, farm.z, farm.yaw, 8, -10);
     const coop = buildCoop();
     coop.position.set(coopPos.x, getTerrainHeight(coopPos.x, coopPos.z), coopPos.z);
     coop.rotation.y = farm.yaw;

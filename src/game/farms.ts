@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { buildGrange, buildMaisonCanadienne } from "./architecture";
 import { getGeo } from "./geo";
 import { matLib } from "./materials";
-import { getTerrainHeight, pushOffRoad } from "./worlddata";
+import { getTerrainHeight, pushOffRoad, RANG_2E_Z, RIVER_RANGS, nearestRoadHit } from "./worlddata";
 import { attachScenicHeat } from "./utilities";
 
 export type CropId = "mais" | "ble" | "foin" | "patate" | "cannabis";
@@ -73,20 +73,24 @@ interface FarmDef {
   plots: PlotDef[];
 }
 
-/** Rangs seigneuriaux : lots longs N-S entre le Chemin du Roy et l'A-40, plus vallées intérieures. */
+/** Rangs seigneuriaux : lots à l'est du rang N-S, cour face au 2e Rang. */
+function riverYard(farmId: string): { x: number; z: number; yaw: number } | null {
+  const rang = RIVER_RANGS.find((r) => r.farmId === farmId);
+  if (!rang) return null;
+  return { x: rang.x + 22, z: RANG_2E_Z - 17, yaw: 0 };
+}
+
 const FARMSTEADS: FarmDef[] = [
   {
     id: "rang_grondines_ouest",
     village: "Grondines",
     villageId: "grondines",
     name: "Rang du Chemin du Roy",
-    x: -980,
-    z: -28,
-    yaw: 0,
+    ...riverYard("rang_grondines_ouest")!,
     crop: "mais",
     plots: [
-      { ox: -13, oz: -48, w: 22, d: 72, crop: "mais", stage: "pousse" },
-      { ox: 13, oz: -48, w: 22, d: 72, crop: null, stage: "friche" },
+      { ox: -13, oz: -22, w: 22, d: 30, crop: "mais", stage: "pousse" },
+      { ox: 13, oz: -22, w: 22, d: 30, crop: null, stage: "friche" },
     ],
   },
   {
@@ -94,13 +98,11 @@ const FARMSTEADS: FarmDef[] = [
     village: "Grondines",
     villageId: "grondines",
     name: "Rang Sainte-Anne",
-    x: -680,
-    z: -30,
-    yaw: 0.02,
+    ...riverYard("rang_grondines_est")!,
     crop: "foin",
     plots: [
-      { ox: -12, oz: -50, w: 20, d: 76, crop: "foin", stage: "mur" },
-      { ox: 12, oz: -50, w: 20, d: 76, crop: "ble", stage: "seme" },
+      { ox: -12, oz: -22, w: 20, d: 30, crop: "foin", stage: "mur" },
+      { ox: 12, oz: -22, w: 20, d: 30, crop: "ble", stage: "seme" },
     ],
   },
   {
@@ -108,13 +110,11 @@ const FARMSTEADS: FarmDef[] = [
     village: "Deschambault-Grondines",
     villageId: "deschambault",
     name: "Rang des Pins",
-    x: -600,
-    z: -32,
-    yaw: 0,
+    ...riverYard("rang_deschambault_ouest")!,
     crop: "mais",
     plots: [
-      { ox: -14, oz: -52, w: 24, d: 80, crop: "mais", stage: "pousse" },
-      { ox: 14, oz: -52, w: 24, d: 80, crop: "foin", stage: "laboure" },
+      { ox: -14, oz: -22, w: 24, d: 32, crop: "mais", stage: "pousse" },
+      { ox: 14, oz: -22, w: 24, d: 32, crop: "foin", stage: "laboure" },
     ],
   },
   {
@@ -122,13 +122,11 @@ const FARMSTEADS: FarmDef[] = [
     village: "Deschambault-Grondines",
     villageId: "deschambault",
     name: "Côte de la Traverse",
-    x: -360,
-    z: -30,
-    yaw: -0.02,
+    ...riverYard("rang_deschambault_est")!,
     crop: "ble",
     plots: [
-      { ox: -13, oz: -48, w: 22, d: 74, crop: "ble", stage: "pousse" },
-      { ox: 13, oz: -48, w: 22, d: 74, crop: null, stage: "friche" },
+      { ox: -13, oz: -22, w: 22, d: 30, crop: "ble", stage: "pousse" },
+      { ox: 13, oz: -22, w: 22, d: 30, crop: null, stage: "friche" },
     ],
   },
   {
@@ -136,13 +134,11 @@ const FARMSTEADS: FarmDef[] = [
     village: "Portneuf",
     villageId: "portneuf",
     name: "Rang de la Pointe",
-    x: -250,
-    z: -34,
-    yaw: 0,
+    ...riverYard("rang_portneuf_ouest")!,
     crop: "mais",
     plots: [
-      { ox: -13, oz: -50, w: 22, d: 76, crop: "mais", stage: "mur" },
-      { ox: 13, oz: -50, w: 22, d: 76, crop: "patate", stage: "pousse" },
+      { ox: -13, oz: -22, w: 22, d: 30, crop: "mais", stage: "mur" },
+      { ox: 13, oz: -22, w: 22, d: 30, crop: "patate", stage: "pousse" },
     ],
   },
   {
@@ -150,13 +146,11 @@ const FARMSTEADS: FarmDef[] = [
     village: "Cap-Santé",
     villageId: "cap_sante",
     name: "Rang Saint-Joseph",
-    x: 240,
-    z: -32,
-    yaw: 0.01,
+    ...riverYard("rang_capsante_ouest")!,
     crop: "patate",
     plots: [
-      { ox: -12, oz: -48, w: 20, d: 72, crop: "patate", stage: "pousse" },
-      { ox: 12, oz: -48, w: 20, d: 72, crop: "foin", stage: "friche" },
+      { ox: -12, oz: -22, w: 20, d: 30, crop: "patate", stage: "pousse" },
+      { ox: 12, oz: -22, w: 20, d: 30, crop: "foin", stage: "friche" },
     ],
   },
   {
@@ -164,13 +158,11 @@ const FARMSTEADS: FarmDef[] = [
     village: "Cap-Santé",
     villageId: "cap_sante",
     name: "Rang du Vieux Chemin",
-    x: 490,
-    z: -30,
-    yaw: 0,
+    ...riverYard("rang_capsante_est")!,
     crop: "foin",
     plots: [
-      { ox: -13, oz: -50, w: 22, d: 76, crop: "foin", stage: "pousse" },
-      { ox: 13, oz: -50, w: 22, d: 76, crop: "ble", stage: "laboure" },
+      { ox: -13, oz: -22, w: 22, d: 30, crop: "foin", stage: "pousse" },
+      { ox: 13, oz: -22, w: 22, d: 30, crop: "ble", stage: "laboure" },
     ],
   },
   {
@@ -178,13 +170,11 @@ const FARMSTEADS: FarmDef[] = [
     village: "Neuville",
     villageId: "neuville",
     name: "Côte des Écureuils",
-    x: 960,
-    z: -28,
-    yaw: 0.02,
+    ...riverYard("rang_neuville_ouest")!,
     crop: "patate",
     plots: [
-      { ox: -12, oz: -46, w: 20, d: 68, crop: "patate", stage: "mur" },
-      { ox: 12, oz: -46, w: 20, d: 68, crop: "mais", stage: "seme" },
+      { ox: -12, oz: -20, w: 20, d: 28, crop: "patate", stage: "mur" },
+      { ox: 12, oz: -20, w: 20, d: 28, crop: "mais", stage: "seme" },
     ],
   },
   {
@@ -481,7 +471,7 @@ function hoopHouse(w: number, d: number) {
   return g;
 }
 
-function buildTracteur(seed: number) {
+export function buildTracteur(seed: number) {
   const g = new THREE.Group();
   g.name = "tracteur";
   const body = new THREE.Mesh(getGeo("box", { w: 1.7, h: 1.05, d: 2.6 }), matLib.get(seed % 2 === 0 ? 0x8a2020 : 0x2a6a38, 0.55, 0.2));
@@ -548,44 +538,55 @@ function paintField(plot: FieldPlot) {
 }
 
 function placeFarmstead(parent: THREE.Group, farm: FarmDef) {
+  const hit = nearestRoadHit(farm.x, farm.z);
+  const yaw = hit ? Math.atan2(hit.x - farm.x, hit.z - farm.z) : farm.yaw;
+  const fx = Math.sin(yaw);
+  const fz = Math.cos(yaw);
+  const rx = Math.cos(yaw);
+  const rz = -Math.sin(yaw);
   const y = getTerrainHeight(farm.x, farm.z);
-  const yard = new THREE.Mesh(getGeo("box", { w: 28, h: 0.07, d: 20 }), matLib.get(0x6a5a42, 1, 0));
+
+  const yard = new THREE.Mesh(getGeo("box", { w: 22, h: 0.07, d: 16 }), matLib.get(0x6a5a42, 1, 0));
   yard.position.set(farm.x, y + 0.03, farm.z);
-  yard.rotation.y = farm.yaw;
+  yard.rotation.y = yaw;
   yard.receiveShadow = true;
   parent.add(yard);
 
-  const drive = new THREE.Mesh(getGeo("box", { w: 3.4, h: 0.05, d: 26 }), matLib.get(0x5a4a38, 1, 0));
-  drive.position.set(farm.x + Math.sin(farm.yaw) * 2, y + 0.025, farm.z + Math.cos(farm.yaw) * 14);
-  drive.rotation.y = farm.yaw;
+  const driveLen = hit ? Math.min(14, Math.max(7, hit.dist - 4.2)) : 10;
+  const drive = new THREE.Mesh(getGeo("box", { w: 3.2, h: 0.05, d: driveLen }), matLib.get(0x5a4a38, 1, 0));
+  const dx = farm.x + fx * (driveLen / 2 + 3.2);
+  const dz = farm.z + fz * (driveLen / 2 + 3.2);
+  drive.position.set(dx, getTerrainHeight(dx, dz) + 0.025, dz);
+  drive.rotation.y = yaw;
   drive.receiveShadow = true;
   parent.add(drive);
 
   const house = buildMaisonCanadienne(farm.village.length * 17 + farm.id.length, 0);
-  attachScenicHeat(house, "poele", farm.yaw);
-  house.position.set(farm.x - Math.cos(farm.yaw) * 10, getTerrainHeight(farm.x - 10, farm.z), farm.z + Math.sin(farm.yaw) * 2);
-  house.rotation.y = farm.yaw;
+  attachScenicHeat(house, "poele", yaw);
+  house.position.set(farm.x, y, farm.z);
+  house.rotation.y = yaw;
   parent.add(house);
 
+  const barnX = farm.x + rx * 16 - fx * 3;
+  const barnZ = farm.z + rz * 16 - fz * 3;
   const barn = buildGrange(2100 + farm.id.length * 13);
-  barn.position.set(
-    farm.x + Math.cos(farm.yaw) * 14,
-    getTerrainHeight(farm.x + 14, farm.z + 4),
-    farm.z + 4 + Math.sin(farm.yaw) * 8,
-  );
-  barn.rotation.y = farm.yaw + 0.12;
+  barn.position.set(barnX, getTerrainHeight(barnX, barnZ), barnZ);
+  barn.rotation.y = yaw + 0.08;
   parent.add(barn);
 
+  const tx = farm.x + rx * 6 + fx * 5;
+  const tz = farm.z + rz * 6 + fz * 5;
   const tractor = buildTracteur(farm.id.length);
-  tractor.position.set(farm.x + 4, getTerrainHeight(farm.x + 4, farm.z + 6) + 0.02, farm.z + 6);
-  tractor.rotation.y = farm.yaw + 0.6;
+  tractor.position.set(tx, getTerrainHeight(tx, tz) + 0.02, tz);
+  tractor.rotation.y = yaw + 0.5;
   parent.add(tractor);
 }
 
 export function mountFarms(parent: THREE.Group): FieldPlot[] {
   const plots: FieldPlot[] = [];
   for (const raw of FARMSTEADS) {
-    const farm = raw.hidden ? raw : { ...raw, ...pushOffRoad(raw.x, raw.z, 16) };
+    const river = RIVER_RANGS.some((r) => r.farmId === raw.id);
+    const farm = raw.hidden || river ? raw : { ...raw, ...pushOffRoad(raw.x, raw.z, 18) };
     if (!farm.hidden) placeFarmstead(parent, farm);
     for (let p = 0; p < farm.plots.length; p++) {
       const def = farm.plots[p]!;

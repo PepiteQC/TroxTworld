@@ -44,6 +44,14 @@ export interface HouseUtils {
   indoorC: number;
   broke: boolean;
   frozen: boolean;
+  
+  // ── FONCTIONNALITÉS RP HYDRO & ÉNERGIE ──
+  bypassActive: boolean;      // Vol d'électricité (bypass du compteur)
+  bypassDetected: boolean;    // Détection par un inspecteur d'Hydro
+  generatorInstalled: boolean;// Génératrice d'urgence possédée
+  generatorActive: boolean;   // Génératrice en marche
+  generatorFuel: number;      // Essence (Litres)
+  hydroAlertLevel: number;    // Suspicion Hydro-Québec (0 à 100)
 }
 
 export const HEAT_CATALOG: HeatSpec[] = [
@@ -151,6 +159,9 @@ export const FURNACE_REPAIR = 85;
 export const PIPE_THAW = 60;
 export const WOOD_BURN_EVERY = 72;
 
+export const GENERATOR_FUEL_MAX = 15;
+export const GENERATOR_CONSUMPTION = 0.42;
+
 const RURAL_TOWNS = new Set([
   "Saint-Casimir",
   "Saint-Alban",
@@ -211,6 +222,12 @@ export function emptyUtils(deedId: string, town = ""): HouseUtils {
     indoorC: 18,
     broke: false,
     frozen: false,
+    bypassActive: false,
+    bypassDetected: false,
+    generatorInstalled: false,
+    generatorActive: false,
+    generatorFuel: 0,
+    hydroAlertLevel: 0,
   };
 }
 
@@ -232,7 +249,20 @@ export function parseUtils(raw: unknown, deedId: string, town = ""): HouseUtils 
     indoorC: Math.max(-20, Math.min(32, n(d.indoorC, 18))),
     broke: Boolean(d.broke),
     frozen: Boolean(d.frozen),
+    bypassActive: Boolean(d.bypassActive),
+    bypassDetected: Boolean(d.bypassDetected),
+    generatorInstalled: Boolean(d.generatorInstalled),
+    generatorActive: Boolean(d.generatorActive),
+    generatorFuel: Math.max(0, Math.min(GENERATOR_FUEL_MAX, n(d.generatorFuel, 0))),
+    hydroAlertLevel: Math.max(0, Math.min(100, n(d.hydroAlertLevel, 0))),
   };
+}
+
+export function hydroLive(u: HouseUtils, grid: GridOutage | null): boolean {
+  if (u.generatorActive && u.generatorInstalled && u.generatorFuel > 0) {
+    return true;
+  }
+  return u.hydroOn && !grid && !u.bypassDetected;
 }
 
 export function heatWorks(u: HouseUtils, grid: GridOutage | null, ambient: number): boolean {
@@ -240,16 +270,9 @@ export function heatWorks(u: HouseUtils, grid: GridOutage | null, ambient: numbe
   const spec = heatById(u.heat);
   if (u.broke && u.heat === "central") return false;
   if (spec.needsWood && u.wood <= 0) return false;
-  if (spec.needsHydro) {
-    if (!u.hydroOn) return false;
-    if (grid) return false;
-  }
+  if (spec.needsHydro && !hydroLive(u, grid)) return false;
   if (u.heat === "thermopompe" && ambient <= -22) return false;
   return true;
-}
-
-export function hydroLive(u: HouseUtils, grid: GridOutage | null): boolean {
-  return u.hydroOn && !grid;
 }
 
 export function waterLive(u: HouseUtils, grid: GridOutage | null): boolean {
@@ -272,27 +295,30 @@ export function monthlyBill(u: HouseUtils, month: number): { hydro: number; wate
   const spec = heatById(u.heat);
   const water = waterById(u.water);
   const hydroMul = winter && spec.needsHydro ? 1.35 : 1;
-  const hydro = Math.round(spec.monthlyHydro * hydroMul * (u.heatOn ? 1 : 0.22));
+  const hydroBillValue = u.bypassActive ? 0 : Math.round(spec.monthlyHydro * hydroMul * (u.heatOn ? 1 : 0.22));
   const eau = water.monthly;
   const maint = spec.monthlyMaint;
-  return { hydro, water: eau, maint, total: hydro + eau + maint };
+  return { hydro: hydroBillValue, water: eau, maint, total: hydroBillValue + eau + maint };
 }
 
-export function outageLabel(kind: GridOutageKind | "fournaise" | "gel"): string {
-  if (kind === "verglas") return "Verglas · réseau Hydro-Québec hors service";
-  if (kind === "panne") return "Panne Hydro-Québec";
-  if (kind === "fournaise") return "Fournaise en panne";
-  return "Tuyaux gelés";
+export function outageLabel(kind: GridOutageKind | "fournaise" | "gel" | "bypass_detection"): string {
+  if (kind === "verglas") return "⚡ ALERTE VERGLAS · Panne réseau Hydro-Québec !";
+  if (kind === "panne") return "⚡ PANNE DE COURANT · Transformateur grillé Hydro-Québec";
+  if (kind === "fournaise") return "🔥 PANNE TECHNIQUE · Fournaise centrale défectueuse";
+  if (kind === "bypass_detection") return "👮 INSPECTION · Hydro-Québec a détecté un vol d'électricité !";
+  return "❄️ GEL · Entrée d'eau principale gelée";
 }
 
 export function heatHint(u: HouseUtils, grid: GridOutage | null, ambient: number): string {
   const spec = heatById(u.heat);
-  if (grid && spec.needsHydro) return "Panne · le bois tient encore, pas l'électrique.";
-  if (u.broke && u.heat === "central") return "Fournaise à réparer.";
-  if (spec.needsWood && u.wood <= 0) return "Plus de bois · corde à la quincaillerie.";
-  if (u.heat === "thermopompe" && ambient <= -20) return "Thermopompe à bout sous −20 °C.";
-  if (u.frozen) return "Tuyaux gelés · faire dégeler.";
-  if (!u.heatOn) return "Chauffage coupé.";
+  if (u.bypassDetected) return "⚡ Courant coupé suite à fraude électrique !";
+  if (grid && spec.needsHydro && !u.generatorActive) return "⚡ Réseau en panne. Lancez la génératrice ou brûlez du bois !";
+  if (u.generatorActive && u.generatorFuel <= 0) return "⛽ Génératrice en panne d'essence !";
+  if (u.broke && u.heat === "central") return "🔧 Fournaise en panne.";
+  if (spec.needsWood && u.wood <= 0) return "🪵 Plus de bois d'allumage.";
+  if (u.heat === "thermopompe" && ambient <= -20) return "❄️ Tempête extrême : Thermopompe inopérante.";
+  if (u.frozen) return "❄️ Tuyaux gelés.";
+  if (!u.heatOn) return "Chauffage désactivé.";
   return spec.hint;
 }
 
@@ -301,6 +327,7 @@ export interface UtilTickCtx {
   weather: "clear" | "rain" | "snow" | "fog" | "storm";
   month: number;
   elapsed: number;
+  weedPlantsCount?: number;
 }
 
 export interface UtilTickResult {
@@ -329,14 +356,14 @@ export function tickHouseUtils(
     nextGrid = { ...nextGrid, t: nextGrid.t - dt };
     if (nextGrid.t <= 0) {
       nextGrid = null;
-      notice = "Hydro-Québec · réseau rétabli";
+      notice = "⚡ RÉSEAU RÉTABLI · Hydro-Québec a complété les travaux";
     }
   } else {
     const winter = ctx.month <= 3 || ctx.month >= 11;
-    if (winter && ctx.weather === "storm" && Math.random() < 0.0038 * dt) {
+    if (winter && ctx.weather === "storm" && Math.random() < 0.0035 * dt) {
       nextGrid = { kind: "verglas", t: 48 + Math.random() * 42 };
       notice = outageLabel("verglas");
-    } else if (winter && ctx.weather === "snow" && Math.random() < 0.0014 * dt) {
+    } else if (winter && ctx.weather === "snow" && Math.random() < 0.0012 * dt) {
       nextGrid = { kind: "panne", t: 28 + Math.random() * 24 };
       notice = outageLabel("panne");
     }
@@ -345,44 +372,83 @@ export function tickHouseUtils(
   for (const id of owned) {
     const cur = houses[id] ?? emptyUtils(id);
     const spec = heatById(cur.heat);
+    
     let wood = cur.wood;
     let broke = cur.broke;
     let frozen = cur.frozen;
     let heatOn = cur.heatOn;
     let billAcc = cur.billAcc + dt;
+    
+    let bypassActive = cur.bypassActive;
+    let bypassDetected = cur.bypassDetected;
+    let generatorActive = cur.generatorActive;
+    let generatorFuel = cur.generatorFuel;
+    let hydroAlertLevel = cur.hydroAlertLevel;
+
+    if (generatorActive && cur.generatorInstalled && generatorFuel > 0) {
+      const fuelBurn = (dt * GENERATOR_CONSUMPTION) / 10;
+      generatorFuel = Math.max(0, generatorFuel - fuelBurn);
+      if (generatorFuel <= 0) {
+        generatorActive = false;
+        notice = "⛽ Génératrice : Panne d'essence ! Chauffage coupé.";
+      }
+    } else {
+      generatorActive = false;
+    }
+
+    const plants = ctx.weedPlantsCount ?? 0;
+    if (plants > 3 && !bypassActive) {
+      hydroAlertLevel = Math.min(100, hydroAlertLevel + dt * (plants * 0.15));
+    } else if (bypassActive) {
+      hydroAlertLevel = Math.min(100, hydroAlertLevel + dt * 0.25);
+    } else {
+      hydroAlertLevel = Math.max(0, hydroAlertLevel - dt * 0.1);
+    }
+
+    if (hydroAlertLevel > 75 && !bypassDetected && Math.random() < 0.015 * dt) {
+      bypassDetected = true;
+      bypassActive = false;
+      heatOn = false;
+      notice = outageLabel("bypass_detection");
+    }
 
     if (heatOn && spec.needsWood && wood > 0) {
       const burn = dt / WOOD_BURN_EVERY;
       wood = Math.max(0, wood - burn);
       if (wood <= 0) {
         wood = 0;
-        notice = notice ?? "Plus de bois · le poêle s'éteint";
+        notice = "🪵 Plus de bois · Le poêle à bois s'est éteint";
       }
     }
 
-    if (!broke && cur.heat === "central" && (ctx.month <= 3 || ctx.month >= 11) && Math.random() < 0.0009 * dt) {
+    if (!broke && cur.heat === "central" && (ctx.month <= 3 || ctx.month >= 11) && Math.random() < 0.0008 * dt) {
       broke = true;
       heatOn = false;
-      notice = notice ?? outageLabel("fournaise");
+      notice = outageLabel("fournaise");
     }
 
-    const works = heatWorks({ ...cur, wood, broke, heatOn }, nextGrid, ctx.ambient);
-    const target = indoorTarget({ ...cur, wood, broke, heatOn }, nextGrid, ctx.ambient);
+    const works = heatWorks({ ...cur, wood, broke, heatOn, generatorActive, generatorFuel, bypassDetected }, nextGrid, ctx.ambient);
+    const target = indoorTarget({ ...cur, wood, broke, heatOn, generatorActive, generatorFuel, bypassDetected }, nextGrid, ctx.ambient);
     const drift = works ? 0.55 : 0.28;
+    
     let indoorC = cur.indoorC + (target - cur.indoorC) * Math.min(1, dt * drift);
     indoorC = Math.round(indoorC * 10) / 10;
 
-    if (!frozen && indoorC < 2.4 && ctx.ambient < -6 && cur.waterOn) {
+    if (!frozen && indoorC < 1.8 && ctx.ambient < -6 && cur.waterOn) {
       frozen = true;
-      notice = notice ?? outageLabel("gel");
+      notice = outageLabel("gel");
     }
-    if (frozen && indoorC > 12) frozen = false;
+    if (frozen && indoorC > 14) {
+      frozen = false;
+    }
 
     if (billAcc >= BILL_EVERY) {
-      const bill = monthlyBill({ ...cur, heatOn }, ctx.month);
+      const bill = monthlyBill({ ...cur, heatOn, bypassActive }, ctx.month);
       debit += bill.total;
       billAcc = 0;
-      label = `Hydro-Québec ${bill.hydro}\u00a0$ · eau ${bill.water}\u00a0$`;
+      label = bypassActive 
+        ? "⚡ FRAUDE ÉLECTRIQUE · Compteur gelé (0$)" 
+        : `Hydro-Québec ${bill.hydro}\u00a0$ · eau ${bill.water}\u00a0$`;
     }
 
     houses[id] = {
@@ -393,6 +459,11 @@ export function tickHouseUtils(
       indoorC,
       broke,
       frozen,
+      bypassActive,
+      bypassDetected,
+      generatorActive,
+      generatorFuel: Math.round(generatorFuel * 100) / 100,
+      hydroAlertLevel: Math.round(hydroAlertLevel),
     };
   }
 
@@ -423,10 +494,10 @@ export function buildHeatPump(): THREE.Group {
 export function buildWoodPile(): THREE.Group {
   const g = new THREE.Group();
   g.name = "corde_bois";
-  const wood = tex.mat("noyer", 0.6, 0.35, 0.7, 0.05);
+  const woodMat = tex.mat("noyer", 0.6, 0.35, 0.7, 0.05);
   for (let row = 0; row < 3; row++) {
     for (let i = 0; i < 5; i++) {
-      const log = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.72, 6), wood);
+      const log = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.72, 6), woodMat);
       log.rotation.z = Math.PI / 2;
       log.position.set((i - 2) * 0.16, 0.1 + row * 0.15, (row % 2) * 0.04);
       log.castShadow = true;
@@ -527,16 +598,93 @@ export function setHeatGlow(root: THREE.Object3D, on: boolean) {
   });
 }
 
-export function buildHydroMeter(): THREE.Group {
+export function buildHydroMeter(bypassActive = false): THREE.Group {
   const g = new THREE.Group();
   g.name = "compteur_hydro";
-  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 1.05, 6), matLib.get(0x3a3e42, 0.5, 0.3));
+  
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 1.05, 8), matLib.get(0x3a3e42, 0.5, 0.3));
   post.position.y = 0.52;
   g.add(post);
+  
   g.add(box(0.28, 0.36, 0.16, 0, 1.05, 0, 0x6a6e72, 0.3, 0.45));
-  const glass = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.14, 0.03), matLib.getEmissive(0x86efac, 0x22c55e, 0.35));
-  glass.position.set(0, 1.08, 0.08);
+  
+  const globe = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.1, 12), matLib.get(0xc8dce8, 0.1, 0.2));
+  globe.rotation.x = Math.PI / 2;
+  globe.position.set(0, 1.05, 0.11);
+  g.add(globe);
+
+  const glass = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 0.08, 0.03), 
+    matLib.getEmissive(0x86efac, 0x22c55e, 0.6)
+  );
+  glass.position.set(0, 1.05, 0.15);
   g.add(glass);
+
+  const logo = new THREE.Mesh(new THREE.CircleGeometry(0.02, 8), matLib.get(0xf97316));
+  logo.position.set(-0.06, 1.18, 0.082);
+  g.add(logo);
+
+  if (bypassActive) {
+    const cableMat = new THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.8 });
+    const bypassCable = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.012, 0.012, 0.34, 6),
+      cableMat
+    );
+    bypassCable.rotation.z = Math.PI / 4;
+    bypassCable.position.set(-0.11, 0.94, 0.09);
+    bypassCable.castShadow = true;
+    g.add(bypassCable);
+  }
+
+  return g;
+}
+
+export function buildGenerator(): THREE.Group {
+  const g = new THREE.Group();
+  g.name = "generatrice_secours";
+
+  const frameMat = matLib.get(0xfacc15, 0.3, 0.8);
+  for (const x of [-0.22, 0.22]) {
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.38, 0.44), frameMat);
+    bar.position.set(x, 0.19, 0);
+    g.add(bar);
+  }
+
+  const engine = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.22, 0.26), matLib.get(0x1a1a1a, 0.8, 0.4));
+  engine.position.set(0, 0.14, -0.02);
+  engine.castShadow = true;
+  g.add(engine);
+
+  const pullCord = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.03, 10), matLib.get(0x8a9096));
+  pullCord.rotation.z = Math.PI / 2;
+  pullCord.position.set(-0.13, 0.14, 0.02);
+  g.add(pullCord);
+
+  const fuelTank = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.06, 0.36), matLib.get(0xe2e8f0, 0.4, 0.2));
+  fuelTank.position.set(0, 0.32, 0);
+  g.add(fuelTank);
+
+  const gasCap = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 0.015, 8), matLib.get(0xdc2626));
+  gasCap.position.set(0.08, 0.355, 0.08);
+  g.add(gasCap);
+
+  const panel = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.14, 0.22), matLib.get(0x2d3748, 0.7));
+  panel.position.set(0.12, 0.16, 0);
+  g.add(panel);
+
+  const outlet = new THREE.Mesh(new THREE.BoxGeometry(0.005, 0.04, 0.03), matLib.get(0x1a1a1a));
+  outlet.position.set(0.131, 0.18, 0.04);
+  g.add(outlet);
+
+  const switchBtn = new THREE.Mesh(new THREE.BoxGeometry(0.005, 0.02, 0.015), matLib.getEmissive(0x22c55e, 0x22c55e, 0.8));
+  switchBtn.position.set(0.131, 0.14, -0.06);
+  g.add(switchBtn);
+
+  const muffler = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.1, 10), matLib.get(0x94a3b8, 0.2, 0.9));
+  muffler.rotation.x = Math.PI / 2;
+  muffler.position.set(-0.06, 0.18, -0.15);
+  g.add(muffler);
+
   return g;
 }
 
@@ -545,16 +693,19 @@ export function attachScenicHeat(parent: THREE.Object3D, heat: HeatId, yaw: numb
   const fz = Math.cos(yaw);
   const rx = Math.cos(yaw);
   const rz = -Math.sin(yaw);
+  
   const meter = buildHydroMeter();
   meter.position.set(rx * (side * 0.55) - fx * 0.4, 0, rz * (side * 0.55) - fz * 0.4);
   meter.rotation.y = yaw + Math.PI / 2;
   parent.add(meter);
+  
   if (heat === "thermopompe" || heat === "central" || heat === "electrique") {
     const unit = buildHeatPump();
     unit.position.set(rx * side - fx * back * 0.15, 0, rz * side - fz * back * 0.15);
     unit.rotation.y = yaw + Math.PI / 2;
     parent.add(unit);
   }
+  
   if (heat === "poele" || heat === "foyer") {
     const pile = buildWoodPile();
     pile.position.set(-rx * (side * 0.72) - fx * 1.2, 0, -rz * (side * 0.72) - fz * 1.2);

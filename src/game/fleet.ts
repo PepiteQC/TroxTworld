@@ -73,7 +73,7 @@ export const FLEET: FleetEntry[] = [
   {
     id: "sq",
     name: "Intercepteur SQ",
-    hint: "Ancienne patrouille",
+    hint: "Gyrophare SQ · H pour les codes",
     price: 14200,
     maxSpeed: 46,
     accel: 20.5,
@@ -81,7 +81,7 @@ export const FLEET: FleetEntry[] = [
     mass: 1,
     caisse: false,
     pro: false,
-    build: () => buildPolice(),
+    build: () => buildPolice(true),
   },
   {
     id: "moto",

@@ -237,7 +237,7 @@ export function fillPlayer(group: THREE.Group, look: Appearance) {
   const hairMat = matLib.get(HAIR_TONES[look.hair] ?? HAIR_TONES[1]!, 0.95);
 
   const torso = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.62, 0.26), jacket);
-  torso.name = "ether-body";
+  torso.name = "TorsoJoint";
   torso.position.y = 1.18;
   torso.castShadow = true;
   group.add(torso);
@@ -253,6 +253,7 @@ export function fillPlayer(group: THREE.Group, look: Appearance) {
   group.add(hips);
 
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8), skin);
+  head.name = "HeadJoint";
   head.position.y = 1.62;
   head.castShadow = true;
   group.add(head);
@@ -284,7 +285,7 @@ export function fillPlayer(group: THREE.Group, look: Appearance) {
     const arm = new THREE.Group();
     arm.position.set(s * 0.28, 1.38, 0);
     arm.userData.arm = s;
-    if (s === 1) arm.name = "ether-arm-r";
+    arm.name = s === 1 ? "ArmRJoint" : "ArmLJoint";
     group.add(arm);
     const sleeve = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.55, 0.1), jacket);
     sleeve.position.y = -0.22;
@@ -296,6 +297,7 @@ export function fillPlayer(group: THREE.Group, look: Appearance) {
     const leg = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.7, 0.16), denim);
     leg.position.set(s * 0.11, 0.4, 0);
     leg.userData.leg = s;
+    leg.name = s === 1 ? "LegRJoint" : "LegLJoint";
     group.add(leg);
     const boot = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.22), matLib.get(QC_PALETTE.porte, 0.9));
     boot.position.set(s * 0.11, 0.06, 0.02);
@@ -321,3 +323,10 @@ export function pulseAura(group: THREE.Group, elapsed: number) {
     }
   });
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BOUCHONS DE COMPATIBILITÉ (Legacy Exports)
+// ─────────────────────────────────────────────────────────────────────────────
+export type PlayerData = any;
+export function getPlayerData(): PlayerData { return null; }
+export function getPlayerId(): string { return "local_player"; }

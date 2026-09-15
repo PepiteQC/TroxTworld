@@ -10,6 +10,7 @@ import { corpseProp, DEAD_LIE, DEAD_SIT } from "./corpses";
 import { ar15Prop, shotgunProp, pistolProp } from "./guns";
 import { injuredProp, INJURED_CLIPS } from "./injured";
 import { catalogBuilder } from "./props3d";
+import { isFoodId, spawnFood } from "./food";
 
 /** IDs EtherWorld — le mesh réel est généré depuis dims, pas 770 fichiers GLB. */
 export interface ModelMeta {
@@ -83,6 +84,36 @@ export const MODEL_CATALOG: Record<string, ModelMeta> = {
   sink: m("sink", "Évier", "cuisine", [0.8, 0.9, 0.6], "#aaaaaa"),
   kisland: m("kisland", "Îlot", "cuisine", [1.6, 0.9, 0.8], "#c8c4bc"),
   micro: m("micro", "Micro-ondes", "cuisine", [0.5, 0.32, 0.4], "#2a2a2e"),
+
+  poutine: m("poutine", "Poutine", "aliments", [0.22, 0.12, 0.22], "#e8b64a"),
+  tourtiere: m("tourtiere", "Tourtière", "aliments", [0.26, 0.1, 0.26], "#c98a3f"),
+  pouding_chomeur: m("pouding_chomeur", "Pouding chômeur", "aliments", [0.16, 0.12, 0.16], "#a5622a"),
+  cretons: m("cretons", "Crétons", "aliments", [0.12, 0.08, 0.12], "#6b4632"),
+  soupe_pois: m("soupe_pois", "Soupe aux pois", "aliments", [0.2, 0.1, 0.2], "#5c8a3a"),
+  pate_chinois: m("pate_chinois", "Pâté chinois", "aliments", [0.22, 0.1, 0.16], "#c9a874"),
+  viande_fumee: m("viande_fumee", "Viande fumée", "aliments", [0.12, 0.1, 0.1], "#6b4632"),
+  bagel: m("bagel", "Bagel Montréal", "aliments", [0.16, 0.06, 0.16], "#d9a85c"),
+  fromage_grains: m("fromage_grains", "Fromage en grains", "aliments", [0.12, 0.16, 0.04], "#f5edc8"),
+  tarte_sucre: m("tarte_sucre", "Tarte au sucre", "aliments", [0.22, 0.06, 0.22], "#a5622a"),
+  pomme: m("pomme", "Pomme", "aliments", [0.1, 0.1, 0.1], "#c22e2e"),
+  banane: m("banane", "Banane", "aliments", [0.16, 0.06, 0.04], "#ecd23a"),
+  orange: m("orange", "Orange", "aliments", [0.1, 0.1, 0.1], "#e87a1e"),
+  carotte: m("carotte", "Carotte", "aliments", [0.06, 0.04, 0.16], "#e2661c"),
+  croissant: m("croissant", "Croissant", "aliments", [0.14, 0.06, 0.08], "#d9a85c"),
+  eau: m("eau", "Bouteille d'eau", "aliments", [0.06, 0.2, 0.06], "#dfeef2"),
+  jus_orange: m("jus_orange", "Jus d'orange", "aliments", [0.06, 0.16, 0.04], "#f5960f"),
+  barre_chocolat: m("barre_chocolat", "Barre chocolat", "aliments", [0.12, 0.03, 0.05], "#3a2113"),
+  beigne: m("beigne", "Beigne glacé", "aliments", [0.14, 0.05, 0.14], "#e89ac4"),
+  hotdog: m("hotdog", "Steamé", "aliments", [0.16, 0.05, 0.06], "#d9a85c"),
+  pizza: m("pizza", "Pointe pizza", "aliments", [0.18, 0.04, 0.16], "#f0c94a"),
+  chips: m("chips", "Sac de chips", "aliments", [0.1, 0.16, 0.05], "#d8342a"),
+  burger: m("burger", "Burger", "aliments", [0.12, 0.08, 0.12], "#d9a85c"),
+  cafe: m("cafe", "Café filtre", "aliments", [0.08, 0.08, 0.08], "#3a2213"),
+  cola: m("cola", "Cola érable", "aliments", [0.06, 0.12, 0.06], "#c7cbd1"),
+  biere: m("biere", "Bière blonde", "aliments", [0.06, 0.12, 0.06], "#e8b830"),
+  pain: m("pain", "Baguette", "aliments", [0.44, 0.05, 0.05], "#d9a85c"),
+  patate: m("patate", "Patate", "aliments", [0.12, 0.08, 0.1], "#c9a874"),
+  sirop: m("sirop", "Sirop d'érable", "aliments", [0.08, 0.14, 0.08], "#c7cbd1"),
 
   pine: m("pine", "Pin", "exterieur", [1.6, 5.5, 1.6], "#0a5a0a"),
   palm: m("palm", "Palmier", "exterieur", [1.2, 5, 1.2], "#2a8a2a"),
@@ -167,6 +198,7 @@ export const MODEL_CATEGORIES = [
   { id: "structures", label: "Structures" },
   { id: "meubles", label: "Meubles" },
   { id: "cuisine", label: "Cuisine" },
+  { id: "aliments", label: "Aliments" },
   { id: "sdb", label: "Salle de bain" },
   { id: "exterieur", label: "Extérieur" },
   { id: "routes", label: "Routes" },
@@ -261,6 +293,9 @@ export function buildFromMeta(id: string): THREE.Group | null {
   }
   if (id === "corpse" || id === "corpse_sit" || id.startsWith("sit_") || id.startsWith("lie_")) {
     return corpseProp(id);
+  }
+  if (isFoodId(id)) {
+    return spawnFood(id, new THREE.Vector3(), 1);
   }
   const crafted = catalogBuilder(id);
   if (crafted) return crafted;

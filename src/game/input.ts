@@ -18,6 +18,10 @@ export interface Actions {
   firm: boolean;
   build: boolean;
   rotate: boolean;
+  chat: boolean;
+  siren: boolean;
+  gesture: boolean;
+  surrender: boolean;
 }
 
 const GAME_CODES = new Set([
@@ -47,6 +51,11 @@ const GAME_CODES = new Set([
   "KeyK",
   "KeyB",
   "KeyQ",
+  "KeyT",
+  "KeyH",
+  "KeyU",
+  "KeyV",
+  "KeyX",
   "Backquote",
   "F1",
 ]);
@@ -85,6 +94,10 @@ export class Input {
   prevFirm = false;
   prevBuild = false;
   prevRotate = false;
+  prevChat = false;
+  prevSiren = false;
+  prevGesture = false;
+  prevSurrender = false;
   cameraEdge = false;
   nightEdge = false;
   mapEdge = false;
@@ -99,6 +112,10 @@ export class Input {
   firmEdge = false;
   buildEdge = false;
   rotateEdge = false;
+  chatEdge = false;
+  sirenEdge = false;
+  gestureEdge = false;
+  surrenderEdge = false;
   touchInteract = false;
   private attached = false;
 
@@ -178,7 +195,7 @@ export class Input {
     throttle = Math.max(throttle, this.touchThrottle);
     brake = Math.max(brake, this.touchBrake);
 
-    const cameraHeld = keys.has("KeyC");
+    const cameraHeld = keys.has("KeyC") || keys.has("KeyV");
     const nightHeld = keys.has("KeyN");
     const mapHeld = keys.has("KeyM");
     const pauseHeld = keys.has("Escape");
@@ -192,6 +209,10 @@ export class Input {
     const firmHeld = keys.has("KeyK");
     const buildHeld = keys.has("KeyB");
     const rotateHeld = keys.has("KeyQ");
+    const chatHeld = keys.has("KeyT");
+    const sirenHeld = keys.has("KeyH");
+    const gestureHeld = keys.has("KeyU");
+    const surrenderHeld = keys.has("KeyX");
     this.cameraEdge = cameraHeld && !this.prevCamera;
     this.nightEdge = nightHeld && !this.prevNight;
     this.mapEdge = mapHeld && !this.prevMap;
@@ -206,6 +227,10 @@ export class Input {
     this.firmEdge = firmHeld && !this.prevFirm;
     this.buildEdge = buildHeld && !this.prevBuild;
     this.rotateEdge = rotateHeld && !this.prevRotate;
+    this.chatEdge = chatHeld && !this.prevChat;
+    this.sirenEdge = sirenHeld && !this.prevSiren;
+    this.gestureEdge = gestureHeld && !this.prevGesture;
+    this.surrenderEdge = surrenderHeld && !this.prevSurrender;
     this.prevCamera = cameraHeld;
     this.prevNight = nightHeld;
     this.prevMap = mapHeld;
@@ -220,6 +245,10 @@ export class Input {
     this.prevFirm = firmHeld;
     this.prevBuild = buildHeld;
     this.prevRotate = rotateHeld;
+    this.prevChat = chatHeld;
+    this.prevSiren = sirenHeld;
+    this.prevGesture = gestureHeld;
+    this.prevSurrender = surrenderHeld;
 
     const boost = keys.has("ShiftLeft") || keys.has("ShiftRight");
     const handbrake = keys.has("Space") || this.touchHandbrake;
@@ -244,6 +273,10 @@ export class Input {
       firm: this.firmEdge,
       build: this.buildEdge,
       rotate: this.rotateEdge,
+      chat: this.chatEdge,
+      siren: this.sirenEdge,
+      gesture: this.gestureEdge,
+      surrender: this.surrenderEdge,
     };
   }
 }

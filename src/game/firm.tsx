@@ -109,13 +109,18 @@ function ManageFirm() {
   const firm = useGameStore((s) => s.firm)!;
   const inventory = useGameStore((s) => s.inventory);
   const op = canOperate(firm);
-  const bag = Object.entries(inventory)
-    .filter(([, n]) => n > 0)
-    .map(([id, n]) => ({ item: itemById(id), n }))
+
+  const inventoryMap = inventory as Record<string, number>;
+  const stockMap = firm.stock as Record<string, number>;
+
+  const bag = Object.entries(inventoryMap)
+    .filter(([, n]) => Number(n) > 0)
+    .map(([id, n]) => ({ item: itemById(id), n: Number(n) }))
     .filter((x): x is { item: ShopItem; n: number } => Boolean(x.item));
-  const stock = Object.entries(firm.stock)
-    .filter(([, n]) => n > 0)
-    .map(([id, n]) => ({ item: itemById(id), n }))
+
+  const stock = Object.entries(stockMap)
+    .filter(([, n]) => Number(n) > 0)
+    .map(([id, n]) => ({ item: itemById(id), n: Number(n) }))
     .filter((x): x is { item: ShopItem; n: number } => Boolean(x.item));
 
   return (
@@ -171,7 +176,7 @@ function ManageFirm() {
         <p className="text-[10px] tracking-[0.2em] text-subtle uppercase">Permis</p>
         <ul className="mt-1 space-y-1">
           {firmSpec(firm.type).permits.map((p) => {
-            const held = firm.permits.some((x) => x.type === p);
+            const held = firm.permits.some((x: { type: string }) => x.type === p);
             const spec = PERMIT_FEES[p];
             return (
               <li key={p} className="flex items-center justify-between rounded-md border border-border bg-surface px-3 py-2">

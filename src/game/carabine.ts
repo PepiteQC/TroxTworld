@@ -1,18 +1,18 @@
 import * as THREE from "three";
-import { matLib } from "./materials";
+import { matLib, type QcMat } from "./materials";
 import { tex } from "./textures";
 
 const box = new THREE.Box3();
 const size = new THREE.Vector3();
 
 let proto: THREE.Group | null = null;
-let stockMat: THREE.MeshStandardMaterial | null = null;
-let blueMat: THREE.MeshStandardMaterial | null = null;
-let padMat: THREE.MeshStandardMaterial | null = null;
-let brassMat: THREE.MeshStandardMaterial | null = null;
-let glassMat: THREE.MeshStandardMaterial | null = null;
-let copperMat: THREE.MeshStandardMaterial | null = null;
-let springMat: THREE.MeshStandardMaterial | null = null;
+let stockMat: QcMat | null = null;
+let blueMat: QcMat | null = null;
+let padMat: QcMat | null = null;
+let brassMat: QcMat | null = null;
+let glassMat: QcMat | null = null;
+let copperMat: QcMat | null = null;
+let springMat: QcMat | null = null;
 
 function mats() {
   if (stockMat) return;
@@ -22,13 +22,7 @@ function mats() {
   brassMat = matLib.get(0xb08a48, 0.35, 0.7);
   copperMat = matLib.get(0x8a5a32, 0.4, 0.55);
   springMat = matLib.get(0x6a6e72, 0.28, 0.8);
-  glassMat = new THREE.MeshStandardMaterial({
-    color: 0x142418,
-    roughness: 0.08,
-    metalness: 0.35,
-    transparent: true,
-    opacity: 0.72,
-  });
+  glassMat = matLib.glass(0x142418, 0.72);
 }
 
 function add(

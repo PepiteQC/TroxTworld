@@ -53,10 +53,8 @@ export function buildEboulis1894(length = 280, width = 170, angle = 0.5): THREE.
   geo.computeVertexNormals();
   const basinMesh = new THREE.Mesh(
     geo,
-    new THREE.MeshStandardMaterial({
+    new THREE.MeshLambertMaterial({
       vertexColors: true,
-      roughness: 1,
-      metalness: 0,
       flatShading: true,
     }),
   );
@@ -276,7 +274,7 @@ export function buildGorge(length = 220, angle = 0.3): THREE.Group {
   rgeo.setAttribute("position", new THREE.Float32BufferAttribute(riverPos, 3));
   rgeo.setIndex(riverIdx);
   rgeo.computeVertexNormals();
-  const river = new THREE.Mesh(rgeo, matLib.get(0x2a5a5a, 0.12, 0.58));
+  const river = new THREE.Mesh(rgeo, matLib.water(0x2a5a5a, 0.9));
   river.userData.isGorgeRiver = true;
   g.add(river);
   return g;
@@ -287,13 +285,7 @@ export function buildPlageParc(radius = 78): THREE.Group {
   g.name = "plage_lac_carillon";
   const deep = new THREE.Mesh(
     new THREE.CircleGeometry(radius, 40),
-    new THREE.MeshStandardMaterial({
-      color: 0x1a4a60,
-      roughness: 0.06,
-      metalness: 0.62,
-      transparent: true,
-      opacity: 0.9,
-    }),
+    matLib.water(0x1a4a60, 0.9),
   );
   deep.rotation.x = -Math.PI / 2;
   deep.position.set(0, -0.4, -radius * 0.35);
@@ -431,40 +423,84 @@ export function buildMoulin(): THREE.Group {
   return g;
 }
 
-export function buildPark(width: number, depth: number): THREE.Group {
+export { buildPark, buildCemetery } from "./park";
+
+/** Marina de Portneuf — hangar, quai de bois, pilotis, trois bateaux. */
+export function buildMarina(): THREE.Group {
   const g = new THREE.Group();
-  const lawn = new THREE.Mesh(
-    new THREE.PlaneGeometry(width, depth),
-    matLib.get(0x4a6a3a, 1),
-  );
-  lawn.rotation.x = -Math.PI / 2;
-  lawn.receiveShadow = true;
-  g.add(lawn);
-  const path = matLib.get(0x9a9086, 0.95);
-  const p1 = new THREE.Mesh(new THREE.PlaneGeometry(width, 2.6), path);
-  p1.rotation.x = -Math.PI / 2;
-  p1.position.y = 0.03;
-  g.add(p1);
-  const p2 = new THREE.Mesh(new THREE.PlaneGeometry(2.6, depth), path);
-  p2.rotation.x = -Math.PI / 2;
-  p2.position.y = 0.03;
-  g.add(p2);
-  const gazeboRoof = new THREE.Mesh(
-    new THREE.ConeGeometry(3.8, 2.0, 8),
-    matLib.get(QC_PALETTE.toleVerte, 0.75, 0.2),
-  );
-  gazeboRoof.position.y = 4.4;
-  gazeboRoof.castShadow = true;
-  g.add(gazeboRoof);
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2;
-    const col = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.1, 0.12, 2.8, 6),
-      matLib.get(QC_PALETTE.boisBlanc, 0.9),
-    );
-    col.position.set(Math.cos(a) * 2.7, 1.5, Math.sin(a) * 2.7);
-    g.add(col);
+  g.name = "marina_portneuf";
+  const wood = matLib.get(0x6a5848, 0.96);
+  const plank = matLib.get(0x8a7a62, 0.94);
+  const steel = matLib.get(0x5a5e62, 0.5, 0.45);
+
+  const apron = new THREE.Mesh(new THREE.BoxGeometry(28, 0.16, 14), matLib.get(0x7a766e, 1));
+  apron.position.set(0, 0.08, -4);
+  apron.receiveShadow = true;
+  g.add(apron);
+
+  const shed = new THREE.Mesh(new THREE.BoxGeometry(10, 4.2, 7.2), matLib.get(QC_PALETTE.toleVerte, 0.88));
+  shed.position.set(-7, 2.2, -5);
+  shed.castShadow = true;
+  g.add(shed);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(11.2, 0.18, 8.2), matLib.get(QC_PALETTE.toleNoire, 0.75, 0.2));
+  roof.position.set(-7, 4.45, -5);
+  roof.rotation.z = 0.06;
+  g.add(roof);
+  const door = new THREE.Mesh(new THREE.BoxGeometry(2.4, 2.6, 0.12), matLib.get(QC_PALETTE.porte, 0.85));
+  door.position.set(-7, 1.4, -1.35);
+  g.add(door);
+
+  const office = new THREE.Mesh(new THREE.BoxGeometry(5.2, 3.1, 4.4), matLib.get(QC_PALETTE.boisCreme, 0.92));
+  office.position.set(6.5, 1.6, -5.2);
+  office.castShadow = true;
+  g.add(office);
+  const officeRoof = new THREE.Mesh(new THREE.BoxGeometry(5.8, 0.14, 5), matLib.get(QC_PALETTE.toleRouge, 0.75, 0.2));
+  officeRoof.position.set(6.5, 3.3, -5.2);
+  g.add(officeRoof);
+
+  const dock = new THREE.Mesh(new THREE.BoxGeometry(5.4, 0.22, 22), plank);
+  dock.position.set(0, 0.42, 12);
+  dock.castShadow = true;
+  g.add(dock);
+  const finger = new THREE.Mesh(new THREE.BoxGeometry(16, 0.2, 1.6), plank);
+  finger.position.set(0, 0.42, 22);
+  g.add(finger);
+
+  for (const [x, z] of [
+    [-2.2, 4],
+    [2.2, 4],
+    [-2.2, 12],
+    [2.2, 12],
+    [-2.2, 20],
+    [2.2, 20],
+    [-7, 22],
+    [7, 22],
+  ] as Array<[number, number]>) {
+    const pile = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 2.4, 6), wood);
+    pile.position.set(x, 0.2, z);
+    pile.castShadow = true;
+    g.add(pile);
   }
+
+  const boatCols = [0x2a6a48, 0xb03828, 0xe0b038];
+  for (let i = 0; i < 3; i++) {
+    const hull = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.42, 0.42, 4.6, 8),
+      matLib.get(boatCols[i]!, 0.45, 0.15),
+    );
+    hull.rotation.x = Math.PI / 2;
+    hull.scale.set(1, 1, 0.5);
+    hull.position.set(-6 + i * 6, 0.28, 18);
+    hull.userData.isBoat = true;
+    g.add(hull);
+    const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.7, 1.4), steel);
+    cabin.position.set(-6 + i * 6, 0.85, 17.2);
+    g.add(cabin);
+  }
+
+  const bollard = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.7, 6), steel);
+  bollard.position.set(2.2, 0.85, 12);
+  g.add(bollard);
   return g;
 }
 

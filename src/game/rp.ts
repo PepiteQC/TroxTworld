@@ -60,12 +60,6 @@ export interface AtmSpot {
 }
 
 export const ATM_SPOTS: AtmSpot[] = [
-  { id: "atm_portneuf", name: "Desjardins Portneuf", x: townCenter("portneuf")[0] + 16, z: townCenter("portneuf")[1] + 10 },
-  { id: "atm_pont", name: "Desjardins Pont-Rouge", x: townCenter("pont_rouge")[0] - 14, z: townCenter("pont_rouge")[1] + 8 },
-  { id: "atm_donna", name: "Desjardins Donnacona", x: townCenter("donnacona")[0] - 16, z: townCenter("donnacona")[1] + 8 },
-  { id: "atm_raymond", name: "Desjardins Saint-Raymond", x: townCenter("saint_raymond")[0] + 14, z: townCenter("saint_raymond")[1] + 8 },
-  { id: "atm_cap", name: "Desjardins Cap-Santé", x: townCenter("cap_sante")[0] - 12, z: townCenter("cap_sante")[1] + 8 },
-  { id: "atm_alban", name: "Desjardins Saint-Alban", x: townCenter("saint_alban")[0] + 12, z: townCenter("saint_alban")[1] + 8 },
   { id: "atm_sq", name: "Guichet du poste SQ", x: -82, z: -40 },
 ];
 
@@ -96,7 +90,7 @@ export const CRIMES: CrimeDef[] = [
   { id: "robbery", name: "Braquage du rang", reward: 220, stars: 2, hint: "Dépanneur après minuit." },
   { id: "carjacking", name: "Vol de char", reward: 340, stars: 3, hint: "Pick-up sur la 138." },
   { id: "drug_dealing", name: "Passe de poche", reward: 180, stars: 2, hint: "Coin sombre." },
-  { id: "bank_robbery", name: "Caisse Desjardins", reward: 720, stars: 4, hint: "Gros coup." },
+  { id: "bank_robbery", name: "Caisse populaire", reward: 720, stars: 4, hint: "Voûte du village." },
 ];
 
 export interface CrimeSpot {

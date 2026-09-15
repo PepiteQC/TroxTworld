@@ -8,6 +8,7 @@ import type { ShopItemId, ShopSpot } from "./commerce";
 import { itemById, shopNameFor } from "./commerce";
 import type { BoutiqueGarment } from "./boutique";
 import { villageCivicSpot, VILLAGES } from "./worlddata";
+import { SHELF_FOOD, spawnShopFood } from "./food";
 
 type WallBox = {
   minX: number;
@@ -25,10 +26,14 @@ export type DepAisle =
   | "biere"
   | "cafe"
   | "atm"
-  | "arriere";
+  | "arriere"
+  | "menu"
+  | "tables"
+  | "dessert"
+  | "boisson";
 
 export interface DepAisleHot {
-  id: DepAisle;
+  id: string;
   label: string;
   hint: string;
   x: number;
@@ -42,14 +47,14 @@ export const DEP_AISLES: Array<{
   hint: string;
   items: ShopItemId[];
 }> = [
-  { id: "caisse", label: "Comptoir", hint: "Caisse, steamé, journal.", items: ["hotdog", "journal"] },
-  { id: "frigo", label: "Frigos", hint: "Lait, cola, œufs.", items: ["lait", "cola", "oeufs", "lait_rang"] },
-  { id: "rayon", label: "Rayons", hint: "Chips, pain, patates.", items: ["chips", "pain", "beurre", "patate"] },
+  { id: "caisse", label: "Comptoir", hint: "Caisse, steamé, croissant.", items: ["hotdog", "journal", "croissant"] },
+  { id: "frigo", label: "Frigos", hint: "Lait, cola, eau, jus.", items: ["lait", "cola", "oeufs", "lait_rang", "eau", "jus_orange"] },
+  { id: "rayon", label: "Rayons", hint: "Chips, pain, fruits.", items: ["chips", "pain", "beurre", "patate", "pomme", "croissant", "barre_chocolat"] },
   { id: "loterie", label: "Loterie", hint: "Loto-Québec.", items: ["loto"] },
   { id: "tabac", label: "Tabac", hint: "Derrière le comptoir.", items: ["tabac"] },
   { id: "biere", label: "Frigo du fond", hint: "Bière froide.", items: ["biere"] },
-  { id: "cafe", label: "Café", hint: "Urne, slush, barre glacée.", items: ["cafe", "slush", "glace"] },
-  { id: "atm", label: "Guichet", hint: "Desjardins.", items: [] },
+  { id: "cafe", label: "Café", hint: "Urne, slush, beigne.", items: ["cafe", "slush", "glace", "beigne"] },
+  { id: "atm", label: "Guichet", hint: "Caisse populaire.", items: [] },
   { id: "arriere", label: "Arrière-boutique", hint: "Stock, personnel.", items: [] },
 ];
 
@@ -115,7 +120,7 @@ function box(
 }
 
 function productCard(id: ShopItemId, x: number, y: number, z: number, rotY = 0) {
-  const mat = new THREE.MeshStandardMaterial({ color: 0x22242c, roughness: 0.55 });
+  const mat = new THREE.MeshLambertMaterial({ color: 0x22242c });
   const loader = new THREE.TextureLoader();
   loader.load(`/products/${id}.jpg`, (tex) => {
     finishMap(tex, "clamp");
@@ -138,10 +143,8 @@ function coolerBank(x: number, z: number, n: number, yaw: number, glass = 0x7ec8
     const px = x - w / 2 + 0.46 + i * 0.92;
     const door = new THREE.Mesh(
       new THREE.PlaneGeometry(0.78, 1.72),
-      matLib.get(glass, 0.12, 0.55),
+      matLib.glass(glass, 0.42),
     );
-    (door.material as THREE.MeshStandardMaterial).transparent = true;
-    (door.material as THREE.MeshStandardMaterial).opacity = 0.42;
     door.position.set(px, 1.12, z + 0.41);
     g.add(door);
     const handle = new THREE.Mesh(
@@ -251,10 +254,10 @@ export function buildDepanneurInterior() {
   aisles.push({
     id: "frigo",
     label: "Frigos",
-    hint: "Lait, cola, œufs.",
+    hint: "Lait, cola, eau, jus.",
     x: -3.6,
     z: -0.4,
-    items: ["lait", "cola", "oeufs", "lait_rang"],
+    items: ["lait", "cola", "oeufs", "lait_rang", "eau", "jus_orange"],
   });
 
   g.add(coolerBank(-1.1, -4.85, 5, 0, 0x4a6a48));
@@ -275,10 +278,10 @@ export function buildDepanneurInterior() {
   aisles.push({
     id: "rayon",
     label: "Rayons",
-    hint: "Chips, pain, patates.",
+    hint: "Chips, pain, fruits.",
     x: 0.2,
     z: 1.35,
-    items: ["chips", "pain", "beurre", "patate"],
+    items: ["chips", "pain", "beurre", "patate", "pomme", "croissant", "barre_chocolat"],
   });
 
   g.add(box(3.6, 1.12, 0.92, 3.85, 0.56, -3.55, 0x3a3a3e, 0.15, 0.45));
@@ -296,7 +299,7 @@ export function buildDepanneurInterior() {
     hint: "Caisse, steamé.",
     x: 3.4,
     z: -2.7,
-    items: ["hotdog", "journal"],
+    items: ["hotdog", "journal", "croissant"],
   });
   aisles.push({
     id: "loterie",
@@ -325,10 +328,10 @@ export function buildDepanneurInterior() {
   aisles.push({
     id: "cafe",
     label: "Café",
-    hint: "Urne, slush.",
+    hint: "Urne, slush, beigne.",
     x: 4.4,
     z: -0.85,
-    items: ["cafe", "slush", "glace"],
+    items: ["cafe", "slush", "glace", "beigne"],
   });
 
   g.add(box(0.7, 1.45, 0.28, 5.85, 0.85, 2.4, 0x1a3a32, 0.25, 0.4));
@@ -390,6 +393,15 @@ export function buildDepanneurInterior() {
   for (const s of spots) {
     g.add(productCard(s.id, s.x, s.y ?? 1.28, s.z + 0.06, s.rot ?? 0));
     garments.push({ itemId: s.id, x: s.x, z: s.z });
+  }
+  for (const s of SHELF_FOOD) {
+    const food = spawnShopFood(s.id, new THREE.Vector3(s.x, s.y, s.z), s.scale ?? 1.2, Math.round(s.x * 17 + s.z * 9));
+    if (!food) continue;
+    if (s.rot) food.rotation.y = s.rot;
+    g.add(food);
+    if (!garments.some((x) => x.itemId === s.id && Math.hypot(x.x - s.x, x.z - s.z) < 0.4)) {
+      garments.push({ itemId: s.id, x: s.x, z: s.z });
+    }
   }
 
   const exitPlate = new THREE.Mesh(
