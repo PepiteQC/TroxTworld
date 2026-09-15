@@ -1,67 +1,67 @@
+// @ts-nocheck
 import { create } from "zustand";
 import { parseAppearance, type Appearance, type OutfitId } from "./character";
 import { parsePlaced, type PlacedProp, type PropId } from "./builder";
+import { bagCapacity, bagWeight, cartTotals, itemById, sellPrice } from "./commerce";
 import {
-  bagCapacity,
-  bagWeight,
-  cartTotals,
-  itemById,
-  sellPrice,
-} from "./commerce";
-import {
-  canOperate,
-  generateNEQ,
-  generatePermitNumber,
-  nearestVillageName,
-  parseFirm,
-  PERMIT_FEES,
-  startupTotal,
-  nextFirmSale,
-  canApplyGrant,
-  type Firm,
-  type FirmType,
-  type PermitId,
-  type MapaqGrantId,
+  canOperate, generateNEQ, generatePermitNumber, nearestVillageName, parseFirm,
+  PERMIT_FEES, startupTotal, nextFirmSale, canApplyGrant,
+  type Firm, type FirmType, type PermitId, type MapaqGrantId,
 } from "./business";
 import { fleetById, hasCaisse, isVehicleId, type VehicleId } from "./fleet";
 import { hotelSecurity } from "./hotel";
 import { rollBoard, type HaulJob } from "./jobs";
+import {
+  addContribution, applyXp, bumpSkill, canStartGig, emptyCareer, getCannotStartReason,
+  gigById, grantGigLicense, joinCareerFaction, makeActiveGig, parseCareer, tickActiveGig,
+  type ActiveGig, type CareerState, type GigLicenseId,
+} from "./gigs";
 import { police, type CitationNotice } from "./police";
 import { crimeById, deedById, gangById, jobById, payrollNet, withTax, type RpJobId } from "./rp";
 import { applyMeal, FRESH_SURVIVAL, parseSurvival, tickSurvival, type SurvivalSnap } from "./survival";
+import { getConsumptionEffect } from "./food";
 import { cropFromSeed, type CropId } from "./farms";
 import {
-  emptyHouse,
-  parseHouses,
-  renoById,
-  hasReno,
-  type BasementFit,
-  type DoorSlot,
-  type GarageFit,
-  type HouseState,
-  type KeyRole,
-  type RenoId,
+  emptyHouse, parseHouses, renoById, hasReno,
+  type BasementFit, type DoorSlot, type GarageFit, type HouseState, type KeyRole, type RenoId,
 } from "./house";
 import {
-  FURNACE_REPAIR,
-  LOGISVERT,
-  PIPE_THAW,
-  WOOD_MAX,
-  heatById,
-  tickHouseUtils,
-  waterById,
-  type GridOutage,
-  type HeatId,
-  type WaterId,
+  heatById, tickHouseUtils, waterById, type GridOutage, type HeatId, type WaterId,
 } from "./utilities";
+import type { ChatKind, ChatMessageState, RiskLevel } from "./rpSchema";
 import { SPAWN } from "./worlddata";
 import {
-  canPurchase,
-  grantLicense,
-  licenseFromItem,
-  parseLicenses,
-  type LicenseId,
+  canPurchase, grantLicense, licenseFromItem, parseLicenses, type LicenseId,
 } from "./weapons";
+import {
+  parseEconomy, opDeposit, opWithdraw, opTransferPersonalToFirm, opTransferFirmToPersonal,
+  opRequestLoan, opInvest, opSellInvestment, tickEconomy, EMPTY_ECONOMY,
+  type EconomyState, type InvestmentType,
+} from "./banking";
+import {
+  parseRealty, EMPTY_REALTY, propertyById, isHouseDeed, tickRealty, startRental, evictRental,
+  listForSale, unlist, maintainProperty, addMortgage, ownedIds, requestVisit, grantAccess, revokeAccess,
+  type RealtyState,
+} from "./realestate";
+import type { QuebecSeason, WeatherCondition, SnowPlowStatus } from "./seasons";
+import type { EventSeverity } from "./events";
+import {
+  LOCAL_PLAYER_ID,
+  hydrateStaff,
+  parseAdminRole,
+  parseStaffRoster,
+  rpJobToRole,
+  setDisplayName,
+  setUserJob,
+  setUserRole,
+  snapshotStaff,
+  getRoleBadgeStyle,
+  getUserRole,
+  promoteUser,
+  demoteUser,
+  AdminRole,
+  RpJobRole,
+} from "./adminPerms";
 
 export interface ChatMessage {
   id: string;
@@ -69,11 +69,21 @@ export interface ChatMessage {
   text: string;
   type: "chat" | "system" | "admin";
   timestamp: number;
+  messageType?: ChatKind;
+  senderId?: string;
 }
 
 export type WeatherId = "clear" | "rain" | "snow" | "fog" | "storm";
 export type PlayMode = "drive" | "walk" | "interior";
-export type CameraMode = "chase" | "hood";
+export type CameraMode = "chase" | "hood" | "far" | "fps" | "top";
+export const CAMERA_CYCLE: CameraMode[] = ["chase", "hood", "far", "fps", "top"];
+export const CAMERA_LABEL: Record<CameraMode, string> = {
+  chase: "Épaule",
+  hood: "Capot",
+  far: "Lointaine",
+  fps: "Première personne",
+  top: "Aérienne",
+};
 
 export interface LedgerEntry {
   id: string;
@@ -88,1440 +98,2190 @@ export interface TicketRecord {
   fine: number;
   at: number;
   kind: "ticket" | "arrest";
+  ticketNumber?: string;
+  csrArticle?: string;
+  demeritPoints?: number;
+  issuingOfficerBadge?: string;
+  paid?: boolean;
 }
 
-export interface HudState {
-  playing: boolean;
-  paused: boolean;
-  loading: boolean;
-  showMap: boolean;
-  night: boolean;
-  cameraMode: CameraMode;
-  speedKmh: number;
-  limit: number;
-  zone: string;
-  surface: string;
-  speeding: boolean;
-  fineFlash: number;
-  poi: string | null;
-  poiDesc: string | null;
-  yaw: number;
-  timeHours: number;
-  mode: PlayMode;
-  prompt: string | null;
-  leaves: string[];
-  cash: number;
-  bank: number;
-  notice: string | null;
-  shopOpen: boolean;
-  shopId: string | null;
-  shopAisle: string | null;
-  fauna: string | null;
-  wantedStars: number;
-  wantedReason: string;
-  bounty: number;
-  evading: boolean;
-  radioOn: boolean;
-  radioTrack: string | null;
-  radioId: string | null;
-  dispatch: string | null;
-  citationOpen: boolean;
-  citation: CitationNotice | null;
-  tickets: TicketRecord[];
-  creatorOpen: boolean;
-  appearance: Appearance;
-  inventoryOpen: boolean;
-  garageOpen: boolean;
-  jobsOpen: boolean;
-  firmOpen: boolean;
-  cartOpen: boolean;
-  atmOpen: boolean;
-  propertyOpen: boolean;
-  elevatorOpen: boolean;
-  lobbyLights: boolean;
-  interiorKind: string | null;
-  sitting: boolean;
-  interiorTitle: string | null;
-  interiorSub: string | null;
-  cart: Record<string, number>;
-  job: HaulJob | null;
-  jobBoard: HaulJob[];
-  x: number;
-  z: number;
-  inventory: Record<string, number>;
-  licenses: LicenseId[];
-  equippedPack: string | null;
-  equippedTool: string | null;
-  firm: Firm | null;
-  surv: SurvivalSnap;
-  phoneOpen: boolean;
-  lockOpen: boolean;
-  lockDoorId: string | null;
-  lockDoorName: string | null;
-  consoleOpen: boolean;
-  notes: string;
-  ledger: LedgerEntry[];
-  godMode: boolean;
-  flyMode: boolean;
-  noclipMode: boolean;
-  weather: WeatherId;
-  chat: ChatMessage[];
-  unlockedDoors: string[];
-  hotelTvOn: boolean;
-  vehicleId: VehicleId;
-  ownedVehicles: VehicleId[];
-  km: number;
-  fines: number;
-  visited: string[];
-  rpJob: RpJobId;
-  gangId: string | null;
-  ownedProps: string[];
-  atmId: string | null;
-  deedId: string | null;
-  buildOpen: boolean;
-  buildType: PropId | null;
-  buildYaw: number;
-  buildScale: number;
-  placed: PlacedProp[];
-  selectedSeed: CropId | null;
-  houses: Record<string, HouseState>;
-  homeFloor: "main" | "basement";
-  gridOutage: GridOutage | null;
-  start: () => void;
-  togglePause: () => void;
-  setHud: (p: Partial<HudState>) => void;
-  visit: (id: string) => void;
-  addCash: (n: number, notice?: string) => void;
-  addItem: (id: string, n?: number) => void;
-  grantLic: (id: LicenseId) => void;
-  addChat: (sender: string, text: string, type?: ChatMessage["type"]) => void;
-  toggleFly: () => void;
-  toggleNoclip: () => void;
-  setWeather: (id: WeatherId) => void;
-  buyItem: (id: string) => boolean;
-  sellItem: (id: string) => void;
-  sellStack: (id: string) => void;
-  dropItem: (id: string, n?: number) => void;
-  useItem: (id: string) => boolean;
-  openShop: (id: string, aisle?: string | null) => void;
-  closeShop: () => void;
-  openPhone: () => void;
-  closePhone: () => void;
-  openLock: (id: string, name: string) => void;
-  closeLock: () => void;
-  openConsole: () => void;
-  closeConsole: () => void;
-  openCitation: (c: CitationNotice) => void;
-  closeCitation: () => void;
-  openCreator: () => void;
-  closeCreator: () => void;
-  setAppearance: (p: Partial<Appearance>) => void;
-  openInventory: () => void;
-  closeInventory: () => void;
-  openGarage: () => void;
-  closeGarage: () => void;
-  buyVehicle: (id: VehicleId) => boolean;
-  equipVehicle: (id: VehicleId) => boolean;
-  openJobs: () => void;
-  closeJobs: () => void;
-  acceptJob: (id: string) => void;
-  abandonJob: () => void;
-  progressHaul: (kind: string) => void;
-  openFirm: () => void;
-  closeFirm: () => void;
-  foundFirm: (type: FirmType, name: string) => boolean;
-  buyPermit: (type: PermitId) => boolean;
-  toggleFirmOpen: () => void;
-  stockIn: (itemId: string) => void;
-  stockOut: (itemId: string) => void;
-  withdrawFirm: () => void;
-  payFirmTax: () => void;
-  tickFirm: (elapsed: number) => void;
-  hireStaff: () => boolean;
-  fireStaff: () => boolean;
-  applyMapaqGrant: (id: MapaqGrantId) => boolean;
-  toggleHotelTv: () => void;
-  addToCart: (itemId: string) => boolean;
-  removeFromCart: (itemId: string) => void;
-  clearCart: () => void;
-  openCart: () => void;
-  closeCart: () => void;
-  checkoutCart: () => boolean;
-  tickSurvival: (dt: number, ctx: Parameters<typeof tickSurvival>[2]) => void;
-  openAtm: (id: string) => void;
-  closeAtm: () => void;
-  atmOp: (action: "deposit" | "withdraw", amount: number) => boolean;
-  openDeed: (id: string) => void;
-  closeDeed: () => void;
-  buyDeed: () => boolean;
-  buyReno: (id: RenoId) => boolean;
-  installHeat: (id: HeatId) => boolean;
-  setWater: (id: WaterId) => boolean;
-  toggleHeat: () => boolean;
-  toggleHydro: () => boolean;
-  toggleWater: () => boolean;
-  loadWood: (n?: number) => boolean;
-  repairFurnace: () => boolean;
-  thawPipes: () => boolean;
-  tickUtilities: (dt: number, ctx: { ambient: number; month: number; elapsed: number; weather: WeatherId }) => void;
-  setBasement: (fit: BasementFit) => boolean;
-  toggleGarageFit: (fit: GarageFit) => boolean;
-  setGarageBays: (n: 1 | 2 | 3) => boolean;
-  cutHouseKey: (role: KeyRole) => boolean;
-  toggleDoorLock: (slot: DoorSlot) => boolean;
-  parkInGarage: (vehicleId: string) => boolean;
-  takeFromGarage: (vehicleId: string) => boolean;
-  setRpJob: (id: RpJobId) => void;
-  joinGang: (id: string) => boolean;
-  leaveGang: () => void;
-  commitCrime: (crime: string, elapsed: number) => boolean;
-  tickPayroll: (elapsed: number) => void;
-  openElevator: () => void;
-  closeElevator: () => void;
-  sit: () => void;
-  stand: () => void;
-  toggleLobbyLights: () => void;
-  ringBell: () => void;
-  overlayOpen: () => boolean;
-  toggleBuild: () => void;
-  selectProp: (id: PropId | null) => void;
-  rotateGhost: () => void;
-  scaleGhost: (dir: 1 | -1) => void;
-  addPlaced: (p: PlacedProp) => void;
-  removePlaced: (id: string) => void;
-  clearPlaced: () => void;
+export type HudState = any;
+
+const SAVE = `portneuf-save-v1`;
+
+function pushLedger(e, t, n) {
+    return [{
+        id: `${Date.now()}-${t}`,
+        label: t,
+        amount: n,
+        at: Date.now()
+    }, ...e].slice(0, 16)
 }
 
-const SAVE = "portneuf-save-v1";
-
-function pushLedger(list: LedgerEntry[], label: string, amount: number): LedgerEntry[] {
-  return [{ id: `${Date.now()}-${label}`, label, amount, at: Date.now() }, ...list].slice(0, 16);
+function parseWeather(e) {
+    return e === `rain` || e === `snow` || e === `fog` || e === `storm` ? e : `clear`
 }
 
-function parseWeather(raw: unknown): WeatherId {
-  return raw === "rain" || raw === "snow" || raw === "fog" || raw === "storm" ? raw : "clear";
+function parseGrid(e) {
+    if (!e || typeof e != `object`) return null;
+    let t = e;
+    if (t.kind !== `verglas` && t.kind !== `panne`) return null;
+    let n = typeof t.t == `number` && t.t > 0 ? t.t : 0;
+    return n <= 0 ? null : {
+        kind: t.kind,
+        t: n
+    }
 }
 
-function parseGrid(raw: unknown): GridOutage | null {
-  if (!raw || typeof raw !== "object") return null;
-  const d = raw as { kind?: unknown; t?: unknown };
-  if (d.kind !== "verglas" && d.kind !== "panne") return null;
-  const t = typeof d.t === "number" && d.t > 0 ? d.t : 0;
-  if (t <= 0) return null;
-  return { kind: d.kind, t };
+function takeInv(e, t, n) {
+    let r = {
+            ...e
+        },
+        i = (r[t] ?? 0) - n;
+    return i <= 0 ? delete r[t] : r[t] = i, r
 }
-
-function takeInv(inv: Record<string, number>, id: string, n: number): Record<string, number> {
-  const next = { ...inv };
-  const left = (next[id] ?? 0) - n;
-  if (left <= 0) delete next[id];
-  else next[id] = left;
-  return next;
-}
-
-const WEAR_OUTFIT: Record<string, OutfitId> = {
-  veste: "canadienne",
-  goose: "goose",
-  roots: "roots",
-  nike: "nike",
-  kaki: "sq",
-};
-
-const EMPTY_SAVE = {
-  visited: [] as string[],
-  km: 0,
-  fines: 0,
-  x: SPAWN.x,
-  z: SPAWN.z,
-  yaw: SPAWN.yaw,
-  night: false,
-  weather: "clear" as WeatherId,
-  leaves: [] as string[],
-  cash: 240,
-  inventory: {} as Record<string, number>,
-  licenses: [] as LicenseId[],
-  notes: "",
-  ledger: [] as LedgerEntry[],
-  tickets: [] as TicketRecord[],
-  appearance: parseAppearance(null),
-  vehicleId: "pickup" as VehicleId,
-  ownedVehicles: ["pickup"] as VehicleId[],
-  equippedTool: null as string | null,
-  equippedPack: null as string | null,
-  firm: null as Firm | null,
-  cart: {} as Record<string, number>,
-  surv: { ...FRESH_SURVIVAL },
-  bank: 2500,
-  rpJob: "civil" as RpJobId,
-  gangId: null as string | null,
-  ownedProps: [] as string[],
-  unlockedDoors: [] as string[],
-  radioOn: false,
-  radioId: "ckoi",
-  hotelTvOn: false,
-  placed: [] as PlacedProp[],
-  selectedSeed: null as CropId | null,
-  houses: {} as Record<string, HouseState>,
-  gridOutage: null as GridOutage | null,
-};
-
-function loadVisited(): typeof EMPTY_SAVE {
-  if (typeof localStorage === "undefined") return { ...EMPTY_SAVE };
-  try {
-    const raw = localStorage.getItem(SAVE);
-    if (!raw) return { ...EMPTY_SAVE };
-    const d = JSON.parse(raw) as Partial<typeof EMPTY_SAVE>;
-    return {
-      visited: d.visited ?? [],
-      km: d.km ?? 0,
-      fines: d.fines ?? 0,
-      x: typeof d.x === "number" ? d.x : SPAWN.x,
-      z: typeof d.z === "number" ? d.z : SPAWN.z,
-      yaw: typeof d.yaw === "number" ? d.yaw : SPAWN.yaw,
-      night: Boolean(d.night),
-      weather: parseWeather((d as { weather?: unknown }).weather),
-      leaves: Array.isArray(d.leaves) ? d.leaves : [],
-      cash: typeof d.cash === "number" ? d.cash : 240,
-      inventory: d.inventory && typeof d.inventory === "object" ? d.inventory : {},
-      licenses: parseLicenses((d as { licenses?: unknown }).licenses),
-      notes: typeof d.notes === "string" ? d.notes : "",
-      ledger: Array.isArray(d.ledger) ? d.ledger : [],
-      unlockedDoors: Array.isArray(d.unlockedDoors) ? d.unlockedDoors : [],
-      radioOn: Boolean(d.radioOn),
-      radioId: typeof d.radioId === "string" ? d.radioId : "ckoi",
-      tickets: Array.isArray(d.tickets) ? d.tickets : [],
-      appearance: parseAppearance((d as { appearance?: unknown }).appearance),
-      vehicleId: isVehicleId((d as { vehicleId?: string }).vehicleId ?? "")
-        ? ((d as { vehicleId: VehicleId }).vehicleId)
-        : "pickup",
-      ownedVehicles: Array.isArray((d as { ownedVehicles?: string[] }).ownedVehicles)
-        ? (["pickup", ...((d as { ownedVehicles: string[] }).ownedVehicles)].filter(
-            (id, i, a): id is VehicleId => isVehicleId(id) && a.indexOf(id) === i,
-          ) as VehicleId[])
-        : (["pickup"] as VehicleId[]),
-      equippedTool: typeof (d as { equippedTool?: unknown }).equippedTool === "string" ? (d as { equippedTool: string }).equippedTool : null,
-      equippedPack: typeof (d as { equippedPack?: unknown }).equippedPack === "string" ? (d as { equippedPack: string }).equippedPack : null,
-      firm: parseFirm((d as { firm?: unknown }).firm),
-      hotelTvOn: Boolean((d as { hotelTvOn?: unknown }).hotelTvOn),
-      cart: (d as { cart?: Record<string, number> }).cart && typeof (d as { cart?: unknown }).cart === "object"
-        ? ((d as { cart: Record<string, number> }).cart)
-        : {},
-      surv: parseSurvival((d as { surv?: unknown }).surv),
-      bank: typeof (d as { bank?: unknown }).bank === "number" ? (d as { bank: number }).bank : 2500,
-      rpJob: jobById(String((d as { rpJob?: unknown }).rpJob ?? "civil")).id,
-      gangId: typeof (d as { gangId?: unknown }).gangId === "string" ? (d as { gangId: string }).gangId : null,
-      ownedProps: Array.isArray((d as { ownedProps?: unknown }).ownedProps)
-        ? ((d as { ownedProps: string[] }).ownedProps)
-        : [],
-      placed: parsePlaced((d as { placed?: unknown }).placed),
-      selectedSeed: (["mais", "ble", "foin", "patate", "cannabis"] as CropId[]).includes(
-        String((d as { selectedSeed?: unknown }).selectedSeed) as CropId,
-      )
-        ? (String((d as { selectedSeed?: unknown }).selectedSeed) as CropId)
-        : null,
-      houses: parseHouses((d as { houses?: unknown }).houses),
-      gridOutage: parseGrid((d as { gridOutage?: unknown }).gridOutage),
+const WEAR_OUTFIT = {
+        veste: `canadienne`,
+        goose: `goose`,
+        roots: `roots`,
+        nike: `nike`,
+        kaki: `sq`
+    },
+    EMPTY_SAVE = {
+        visited: [],
+        km: 0,
+        fines: 0,
+        x: SPAWN.x,
+        z: SPAWN.z,
+        yaw: SPAWN.yaw,
+        night: false,
+        weather: `clear`,
+        leaves: [],
+        lootedItems: [],
+        cash: 240,
+        inventory: {},
+        licenses: [],
+        notes: ``,
+        ledger: [],
+        tickets: [],
+        demeritPoints: 0,
+        licenseSuspendedUntil: 0,
+        appearance: parseAppearance(null),
+        vehicleId: `pickup`,
+        ownedVehicles: [`pickup`],
+        equippedTool: null,
+        equippedPack: null,
+        firm: null,
+        cart: {},
+        surv: {
+            ...FRESH_SURVIVAL
+        },
+        bank: 2500,
+        economy: {
+            ...EMPTY_ECONOMY,
+            atms: {}
+        },
+        realty: {
+            ...EMPTY_REALTY
+        },
+        rpJob: `civil`,
+        gangId: null,
+        ownedProps: [],
+        unlockedDoors: [],
+        radioOn: false,
+        radioId: `ckoi`,
+        hotelTvOn: false,
+        placed: [],
+        selectedSeed: null,
+        houses: {},
+        gridOutage: null,
+        career: emptyCareer(),
+        activeGig: null,
+        adminRole: `intellectus_ai`,
+        staffRoster: null
     };
-  } catch {
-    return { ...EMPTY_SAVE };
-  }
-}
 
-const initial = loadVisited();
-hotelSecurity.hydrate(initial.unlockedDoors, initial.hotelTvOn);
-
-export const useGameStore = create<HudState>((set, get) => ({
-  playing: false,
-  paused: false,
-  loading: true,
-  showMap: false,
-  night: initial.night,
-  weather: initial.weather,
-  cameraMode: "chase",
-  speedKmh: 0,
-  limit: 90,
-  zone: "Route 138",
-  surface: "Asphalte",
-  speeding: false,
-  fineFlash: 0,
-  poi: null,
-  poiDesc: null,
-  yaw: initial.yaw,
-  timeHours: 16,
-  mode: "drive",
-  prompt: null,
-  leaves: initial.leaves,
-  cash: initial.cash,
-  bank: initial.bank,
-  notice: null,
-  shopOpen: false,
-  shopId: null,
-  shopAisle: null,
-  fauna: null,
-  wantedStars: 0,
-  wantedReason: "",
-  bounty: 0,
-  evading: false,
-  radioOn: initial.radioOn,
-  radioTrack: null,
-  radioId: initial.radioId,
-  dispatch: null,
-  citationOpen: false,
-  citation: null,
-  tickets: initial.tickets,
-  creatorOpen: false,
-  appearance: initial.appearance,
-  inventoryOpen: false,
-  garageOpen: false,
-  jobsOpen: false,
-  firmOpen: false,
-  cartOpen: false,
-  atmOpen: false,
-  propertyOpen: false,
-  elevatorOpen: false,
-  lobbyLights: true,
-  interiorKind: null,
-  sitting: false,
-  interiorTitle: null,
-  interiorSub: null,
-  cart: initial.cart,
-  job: null,
-  jobBoard: [],
-  x: initial.x,
-  z: initial.z,
-  inventory: initial.inventory,
-  licenses: initial.licenses,
-  equippedPack: initial.equippedPack,
-  equippedTool: initial.equippedTool,
-  firm: initial.firm,
-  surv: initial.surv,
-  phoneOpen: false,
-  lockOpen: false,
-  lockDoorId: null,
-  lockDoorName: null,
-  consoleOpen: false,
-  notes: initial.notes,
-  ledger: initial.ledger,
-  godMode: false,
-  flyMode: false,
-  noclipMode: false,
-  chat: [] as ChatMessage[],
-  unlockedDoors: initial.unlockedDoors,
-  hotelTvOn: initial.hotelTvOn,
-  vehicleId: initial.vehicleId,
-  ownedVehicles: initial.ownedVehicles,
-  km: initial.km,
-  fines: initial.fines,
-  visited: initial.visited,
-  rpJob: initial.rpJob,
-  gangId: initial.gangId,
-  ownedProps: initial.ownedProps,
-  atmId: null,
-  deedId: null,
-  buildOpen: false,
-  buildType: null,
-  buildYaw: 0,
-  buildScale: 1,
-  placed: initial.placed,
-  selectedSeed: initial.selectedSeed,
-  houses: initial.houses,
-  homeFloor: "main" as const,
-  gridOutage: initial.gridOutage,
-  overlayOpen: () => {
-    const s = get();
-    return (
-      s.shopOpen || s.phoneOpen || s.lockOpen || s.consoleOpen || s.showMap || s.citationOpen ||
-      s.creatorOpen || s.inventoryOpen || s.garageOpen || s.jobsOpen || s.firmOpen || s.cartOpen ||
-      s.atmOpen || s.propertyOpen || s.elevatorOpen
-    );
-  },
-  start: () => set({ playing: true, paused: false }),
-  togglePause: () => {
-    const s = get();
-    if (s.shopOpen) return get().closeShop();
-    if (s.phoneOpen) return get().closePhone();
-    if (s.lockOpen) return get().closeLock();
-    if (s.consoleOpen) return get().closeConsole();
-    if (s.citationOpen) return get().closeCitation();
-    if (s.creatorOpen) return get().closeCreator();
-    if (s.inventoryOpen) return get().closeInventory();
-    if (s.garageOpen) return get().closeGarage();
-    if (s.jobsOpen) return get().closeJobs();
-    if (s.firmOpen) return get().closeFirm();
-    if (s.cartOpen) return get().closeCart();
-    if (s.atmOpen) return get().closeAtm();
-    if (s.propertyOpen) return get().closeDeed();
-    if (s.elevatorOpen) return get().closeElevator();
-    if (s.buildOpen) return get().toggleBuild();
-    const paused = !s.paused;
-    set({ paused, showMap: paused ? s.showMap : false });
-  },
-  setHud: (p) => set(p as Partial<HudState>),
-  visit: (id) => {
-    const visited = get().visited;
-    if (visited.includes(id)) return;
-    set({ visited: [...visited, id] });
-  },
-  addCash: (n, notice) => {
-    const s = get();
-    set({
-      cash: Math.round((s.cash + n) * 100) / 100,
-      notice: notice ?? s.notice,
-      ledger: n !== 0 ? pushLedger(s.ledger, notice ?? "Espèces", n) : s.ledger,
-    });
-    persist();
-  },
-  addItem: (id, n = 1) => {
-    const inv = { ...get().inventory };
-    inv[id] = (inv[id] ?? 0) + n;
-    const lic = licenseFromItem(id);
-    const licenses = lic ? grantLicense(get().licenses, lic) : get().licenses;
-    set({ inventory: inv, licenses });
-    persist();
-  },
-  grantLic: (id) => {
-    set({ licenses: grantLicense(get().licenses, id), notice: `Permis · ${id}` });
-    persist();
-  },
-  addChat: (sender, text, type = "chat") => {
-    const line: ChatMessage = {
-      id: Math.random().toString(36).slice(2, 8),
-      sender,
-      text,
-      type,
-      timestamp: Date.now(),
+function loadVisited() {
+    if (typeof localStorage === "undefined") return {
+        ...EMPTY_SAVE
     };
-    set({ chat: [...get().chat, line].slice(-24) });
-  },
-  toggleFly: () => {
-    const on = !get().flyMode;
-    set({ flyMode: on, notice: on ? "Vol" : "Vol coupé" });
-  },
-  toggleNoclip: () => {
-    const on = !get().noclipMode;
-    set({ noclipMode: on, notice: on ? "Noclip" : "Noclip coupé" });
-  },
-  setWeather: (id) => {
-    set({ weather: id, notice: `Météo · ${id}` });
-    persist();
-  },
-  buyItem: (id) => {
-    const item = itemById(id);
-    if (!item) return false;
-    const s = get();
-    const gate = canPurchase(s.licenses, id);
-    if (!gate.ok) {
-      set({ notice: gate.message ?? "Permis requis" });
-      return false;
-    }
-    if (s.cash < item.price) {
-      set({ notice: "Pas assez d'espèces" });
-      return false;
-    }
-    const cap = bagCapacity(s.equippedPack);
-    if (bagWeight(s.inventory) + item.weight > cap + 0.05) {
-      set({ notice: "Sac trop lourd" });
-      return false;
-    }
-    const inventory = { ...s.inventory, [id]: (s.inventory[id] ?? 0) + 1 };
-    const lic = licenseFromItem(id);
-    set({
-      cash: Math.round((s.cash - item.price) * 100) / 100,
-      inventory,
-      licenses: lic ? grantLicense(s.licenses, lic) : s.licenses,
-      notice: item.name,
-      ledger: pushLedger(s.ledger, item.name, -item.price),
-    });
-    persist();
-    return true;
-  },
-  sellItem: (id) => {
-    const item = itemById(id);
-    const s = get();
-    if (!item || (s.inventory[id] ?? 0) < 1) return;
-    const price = sellPrice(item);
-    set({
-      inventory: takeInv(s.inventory, id, 1),
-      cash: Math.round((s.cash + price) * 100) / 100,
-      notice: `Vendu · ${item.name}`,
-      ledger: pushLedger(s.ledger, `Revente ${item.name}`, price),
-    });
-    persist();
-  },
-  sellStack: (id) => {
-    const item = itemById(id);
-    const s = get();
-    const n = s.inventory[id] ?? 0;
-    if (!item || n < 1) return;
-    const price = Math.round(sellPrice(item) * n * 100) / 100;
-    const inventory = { ...s.inventory };
-    delete inventory[id];
-    set({
-      inventory,
-      cash: Math.round((s.cash + price) * 100) / 100,
-      notice: `Vendu · ${item.name} ×${n}`,
-      ledger: pushLedger(s.ledger, `Revente ${item.name}`, price),
-    });
-    persist();
-  },
-  dropItem: (id, n = 1) => {
-    const s = get();
-    if ((s.inventory[id] ?? 0) < n) return;
-    set({ inventory: takeInv(s.inventory, id, n), notice: "Objet laissé" });
-    persist();
-  },
-  useItem: (id) => {
-    const item = itemById(id);
-    const s = get();
-    if (!item || (s.inventory[id] ?? 0) < 1) return false;
-    if (id === "corde_bois") {
-      return get().loadWood(1);
-    }
-    if (item.use === "eat" || item.use === "drink") {
-      set({
-        inventory: takeInv(s.inventory, id, 1),
-        surv: applyMeal(s.surv, item.use === "drink" ? "drink" : "eat"),
-        notice: item.name,
-      });
-      persist();
-      return true;
-    }
-    if (item.use === "seed") {
-      const crop = cropFromSeed(id);
-      set({ selectedSeed: crop, notice: `Semence · ${item.name}` });
-      persist();
-      return true;
-    }
-    if (item.use === "tool") {
-      set({ equippedTool: s.equippedTool === id ? null : id, notice: s.equippedTool === id ? "Rangé" : item.name });
-      persist();
-      return true;
-    }
-    if (item.use === "wear") {
-      if (id.startsWith("sac")) {
-        set({ equippedPack: s.equippedPack === id ? null : id, notice: item.name });
-      } else {
-        const outfit = WEAR_OUTFIT[id] ?? s.appearance.outfit;
-        const hairStyle = id === "tuque" ? "chapeau" : s.appearance.hairStyle;
-        set({ appearance: { ...s.appearance, outfit, hairStyle }, notice: `Porté · ${item.name}` });
-      }
-      persist();
-      return true;
-    }
-    if (item.use === "fuel" || item.use === "drug") {
-      set({ inventory: takeInv(s.inventory, id, 1), notice: item.name });
-      persist();
-      return true;
-    }
-    return false;
-  },
-  openShop: (id, aisle) => set({ shopOpen: true, shopId: id, shopAisle: aisle ?? null, paused: true, showMap: false, phoneOpen: false }),
-  closeShop: () => set({ shopOpen: false, shopAisle: null, paused: false }),
-  openPhone: () => set({ phoneOpen: true, paused: true, showMap: false }),
-  closePhone: () => set({ phoneOpen: false, paused: false }),
-  openLock: (id, name) => set({ lockOpen: true, lockDoorId: id, lockDoorName: name, paused: true }),
-  closeLock: () => set({ lockOpen: false, lockDoorId: null, lockDoorName: null, paused: false }),
-  openConsole: () => set({ consoleOpen: true, paused: true }),
-  closeConsole: () => set({ consoleOpen: false, paused: false }),
-  openCitation: (c) => set({ citationOpen: true, citation: c, paused: true, tickets: [{ article: c.article, description: c.description, fine: c.fine, at: Date.now(), kind: c.kind }, ...get().tickets].slice(0, 16) }),
-  closeCitation: () => set({ citationOpen: false, citation: null, paused: false }),
-  openCreator: () => set({ creatorOpen: true, paused: true }),
-  closeCreator: () => set({ creatorOpen: false, paused: false }),
-  setAppearance: (p) => set({ appearance: parseAppearance({ ...get().appearance, ...p }) }),
-  openInventory: () => set({ inventoryOpen: true, paused: true }),
-  closeInventory: () => set({ inventoryOpen: false, paused: false }),
-  openGarage: () => set({ garageOpen: true, paused: true }),
-  closeGarage: () => set({ garageOpen: false, paused: false }),
-  buyVehicle: (id) => {
-    const spec = fleetById(id);
-    const s = get();
-    if (!spec) return false;
-    if (s.ownedVehicles.includes(id)) return get().equipVehicle(id);
-    if (spec.pro) {
-      if (!s.firm) { set({ notice: "Immatriculez au REQ" }); return false; }
-      if (s.firm.balance < spec.price) { set({ notice: "Caisse entreprise insuffisante" }); return false; }
-      set({
-        firm: { ...s.firm, balance: Math.round((s.firm.balance - spec.price) * 100) / 100 },
-        ownedVehicles: [...s.ownedVehicles, id],
-        vehicleId: id,
-        notice: `${spec.name} · caisse −${spec.price}\u00a0$`,
-      });
-      persist();
-      return true;
-    }
-    if (s.cash < spec.price) { set({ notice: "Pas assez d'espèces" }); return false; }
-    set({
-      cash: Math.round((s.cash - spec.price) * 100) / 100,
-      ownedVehicles: [...s.ownedVehicles, id],
-      vehicleId: id,
-      notice: spec.name,
-      ledger: pushLedger(s.ledger, spec.name, -spec.price),
-    });
-    persist();
-    return true;
-  },
-  equipVehicle: (id) => {
-    if (!get().ownedVehicles.includes(id)) return false;
-    set({ vehicleId: id, garageOpen: false, paused: false });
-    persist();
-    return true;
-  },
-  openJobs: () => set({ jobsOpen: true, paused: true, jobBoard: get().jobBoard.length ? get().jobBoard : rollBoard() }),
-  closeJobs: () => set({ jobsOpen: false, paused: false }),
-  acceptJob: (id) => {
-    const offer = get().jobBoard.find((j) => j.id === id);
-    if (!offer) return;
-    set({ job: { ...offer, loaded: false }, jobsOpen: false, paused: false, notice: offer.title });
-    persist();
-  },
-  abandonJob: () => set({ job: null, jobBoard: rollBoard() }),
-  progressHaul: (kind) => {
-    const s = get();
-    const job = s.job;
-    if (!job) return;
-    if (!job.loaded) {
-      if (job.needs === "pickup" && !hasCaisse(kind)) {
-        set({ notice: "Il faut une caisse" });
-        return;
-      }
-      set({ job: { ...job, loaded: true }, notice: `Chargé · ${job.from.name}` });
-      return;
-    }
-    set({
-      job: null,
-      jobBoard: rollBoard(),
-      cash: Math.round((s.cash + job.pay) * 100) / 100,
-      notice: `Livré · ${job.to.name} · +${job.pay}\u00a0$`,
-      ledger: pushLedger(s.ledger, job.title, job.pay),
-    });
-    persist();
-  },
-  openFirm: () => set({ firmOpen: true, paused: true }),
-  closeFirm: () => set({ firmOpen: false, paused: false }),
-  foundFirm: (type, name) => {
-    const s = get();
-    const total = startupTotal(type);
-    if (s.cash < total) { set({ notice: "Fonds insuffisants" }); return false; }
-    const village = nearestVillageName(s.x, s.z);
-    const firm: Firm = {
-      id: `firm-${Date.now()}`,
-      neq: generateNEQ(),
-      tradeName: name || type,
-      type,
-      village,
-      x: s.x,
-      z: s.z,
-      status: "en_demarrage",
-      balance: 0,
-      taxOwed: 0,
-      permits: [],
-      stock: {},
-      isOpen: false,
-      lifetimeRevenue: 0,
-      staff: 0,
-      grants: {},
-    };
-    set({
-      cash: Math.round((s.cash - total) * 100) / 100,
-      firm,
-      notice: `Immatriculée · NEQ ${firm.neq}`,
-      ledger: pushLedger(s.ledger, "Immatriculation REQ", -total),
-    });
-    persist();
-    return true;
-  },
-  buyPermit: (type) => {
-    const s = get();
-    if (!s.firm) return false;
-    if (s.firm.permits.some((p) => p.type === type)) return false;
-    const fee = PERMIT_FEES[type].fee;
-    if (s.cash < fee) { set({ notice: "Pas assez d'espèces" }); return false; }
-    const permits = [...s.firm.permits, { type, number: generatePermitNumber(type) }];
-    const ready = canOperate({ ...s.firm, permits, status: "active" }).ok;
-    set({
-      cash: Math.round((s.cash - fee) * 100) / 100,
-      firm: { ...s.firm, permits, status: ready ? "active" : s.firm.status },
-      notice: PERMIT_FEES[type].label,
-      ledger: pushLedger(s.ledger, PERMIT_FEES[type].label, -fee),
-    });
-    persist();
-    return true;
-  },
-  toggleFirmOpen: () => {
-    const firm = get().firm;
-    if (!firm) return;
-    set({ firm: { ...firm, isOpen: !firm.isOpen } });
-    persist();
-  },
-  stockIn: (itemId) => {
-    const s = get();
-    if (!s.firm || (s.inventory[itemId] ?? 0) < 1) return;
-    const stock = { ...s.firm.stock, [itemId]: (s.firm.stock[itemId] ?? 0) + 1 };
-    set({ firm: { ...s.firm, stock }, inventory: takeInv(s.inventory, itemId, 1) });
-    persist();
-  },
-  stockOut: (itemId) => {
-    const s = get();
-    if (!s.firm || (s.firm.stock[itemId] ?? 0) < 1) return;
-    const stock = { ...s.firm.stock };
-    stock[itemId] -= 1;
-    if (stock[itemId] <= 0) delete stock[itemId];
-    const inventory = { ...s.inventory, [itemId]: (s.inventory[itemId] ?? 0) + 1 };
-    set({ firm: { ...s.firm, stock }, inventory });
-    persist();
-  },
-  withdrawFirm: () => {
-    const s = get();
-    if (!s.firm || s.firm.balance < 1) return;
-    const n = Math.floor(s.firm.balance);
-    set({
-      firm: { ...s.firm, balance: Math.round((s.firm.balance - n) * 100) / 100 },
-      cash: Math.round((s.cash + n) * 100) / 100,
-      notice: `Retrait caisse · ${n}\u00a0$`,
-      ledger: pushLedger(s.ledger, "Retrait enseigne", n),
-    });
-    persist();
-  },
-  payFirmTax: () => {
-    const s = get();
-    if (!s.firm || s.firm.taxOwed <= 0) return;
-    if (s.firm.balance < s.firm.taxOwed) { set({ notice: "Caisse insuffisante" }); return; }
-    set({ firm: { ...s.firm, balance: Math.round((s.firm.balance - s.firm.taxOwed) * 100) / 100, taxOwed: 0 }, notice: "Remise TPS+TVQ" });
-    persist();
-  },
-  tickFirm: (elapsed) => {
-    const s = get();
-    if (!s.firm || !s.firm.isOpen) return;
-    if (!canOperate(s.firm).ok) return;
-    const sale = nextFirmSale(s.firm, elapsed);
-    if (sale.take <= 0 && !sale.sold) return;
-    const stock = { ...s.firm.stock };
-    if (sale.sold && stock[sale.sold]) {
-      stock[sale.sold] -= 1;
-      if (stock[sale.sold]! <= 0) delete stock[sale.sold];
-    }
-    set({
-      firm: {
-        ...s.firm,
-        stock,
-        balance: Math.round((s.firm.balance + sale.take) * 100) / 100,
-        taxOwed: Math.round((s.firm.taxOwed + sale.tax) * 100) / 100,
-        lifetimeRevenue: Math.round((s.firm.lifetimeRevenue + sale.take) * 100) / 100,
-      },
-    });
-  },
-  hireStaff: () => {
-    const s = get();
-    if (!s.firm) return false;
-    if ((s.firm.staff ?? 0) >= 6) { set({ notice: "Effectif plein" }); return false; }
-    if (s.firm.balance < 80 && s.cash < 80) { set({ notice: "Pas de fonds pour embaucher" }); return false; }
-    const fromFirm = s.firm.balance >= 80;
-    set({
-      cash: fromFirm ? s.cash : Math.round((s.cash - 80) * 100) / 100,
-      firm: {
-        ...s.firm,
-        staff: (s.firm.staff ?? 0) + 1,
-        balance: fromFirm ? Math.round((s.firm.balance - 80) * 100) / 100 : s.firm.balance,
-      },
-      notice: "Embauche · 80 $",
-    });
-    persist();
-    return true;
-  },
-  fireStaff: () => {
-    const s = get();
-    if (!s.firm || (s.firm.staff ?? 0) < 1) return false;
-    set({ firm: { ...s.firm, staff: s.firm.staff - 1 }, notice: "Employé congédié" });
-    persist();
-    return true;
-  },
-  applyMapaqGrant: (id) => {
-    const s = get();
-    if (!s.firm) { set({ notice: "Immatriculez au REQ" }); return false; }
-    const check = canApplyGrant(s.firm, id);
-    if (!check.ok) { set({ notice: check.reason }); return false; }
-    if (s.cash < 8 && s.firm.balance < 8) { set({ notice: "Frais de dossier 8 $" }); return false; }
-    const fromFirm = s.firm.balance >= 8;
-    set({
-      cash: fromFirm ? s.cash : Math.round((s.cash - 8) * 100) / 100,
-      firm: {
-        ...s.firm,
-        balance: Math.round((s.firm.balance + check.amount - (fromFirm ? 8 : 0)) * 100) / 100,
-        grants: { ...(s.firm.grants ?? {}), [id]: check.amount },
-      },
-      notice: check.reason,
-      ledger: pushLedger(s.ledger, check.reason, check.amount),
-    });
-    persist();
-    return true;
-  },
-  toggleHotelTv: () => {
-    const next = hotelSecurity.toggleTv();
-    set({ hotelTvOn: next, notice: next ? "TV · Best Life" : "TV éteinte" });
-  },
-  addToCart: (itemId) => {
-    const item = itemById(itemId);
-    if (!item) return false;
-    const s = get();
-    const n = (s.cart[itemId] ?? 0) + 1;
-    set({ cart: { ...s.cart, [itemId]: n }, notice: `${item.name} · panier` });
-    return true;
-  },
-  removeFromCart: (itemId) => {
-    const s = get();
-    const n = (s.cart[itemId] ?? 0) - 1;
-    const cart = { ...s.cart };
-    if (n <= 0) delete cart[itemId];
-    else cart[itemId] = n;
-    set({ cart });
-  },
-  clearCart: () => set({ cart: {} }),
-  openCart: () => set({ cartOpen: true, paused: true }),
-  closeCart: () => set({ cartOpen: false, paused: false }),
-  checkoutCart: () => {
-    const s = get();
-    const t = cartTotals(s.cart);
-    if (t.count < 1) return false;
-    if (s.cash < t.total) { set({ notice: "Pas assez d'espèces" }); return false; }
-    for (const line of t.lines) {
-      const gate = canPurchase(s.licenses, line.item.id);
-      if (!gate.ok) {
-        set({ notice: gate.message ?? "Permis requis" });
-        return false;
-      }
-    }
-    const inventory = { ...s.inventory };
-    let licenses = s.licenses;
-    for (const line of t.lines) {
-      inventory[line.item.id] = (inventory[line.item.id] ?? 0) + line.qty;
-      const lic = licenseFromItem(line.item.id);
-      if (lic) licenses = grantLicense(licenses, lic);
-    }
-    set({
-      cash: Math.round((s.cash - t.total) * 100) / 100,
-      inventory,
-      licenses,
-      cart: {},
-      cartOpen: false,
-      paused: false,
-      notice: `Caisse · ${t.total}\u00a0$`,
-      ledger: pushLedger(s.ledger, "Panier Éther", -t.total),
-    });
-    persist();
-    return true;
-  },
-  tickSurvival: (dt, ctx) => set({ surv: tickSurvival(get().surv, dt, ctx) }),
-  openAtm: (id) => set({ atmOpen: true, atmId: id, paused: true, showMap: false, phoneOpen: false, shopOpen: false }),
-  closeAtm: () => set({ atmOpen: false, atmId: null, paused: false }),
-  atmOp: (action, amount) => {
-    const s = get();
-    const n = Math.max(1, Math.round(amount));
-    if (action === "deposit") {
-      if (s.cash < n) { set({ notice: "Pas assez d'espèces" }); return false; }
-      set({
-        cash: Math.round((s.cash - n) * 100) / 100,
-        bank: Math.round((s.bank + n) * 100) / 100,
-        notice: `Dépôt · ${n}\u00a0$`,
-        ledger: pushLedger(s.ledger, "Dépôt Desjardins", -n),
-      });
-      persist();
-      return true;
-    }
-    const fee = Math.max(1, Math.round(n * 0.01));
-    if (s.bank < n + fee) { set({ notice: "Solde insuffisant · frais 1 %" }); return false; }
-    set({
-      cash: Math.round((s.cash + n) * 100) / 100,
-      bank: Math.round((s.bank - n - fee) * 100) / 100,
-      notice: `Retrait · ${n}\u00a0$ · frais ${fee}\u00a0$`,
-      ledger: pushLedger(s.ledger, "Retrait Desjardins", n),
-    });
-    persist();
-    return true;
-  },
-  openDeed: (id) => set({ propertyOpen: true, deedId: id, paused: true, showMap: false, phoneOpen: false }),
-  closeDeed: () => set({ propertyOpen: false, deedId: null, paused: false }),
-  buyDeed: () => {
-    const s = get();
-    const deed = deedById(s.deedId ?? "");
-    if (!deed || s.ownedProps.includes(deed.id)) return false;
-    const { tax, total } = withTax(deed.price);
-    if (s.cash < total) { set({ notice: "Fonds insuffisants" }); return false; }
-    const inv = { ...s.inventory, cle_maison: (s.inventory.cle_maison ?? 0) + 1 };
-    set({
-      cash: Math.round((s.cash - total) * 100) / 100,
-      ownedProps: [...s.ownedProps, deed.id],
-      houses: { ...s.houses, [deed.id]: s.houses[deed.id] ?? emptyHouse(deed.id, deed.town) },
-      inventory: inv,
-      propertyOpen: true,
-      paused: true,
-      notice: `Acte · ${deed.name} · clés dans la poche`,
-      ledger: pushLedger(s.ledger, `Maison · ${deed.town}`, -total),
-    });
-    persist();
-    return true;
-  },
-  buyReno: (id) => {
-    const s = get();
-    const deed = deedById(s.deedId ?? "");
-    if (!deed || !s.ownedProps.includes(deed.id)) return false;
-    const spec = renoById(id);
-    const cur = s.houses[deed.id] ?? emptyHouse(deed.id);
-    if (cur.renos.includes(id)) { set({ notice: "Déjà fait" }); return false; }
-    const { tax, total } = withTax(spec.price);
-    if (s.cash < total) { set({ notice: "Fonds insuffisants" }); return false; }
-    const next: HouseState = { ...cur, renos: [...cur.renos, id] };
-    set({
-      cash: Math.round((s.cash - total) * 100) / 100,
-      houses: { ...s.houses, [deed.id]: next },
-      notice: `Travaux · ${spec.label} · TPS+TVQ ${tax}\u00a0$`,
-      ledger: pushLedger(s.ledger, `Reno · ${spec.label}`, -total),
-    });
-    persist();
-    return true;
-  },
-  installHeat: (id) => {
-    const s = get();
-    const deed = deedById(s.deedId ?? "");
-    if (!deed || !s.ownedProps.includes(deed.id)) return false;
-    const spec = heatById(id);
-    const cur = s.houses[deed.id] ?? emptyHouse(deed.id, deed.town);
-    if (cur.heat === id) { set({ notice: "Déjà installé" }); return false; }
-    let price = spec.price;
-    if (id === "thermopompe") price = Math.max(0, price - LOGISVERT);
-    const { tax, total } = withTax(price);
-    if (price > 0 && s.cash < total) { set({ notice: "Fonds insuffisants" }); return false; }
-    const next: HouseState = {
-      ...cur,
-      heat: id,
-      heatOn: true,
-      broke: false,
-      wood: spec.needsWood ? Math.max(cur.wood, 2) : cur.wood,
-    };
-    set({
-      cash: price > 0 ? Math.round((s.cash - total) * 100) / 100 : s.cash,
-      houses: { ...s.houses, [deed.id]: next },
-      notice: id === "thermopompe"
-        ? `Thermopompe · LogisVert −${LOGISVERT}\u00a0$`
-        : `Chauffage · ${spec.label}`,
-      ledger: price > 0 ? pushLedger(s.ledger, `Chauffage · ${spec.label}`, -total) : s.ledger,
-    });
-    persist();
-    return true;
-  },
-  setWater: (id) => {
-    const s = get();
-    const deed = deedById(s.deedId ?? "");
-    if (!deed || !s.ownedProps.includes(deed.id)) return false;
-    const cur = s.houses[deed.id] ?? emptyHouse(deed.id, deed.town);
-    if (cur.water === id) return true;
-    const fee = id === "puits" ? 120 : 40;
-    const { total } = withTax(fee);
-    if (s.cash < total) { set({ notice: "Fonds insuffisants" }); return false; }
-    set({
-      cash: Math.round((s.cash - total) * 100) / 100,
-      houses: { ...s.houses, [deed.id]: { ...cur, water: id, waterOn: true, frozen: false } },
-      notice: waterById(id).label,
-      ledger: pushLedger(s.ledger, waterById(id).label, -total),
-    });
-    persist();
-    return true;
-  },
-  toggleHeat: () => {
-    const s = get();
-    const id = s.deedId ?? s.ownedProps[0];
-    if (!id || !s.ownedProps.includes(id)) return false;
-    const cur = s.houses[id] ?? emptyHouse(id);
-    const spec = heatById(cur.heat);
-    if (!cur.heatOn && spec.needsWood && cur.wood <= 0) {
-      set({ notice: "Plus de bois" });
-      return false;
-    }
-    if (!cur.heatOn && spec.needsHydro && (!cur.hydroOn || s.gridOutage)) {
-      set({ notice: "Hydro coupé · pas d'électrique" });
-      return false;
-    }
-    set({
-      houses: { ...s.houses, [id]: { ...cur, heatOn: !cur.heatOn } },
-      notice: !cur.heatOn ? `Chauffage · ${spec.label}` : "Chauffage coupé",
-    });
-    persist();
-    return true;
-  },
-  toggleHydro: () => {
-    const s = get();
-    const id = s.deedId ?? s.ownedProps[0];
-    if (!id || !s.ownedProps.includes(id)) return false;
-    const cur = s.houses[id] ?? emptyHouse(id);
-    const on = !cur.hydroOn;
-    set({
-      houses: { ...s.houses, [id]: { ...cur, hydroOn: on, heatOn: on ? cur.heatOn : heatById(cur.heat).panneProof ? cur.heatOn : false } },
-      notice: on ? "Panneau Hydro · sous tension" : "Disjoncteur · coupé",
-    });
-    persist();
-    return true;
-  },
-  toggleWater: () => {
-    const s = get();
-    const id = s.deedId ?? s.ownedProps[0];
-    if (!id || !s.ownedProps.includes(id)) return false;
-    const cur = s.houses[id] ?? emptyHouse(id);
-    if (cur.frozen && cur.waterOn) { set({ notice: "Tuyaux gelés · dégeler d'abord" }); return false; }
-    set({
-      houses: { ...s.houses, [id]: { ...cur, waterOn: !cur.waterOn } },
-      notice: !cur.waterOn ? "Eau ouverte" : "Entrée d'eau fermée",
-    });
-    persist();
-    return true;
-  },
-  loadWood: (n = 1) => {
-    const s = get();
-    const id = s.deedId ?? s.ownedProps[0];
-    if (!id || !s.ownedProps.includes(id)) {
-      set({ notice: "Chargez le poêle chez vous" });
-      return false;
-    }
-    const cur = s.houses[id] ?? emptyHouse(id);
-    if (!heatById(cur.heat).needsWood) {
-      set({ notice: "Pas de poêle ni foyer" });
-      return false;
-    }
-    if ((s.inventory.corde_bois ?? 0) < n) {
-      set({ notice: "Pas de corde de bois" });
-      return false;
-    }
-    if (cur.wood >= WOOD_MAX) {
-      set({ notice: "Bûcher plein" });
-      return false;
-    }
-    const add = Math.min(n, WOOD_MAX - Math.floor(cur.wood));
-    set({
-      inventory: takeInv(s.inventory, "corde_bois", add),
-      houses: { ...s.houses, [id]: { ...cur, wood: Math.min(WOOD_MAX, cur.wood + add) } },
-      notice: `Bois · ${Math.min(WOOD_MAX, cur.wood + add).toFixed(0)} cordes`,
-    });
-    persist();
-    return true;
-  },
-  repairFurnace: () => {
-    const s = get();
-    const id = s.deedId ?? s.ownedProps[0];
-    if (!id || !s.ownedProps.includes(id)) return false;
-    const cur = s.houses[id] ?? emptyHouse(id);
-    if (!cur.broke) { set({ notice: "Fournaise ok" }); return false; }
-    const { total } = withTax(FURNACE_REPAIR);
-    if (s.cash < total) { set({ notice: "Réparation · fonds insuffisants" }); return false; }
-    set({
-      cash: Math.round((s.cash - total) * 100) / 100,
-      houses: { ...s.houses, [id]: { ...cur, broke: false, heatOn: true } },
-      notice: "Fournaise réparée",
-      ledger: pushLedger(s.ledger, "Fournaise", -total),
-    });
-    persist();
-    return true;
-  },
-  thawPipes: () => {
-    const s = get();
-    const id = s.deedId ?? s.ownedProps[0];
-    if (!id || !s.ownedProps.includes(id)) return false;
-    const cur = s.houses[id] ?? emptyHouse(id);
-    if (!cur.frozen) { set({ notice: "Tuyaux ok" }); return false; }
-    const { total } = withTax(PIPE_THAW);
-    if (s.cash < total) { set({ notice: "Plombier · fonds insuffisants" }); return false; }
-    set({
-      cash: Math.round((s.cash - total) * 100) / 100,
-      houses: { ...s.houses, [id]: { ...cur, frozen: false, waterOn: true } },
-      notice: "Tuyaux dégelés",
-      ledger: pushLedger(s.ledger, "Plombier", -total),
-    });
-    persist();
-    return true;
-  },
-  tickUtilities: (dt, ctx) => {
-    const s = get();
-    if (s.ownedProps.length === 0 && !s.gridOutage) return;
-    const snap: Record<string, HouseState> = {};
-    for (const id of s.ownedProps) snap[id] = s.houses[id] ?? emptyHouse(id);
-    const next = tickHouseUtils(snap, s.ownedProps, s.gridOutage, dt, {
-      ambient: ctx.ambient,
-      weather: ctx.weather,
-      month: ctx.month,
-      elapsed: ctx.elapsed,
-    });
-    const houses = { ...s.houses };
-    for (const [id, u] of Object.entries(next.houses)) {
-      const cur = houses[id] ?? emptyHouse(id);
-      houses[id] = { ...cur, ...u };
-    }
-    let cash = s.cash;
-    let bank = s.bank;
-    let ledger = s.ledger;
-    let notice: string | null = next.notice;
-    if (next.debit > 0) {
-      if (bank >= next.debit) bank = Math.round((bank - next.debit) * 100) / 100;
-      else if (cash + bank >= next.debit) {
-        const rest = next.debit - bank;
-        bank = 0;
-        cash = Math.round((cash - rest) * 100) / 100;
-      } else {
-        for (const id of s.ownedProps) {
-          const cur = houses[id]!;
-          houses[id] = { ...cur, hydroOn: false, heatOn: heatById(cur.heat).panneProof ? cur.heatOn : false };
+    try {
+        let e = localStorage.getItem(SAVE);
+        if (!e) return {
+            ...EMPTY_SAVE
+        };
+        let t = JSON.parse(e);
+        return {
+            visited: t.visited ?? [],
+            km: t.km ?? 0,
+            fines: t.fines ?? 0,
+            x: typeof t.x == `number` ? t.x : SPAWN.x,
+            z: typeof t.z == `number` ? t.z : SPAWN.z,
+            yaw: typeof t.yaw == `number` ? t.yaw : SPAWN.yaw,
+            night: !!t.night,
+            weather: parseWeather(t.weather),
+            leaves: Array.isArray(t.leaves) ? t.leaves : [],
+            lootedItems: Array.isArray(t.lootedItems) ? t.lootedItems : [],
+            cash: typeof t.cash == `number` ? t.cash : 240,
+            inventory: t.inventory && typeof t.inventory == `object` ? t.inventory : {},
+            licenses: parseLicenses(t.licenses),
+            notes: typeof t.notes == `string` ? t.notes : ``,
+            ledger: Array.isArray(t.ledger) ? t.ledger : [],
+            unlockedDoors: Array.isArray(t.unlockedDoors) ? t.unlockedDoors : [],
+            radioOn: !!t.radioOn,
+            radioId: typeof t.radioId == `string` ? t.radioId : `ckoi`,
+            tickets: Array.isArray(t.tickets) ? t.tickets : [],
+            demeritPoints: typeof t.demeritPoints == `number` ? t.demeritPoints : 0,
+            licenseSuspendedUntil: typeof t.licenseSuspendedUntil == `number` ? t.licenseSuspendedUntil : 0,
+            appearance: parseAppearance(t.appearance),
+            vehicleId: isVehicleId(t.vehicleId ?? ``) ? t.vehicleId : `pickup`,
+            ownedVehicles: Array.isArray(t.ownedVehicles) ? [`pickup`, ...t.ownedVehicles].filter((e, t, n) => isVehicleId(e) && n.indexOf(e) === t) : [`pickup`],
+            equippedTool: typeof t.equippedTool == `string` ? t.equippedTool : null,
+            equippedPack: typeof t.equippedPack == `string` ? t.equippedPack : null,
+            firm: parseFirm(t.firm),
+            hotelTvOn: !!t.hotelTvOn,
+            cart: t.cart && typeof t.cart == `object` ? t.cart : {},
+            surv: parseSurvival(t.surv),
+            bank: typeof t.bank == `number` ? t.bank : 2500,
+            economy: parseEconomy(t.economy),
+            realty: parseRealty(t.realty),
+            rpJob: jobById(String(t.rpJob ?? `civil`)).id,
+            gangId: typeof t.gangId == `string` ? t.gangId : null,
+            ownedProps: Array.isArray(t.ownedProps) ? t.ownedProps : [],
+            placed: parsePlaced(t.placed),
+            selectedSeed: [`mais`, `ble`, `foin`, `patate`, `cannabis`].includes(String(t.selectedSeed)) ? String(t.selectedSeed) : null,
+            houses: parseHouses(t.houses),
+            gridOutage: parseGrid(t.gridOutage),
+            career: parseCareer(t.career),
+            activeGig: null,
+            adminRole: parseAdminRole(t.adminRole) ?? `intellectus_ai`,
+            staffRoster: parseStaffRoster(t.staffRoster)
         }
-        notice = "Hydro-Québec · coupure pour non-paiement";
-      }
-      if (next.label) ledger = pushLedger(ledger, next.label, -next.debit);
-      if (!notice) notice = next.label;
+    } catch {
+        return {
+            ...EMPTY_SAVE
+        }
     }
-    set({
-      houses,
-      gridOutage: next.grid,
-      cash,
-      bank,
-      ledger,
-      ...(notice ? { notice } : {}),
-    });
-    if (next.debit > 0 || next.notice || next.grid !== s.gridOutage) persist();
-  },
-  setBasement: (fit) => {
-    const s = get();
-    const id = s.deedId;
-    if (!id || !s.ownedProps.includes(id)) return false;
-    const cur = s.houses[id] ?? emptyHouse(id);
-    if (!hasReno(cur, "soussol")) { set({ notice: "Finissez le sous-sol d'abord" }); return false; }
-    set({ houses: { ...s.houses, [id]: { ...cur, basement: fit } }, notice: `Sous-sol · ${fit}` });
-    persist();
-    return true;
-  },
-  toggleGarageFit: (fit) => {
-    const s = get();
-    const id = s.deedId;
-    if (!id || !s.ownedProps.includes(id)) return false;
-    const cur = s.houses[id] ?? emptyHouse(id);
-    if (!hasReno(cur, "garage")) { set({ notice: "Bâtissez le garage d'abord" }); return false; }
-    const on = cur.garageFits.includes(fit);
-    if (!on) {
-      const spec = { etabli: 60, outils: 45, rangement: 40, compresseur: 90, deco: 35, mecanique: 120 }[fit];
-      const { total } = withTax(spec);
-      if (s.cash < total) { set({ notice: "Fonds insuffisants" }); return false; }
-      set({
-        cash: Math.round((s.cash - total) * 100) / 100,
-        houses: { ...s.houses, [id]: { ...cur, garageFits: [...cur.garageFits, fit] } },
-        notice: `Garage · ${fit}`,
-        ledger: pushLedger(s.ledger, `Garage · ${fit}`, -total),
-      });
-    } else {
-      set({
-        houses: { ...s.houses, [id]: { ...cur, garageFits: cur.garageFits.filter((f) => f !== fit) } },
-        notice: `Retiré · ${fit}`,
-      });
+}
+const initial = loadVisited();
+hydrateStaff(initial.staffRoster, parseAdminRole(initial.adminRole) ?? AdminRole.INTELLECTUS_AI);
+setDisplayName(LOCAL_PLAYER_ID, initial.appearance?.name ?? "Citoyen");
+{
+  const role = parseAdminRole(initial.adminRole) ?? AdminRole.INTELLECTUS_AI;
+  const job =
+    role === AdminRole.INTELLECTUS_AI && (initial.rpJob === "civil" || !initial.rpJob)
+      ? RpJobRole.ETHER_ARCHITECT
+      : rpJobToRole(initial.rpJob);
+  setUserJob(LOCAL_PLAYER_ID, job);
+}
+hotelSecurity.hydrate(initial.unlockedDoors, initial.hotelTvOn);
+export const useGameStore = create<HudState>()((set, get) => ({
+    playing: false,
+    paused: false,
+    loading: true,
+    showMap: false,
+    night: initial.night,
+    weather: initial.weather,
+    season: "automne" as QuebecSeason,
+    wxCondition: "nuageux" as WeatherCondition,
+    wxTemp: 9,
+    snowCm: 0,
+    plowStatus: "idle" as SnowPlowStatus,
+    eventBanner: null as string | null,
+    eventSeverity: null as EventSeverity | null,
+    cameraMode: `chase`,
+    gesture: `none`,
+    gestureOpen: false,
+    lootedItems: initial.lootedItems ?? [],
+    speedKmh: 0,
+    limit: 90,
+    zone: `Route 138`,
+    surface: `Asphalte`,
+    speeding: false,
+    fineFlash: 0,
+    policeEta: 240,
+    safeZone: false,
+    poi: null,
+    poiDesc: null,
+    yaw: initial.yaw,
+    timeHours: 16,
+    mode: `drive`,
+    prompt: null,
+    leaves: initial.leaves,
+    cash: initial.cash,
+    bank: initial.bank,
+    economy: initial.economy,
+    realty: initial.realty,
+    notice: null,
+    shopOpen: false,
+    shopId: null,
+    shopAisle: null,
+    fauna: null,
+    wantedStars: 0,
+    wantedReason: ``,
+    bounty: 0,
+    evading: false,
+    radioOn: initial.radioOn,
+    radioTrack: null,
+    radioId: initial.radioId,
+    dispatch: null,
+    citationOpen: false,
+    citation: null,
+    tickets: initial.tickets,
+    demeritPoints: initial.demeritPoints ?? 0,
+    licenseSuspendedUntil: initial.licenseSuspendedUntil ?? 0,
+    bloodAlcohol: 0,
+    radarActive: true,
+    creatorOpen: false,
+    appearance: initial.appearance,
+    inventoryOpen: false,
+    garageOpen: false,
+    jobsOpen: false,
+    firmOpen: false,
+    cartOpen: false,
+    atmOpen: false,
+    propertyOpen: false,
+    elevatorOpen: false,
+    lobbyLights: true,
+    interiorKind: null,
+    sitting: false,
+    interiorTitle: null,
+    interiorSub: null,
+    cart: initial.cart,
+    job: null,
+    jobBoard: [],
+    career: initial.career ?? emptyCareer(),
+    activeGig: null,
+    adminRole: parseAdminRole(initial.adminRole) ?? AdminRole.INTELLECTUS_AI,
+    staffRoster: snapshotStaff(),
+    x: initial.x,
+    z: initial.z,
+    inventory: initial.inventory,
+    licenses: initial.licenses,
+    equippedPack: initial.equippedPack,
+    equippedTool: initial.equippedTool,
+    firm: initial.firm,
+    surv: initial.surv,
+    phoneOpen: false,
+    lockOpen: false,
+    lockDoorId: null,
+    lockDoorName: null,
+    consoleOpen: false,
+    intelOpen: false,
+    notes: initial.notes,
+    ledger: initial.ledger,
+    godMode: false,
+    flyMode: false,
+    noclipMode: false,
+    staffFrozen: false,
+    vanished: false,
+    muted: false,
+    armor: 0,
+    chat: [],
+    chatOpen: false,
+    netPeers: 0,
+    riskLevel: `GREEN`,
+    unlockedDoors: initial.unlockedDoors,
+    hotelTvOn: initial.hotelTvOn,
+    vehicleId: initial.vehicleId,
+    ownedVehicles: initial.ownedVehicles,
+    km: initial.km,
+    fines: initial.fines,
+    visited: initial.visited,
+    rpJob: initial.rpJob,
+    gangId: initial.gangId,
+    ownedProps: initial.ownedProps,
+    atmId: null,
+    deedId: null,
+    buildOpen: false,
+    buildType: null,
+    buildYaw: 0,
+    buildScale: 1,
+    placed: initial.placed,
+    selectedSeed: initial.selectedSeed,
+    houses: initial.houses,
+    homeFloor: `main`,
+    gridOutage: initial.gridOutage,
+    overlayOpen: () => {
+        let e = get();
+        return e.shopOpen || e.phoneOpen || e.lockOpen || e.consoleOpen || e.intelOpen || e.showMap || e.citationOpen || e.creatorOpen || e.inventoryOpen || e.garageOpen || e.jobsOpen || e.firmOpen || e.cartOpen || e.atmOpen || e.propertyOpen || e.elevatorOpen || e.chatOpen || e.gestureOpen
+    },
+    start: () => set({
+        playing: true,
+        paused: false
+    }),
+    togglePause: () => {
+        let n = get();
+        if (n.chatOpen) return get().closeChat();
+        if (n.gestureOpen) return get().closeGesture();
+        if (n.shopOpen) return get().closeShop();
+        if (n.phoneOpen) return get().closePhone();
+        if (n.lockOpen) return get().closeLock();
+        if (n.consoleOpen) return get().closeConsole();
+        if (n.intelOpen) return get().closeIntel();
+        if (n.citationOpen) return get().closeCitation();
+        if (n.creatorOpen) return get().closeCreator();
+        if (n.inventoryOpen) return get().closeInventory();
+        if (n.garageOpen) return get().closeGarage();
+        if (n.jobsOpen) return get().closeJobs();
+        if (n.firmOpen) return get().closeFirm();
+        if (n.cartOpen) return get().closeCart();
+        if (n.atmOpen) return get().closeAtm();
+        if (n.propertyOpen) return get().closeDeed();
+        if (n.elevatorOpen) return get().closeElevator();
+        if (n.buildOpen) return get().toggleBuild();
+        let r = !n.paused;
+        set({
+            paused: r,
+            showMap: r ? n.showMap : false
+        })
+    },
+    setHud: (p) => set(p),
+    visit: n => {
+        let r = get().visited;
+        r.includes(n) || set({
+            visited: [...r, n]
+        })
+    },
+    addCash: (n, r) => {
+        let i = get();
+        set({
+            cash: Math.round((i.cash + n) * 100) / 100,
+            notice: r ?? i.notice,
+            ledger: n === 0 ? i.ledger : pushLedger(i.ledger, r ?? `Espèces`, n)
+        }), persist()
+    },
+    addItem: (n, r = 1) => {
+        let i = {
+            ...get().inventory
+        };
+        i[n] = (i[n] ?? 0) + r;
+        let a = licenseFromItem(n);
+        set({
+            inventory: i,
+            licenses: a ? grantLicense(get().licenses, a) : get().licenses
+        }), persist()
+    },
+    grantLic: n => {
+        set({
+            licenses: grantLicense(get().licenses, n),
+            notice: `Permis · ${n}`
+        }), persist()
+    },
+    addChat: (n, r, i = `chat`, a) => {
+        let o = {
+            id: a?.id ?? Math.random().toString(36).slice(2, 8),
+            sender: n,
+            text: r,
+            type: i,
+            timestamp: a?.timestamp ?? Date.now(),
+            messageType: a?.messageType,
+            senderId: a?.senderId
+        };
+        set({
+            chat: [...get().chat, o].slice(-40)
+        })
+    },
+    openChat: () => set({
+        chatOpen: true,
+        paused: false
+    }),
+    closeChat: () => set({
+        chatOpen: false
+    }),
+    toggleFly: () => {
+        let n = !get().flyMode;
+        set({
+            flyMode: n,
+            notice: n ? `Vol` : `Vol coupé`
+        })
+    },
+    toggleNoclip: () => {
+        let n = !get().noclipMode;
+        set({
+            noclipMode: n,
+            notice: n ? `Noclip` : `Noclip coupé`
+        })
+    },
+    setWeather: t => {
+        set({
+            weather: t,
+            notice: `Météo · ${t}`
+        }), persist()
+    },
+    buyItem: n => {
+        let r = itemById(n);
+        if (!r) return false;
+        let i = get(),
+            a = canPurchase(i.licenses, n, i.rpJob);
+        if (!a.ok) return set({
+            notice: a.message ?? `Permis requis`
+        }), false;
+        if (i.cash < r.price) return set({
+            notice: `Pas assez d'espèces`
+        }), false;
+        let o = bagCapacity(i.equippedPack);
+        if (bagWeight(i.inventory) + r.weight > o + .05) return set({
+            notice: `Sac trop lourd`
+        }), false;
+        let s = {
+                ...i.inventory,
+                [n]: (i.inventory[n] ?? 0) + 1
+            },
+            c = licenseFromItem(n);
+        return set({
+            cash: Math.round((i.cash - r.price) * 100) / 100,
+            inventory: s,
+            licenses: c ? grantLicense(i.licenses, c) : i.licenses,
+            notice: r.name,
+            ledger: pushLedger(i.ledger, r.name, -r.price)
+        }), persist(), true
+    },
+    sellItem: n => {
+        let r = itemById(n),
+            i = get();
+        if (!r || (i.inventory[n] ?? 0) < 1) return;
+        let a = sellPrice(r);
+        set({
+            inventory: takeInv(i.inventory, n, 1),
+            cash: Math.round((i.cash + a) * 100) / 100,
+            notice: `Vendu · ${r.name}`,
+            ledger: pushLedger(i.ledger, `Revente ${r.name}`, a)
+        }), persist()
+    },
+    sellStack: n => {
+        let r = itemById(n),
+            i = get(),
+            a = i.inventory[n] ?? 0;
+        if (!r || a < 1) return;
+        let o = Math.round(sellPrice(r) * a * 100) / 100,
+            s = {
+                ...i.inventory
+            };
+        delete s[n], set({
+            inventory: s,
+            cash: Math.round((i.cash + o) * 100) / 100,
+            notice: `Vendu · ${r.name} ×${a}`,
+            ledger: pushLedger(i.ledger, `Revente ${r.name}`, o)
+        }), persist()
+    },
+    dropItem: (n, r = 1) => {
+        let i = get();
+        (i.inventory[n] ?? 0) < r || (set({
+            inventory: takeInv(i.inventory, n, r),
+            notice: `Objet laissé`
+        }), persist())
+    },
+    useItem: n => {
+        let r = itemById(n),
+            i = get();
+        if (!r || (i.inventory[n] ?? 0) < 1) return false;
+        if (n === `corde_bois`) return get().loadWood(1);
+        if (r.use === `eat` || r.use === `drink`) {
+            let t = getConsumptionEffect(n),
+                a = t?.hunger ?? r.hunger,
+                o = t?.thirst ?? r.thirst;
+            return set({
+                inventory: takeInv(i.inventory, n, 1),
+                surv: applyMeal(i.surv, r.use === `drink` ? `drink` : `eat`, {
+                    hunger: a,
+                    thirst: o
+                }),
+                bloodAlcohol: n === `biere` ? police.drinkBeer(32) : i.bloodAlcohol,
+                notice: n === `biere` ? `Bu · ${r.name} · ${Math.round(police.bloodAlcohol)} mg` : r.use === `drink` ? `Bu · ${r.name}` : `Mangé · ${r.name}`
+            }), persist(), true
+        }
+        if (r.use === `seed`) return set({
+            selectedSeed: cropFromSeed(n),
+            notice: `Semence · ${r.name}`
+        }), persist(), true;
+        if (r.use === `tool`) return set({
+            equippedTool: i.equippedTool === n ? null : n,
+            notice: i.equippedTool === n ? `Rangé` : r.name
+        }), persist(), true;
+        if (r.use === `wear`) {
+            if (n.startsWith(`sac`)) set({
+                equippedPack: i.equippedPack === n ? null : n,
+                notice: r.name
+            });
+            else {
+                let t = WEAR_OUTFIT[n] ?? i.appearance.outfit,
+                    a = n === `tuque` ? `chapeau` : i.appearance.hairStyle;
+                set({
+                    appearance: {
+                        ...i.appearance,
+                        outfit: t,
+                        hairStyle: a
+                    },
+                    notice: `Porté · ${r.name}`
+                })
+            }
+            return persist(), true
+        }
+        return r.use === `fuel` || r.use === `drug` ? (set({
+            inventory: takeInv(i.inventory, n, 1),
+            notice: r.name
+        }), persist(), true) : false
+    },
+    openShop: (t, n) => set({
+        shopOpen: true,
+        shopId: t,
+        shopAisle: n ?? null,
+        paused: true,
+        showMap: false,
+        phoneOpen: false
+    }),
+    closeShop: () => set({
+        shopOpen: false,
+        shopAisle: null,
+        paused: false
+    }),
+    openPhone: () => set({
+        phoneOpen: true,
+        paused: true,
+        showMap: false
+    }),
+    closePhone: () => set({
+        phoneOpen: false,
+        paused: false
+    }),
+    openLock: (t, n) => set({
+        lockOpen: true,
+        lockDoorId: t,
+        lockDoorName: n,
+        paused: true
+    }),
+    closeLock: () => set({
+        lockOpen: false,
+        lockDoorId: null,
+        lockDoorName: null,
+        paused: false
+    }),
+    openConsole: () => set({
+        consoleOpen: true,
+        paused: true
+    }),
+    closeConsole: () => set({
+        consoleOpen: false,
+        paused: false
+    }),
+    openIntel: () => set({
+        intelOpen: true,
+        paused: true,
+        consoleOpen: false,
+        phoneOpen: false
+    }),
+    closeIntel: () => set({
+        intelOpen: false,
+        paused: false
+    }),
+    openCitation: n => set({
+        citationOpen: true,
+        citation: n,
+        paused: true,
+        tickets: [{
+            article: n.article,
+            description: n.description,
+            fine: n.fine,
+            at: Date.now(),
+            kind: n.kind,
+            ticketNumber: n.ticketNumber,
+            csrArticle: n.article,
+            demeritPoints: n.points,
+            issuingOfficerBadge: n.badge,
+            paid: false
+        }, ...get().tickets].slice(0, 16)
+    }),
+    closeCitation: () => set({
+        citationOpen: false,
+        citation: null,
+        paused: false
+    }),
+    payCitation: () => {
+        const i = get();
+        const n = i.citation;
+        if (!n) return set({ citationOpen: false, citation: null, paused: false });
+        const { paid } = police.payTicket(n.ticketNumber);
+        const charge = paid > 0 ? paid : n.fine;
+        police.licenseSuspendedUntil = police.licenseSuspendedUntil || i.licenseSuspendedUntil;
+        set({
+            citationOpen: false,
+            citation: null,
+            paused: false,
+            cash: Math.round((i.cash - charge) * 100) / 100,
+            fines: i.fines + charge,
+            demeritPoints: police.demeritTotal,
+            licenseSuspendedUntil: police.licenseSuspendedUntil,
+            tickets: i.tickets.map((t, idx) => idx === 0 ? { ...t, paid: true } : t),
+            notice: n.kind === "arrest" ? "Constat signé · cellule" : `Constat payé · ${charge}\u00a0$`,
+            ledger: pushLedger(i.ledger, n.kind === "arrest" ? "Amende SQ" : `Constat ${n.article}`, -charge)
+        });
+        persist();
+    },
+    openCreator: () => set({
+        creatorOpen: true,
+        paused: true
+    }),
+    closeCreator: () => set({
+        creatorOpen: false,
+        paused: false
+    }),
+    setAppearance: n => set({
+        appearance: parseAppearance({
+            ...get().appearance,
+            ...n
+        })
+    }),
+    openInventory: () => set({
+        inventoryOpen: true,
+        paused: true
+    }),
+    closeInventory: () => set({
+        inventoryOpen: false,
+        paused: false
+    }),
+    openGarage: () => set({
+        garageOpen: true,
+        paused: true
+    }),
+    closeGarage: () => set({
+        garageOpen: false,
+        paused: false
+    }),
+    openGesture: () => set({
+        gestureOpen: true
+    }),
+    closeGesture: () => set({
+        gestureOpen: false
+    }),
+    toggleGesture: () => set({
+        gestureOpen: !get().gestureOpen
+    }),
+    setGesture: n => set({
+        gesture: n,
+        gestureOpen: false,
+        sitting: n === `sit`
+    }),
+    lootItem: n => {
+        let e = get().lootedItems ?? [];
+        if (e.includes(n)) return;
+        set({
+            lootedItems: [...e, n]
+        }), persist()
+    },
+    buyVehicle: n => {
+        let r = fleetById(n),
+            i = get();
+        return r ? i.ownedVehicles.includes(n) ? get().equipVehicle(n) : r.pro ? i.firm ? i.firm.balance < r.price ? (set({
+            notice: `Caisse entreprise insuffisante`
+        }), false) : (set({
+            firm: {
+                ...i.firm,
+                balance: Math.round((i.firm.balance - r.price) * 100) / 100
+            },
+            ownedVehicles: [...i.ownedVehicles, n],
+            vehicleId: n,
+            notice: `${r.name} · caisse −${r.price}\u00a0$`
+        }), persist(), true) : (set({
+            notice: `Immatriculez au REQ`
+        }), false) : i.cash < r.price ? (set({
+            notice: `Pas assez d'espèces`
+        }), false) : (set({
+            cash: Math.round((i.cash - r.price) * 100) / 100,
+            ownedVehicles: [...i.ownedVehicles, n],
+            vehicleId: n,
+            notice: r.name,
+            ledger: pushLedger(i.ledger, r.name, -r.price)
+        }), persist(), true) : false
+    },
+    equipVehicle: n => get().ownedVehicles.includes(n) ? (set({
+        vehicleId: n,
+        garageOpen: false,
+        paused: false
+    }), persist(), true) : false,
+    openJobs: () => set({
+        jobsOpen: true,
+        paused: true,
+        jobBoard: get().jobBoard.length ? get().jobBoard : rollBoard()
+    }),
+    closeJobs: () => set({
+        jobsOpen: false,
+        paused: false
+    }),
+    acceptJob: n => {
+        let r = get().jobBoard.find(e => e.id === n);
+        r && (set({
+            job: {
+                ...r,
+                loaded: false
+            },
+            jobsOpen: false,
+            paused: false,
+            notice: r.title
+        }), persist())
+    },
+    abandonJob: () => set({
+        job: null,
+        jobBoard: rollBoard()
+    }),
+    progressHaul: n => {
+        let r = get(),
+            i = r.job;
+        if (i) {
+            if (!i.loaded) {
+                if (i.needs === `pickup` && !hasCaisse(n)) {
+                    set({
+                        notice: `Il faut une caisse`
+                    });
+                    return
+                }
+                set({
+                    job: {
+                        ...i,
+                        loaded: true
+                    },
+                    notice: `Chargé · ${i.from.name}`
+                });
+                return
+            }
+            set({
+                job: null,
+                jobBoard: rollBoard(),
+                cash: Math.round((r.cash + i.pay) * 100) / 100,
+                notice: `Livré · ${i.to.name} · +${i.pay}\u00a0$`,
+                ledger: pushLedger(r.ledger, i.title, i.pay)
+            }), persist()
+        }
+    },
+    startGig: n => {
+        let r = get(),
+            i = gigById(n);
+        if (!i) return set({
+            notice: `Quart introuvable`
+        }), false;
+        let a = getCannotStartReason(r.career, n, r.activeGig);
+        if (a) return set({
+            notice: a
+        }), false;
+        if (!canStartGig(r.career, n, r.activeGig)) return false;
+        let o = makeActiveGig(r.career, i),
+            s = r.career;
+        if (i.factionId && !s.faction) {
+            let e = {
+                spvq: `SPVQ`,
+                sante_publique: `Santé publique`,
+                municipalite: `Municipalité`
+            };
+            s = {
+                ...s,
+                faction: joinCareerFaction(i.factionId, e[i.factionId] ?? i.factionId)
+            }
+        }
+        return set({
+            activeGig: o,
+            career: s,
+            notice: `Quart · ${i.title}`,
+            phoneOpen: false,
+            paused: false
+        }), persist(), true
+    },
+    cancelGig: () => {
+        let n = get();
+        if (!n.activeGig) return;
+        let r = n.activeGig.id;
+        set({
+            activeGig: null,
+            career: {
+                ...n.career,
+                gigCooldowns: {
+                    ...n.career.gigCooldowns,
+                    [r]: Date.now() + 3e4
+                }
+            },
+            notice: `Quart annulé`
+        }), persist()
+    },
+    tickGig: (n, r) => {
+        let i = get(),
+            a = i.activeGig;
+        if (!a) return;
+        let o = tickActiveGig(a, n, i.career.skills);
+        if (o.kind === `none`) {
+            set({
+                activeGig: {
+                    ...o.gig
+                }
+            });
+            return
+        }
+        if (o.kind === `step`) {
+            let t = i.career.skills;
+            o.skill && (t = bumpSkill(t, o.skill, 1)), set({
+                activeGig: {
+                    ...o.gig
+                },
+                career: {
+                    ...i.career,
+                    skills: t
+                }
+            });
+            return
+        }
+        if (o.kind === `fail`) {
+            let t = gigById(a.id),
+                n = i.cash;
+            o.penalty && o.penalty > 0 && (n = Math.max(0, n - o.penalty));
+            let s = {
+                ...i.career,
+                jobsFailed: i.career.jobsFailed + 1,
+                gigCooldowns: {
+                    ...i.career.gigCooldowns,
+                    [a.id]: Date.now() + (t?.cooldownMs ?? 3e4) * 2
+                },
+                jobHistory: [{
+                    jobId: a.id,
+                    title: a.title,
+                    reward: 0,
+                    completedAt: Date.now(),
+                    success: false,
+                    duration: a.durationMs
+                }, ...i.career.jobHistory].slice(0, 40),
+                skills: o.gig.steps[o.gig.currentStep]?.skillCheck ? bumpSkill(i.career.skills, o.gig.steps[o.gig.currentStep].skillCheck.skill, .5) : i.career.skills
+            };
+            o.wanted && Gj.report(o.wanted >= 4 ? `robbery` : o.wanted >= 3 ? `drug_dealing` : `theft`, r), set({
+                activeGig: null,
+                career: s,
+                cash: n,
+                notice: o.wanted ? `Repéré · ${a.title}` : `Échec · ${a.title}`
+            }), persist();
+            return
+        }
+        let s = gigById(a.id),
+            c = i.career;
+        s && (c = applyXp(c, s.xpReward).career, c.level >= 2 && (c = {
+            ...c,
+            licenses: grantGigLicense(c.licenses, `permis_c`)
+        }), s.skillRequired && (c = {
+            ...c,
+            skills: bumpSkill(c.skills, s.skillRequired.skill, 2)
+        }), c = {
+            ...c,
+            skills: bumpSkill(c.skills, `endurance`, 1)
+        }, c.faction && (c = {
+            ...c,
+            faction: addContribution(c.faction, Math.floor(a.reward / 10))
+        }), c = {
+            ...c,
+            jobsCompleted: c.jobsCompleted + 1,
+            gigCooldowns: {
+                ...c.gigCooldowns,
+                [a.id]: Date.now() + s.cooldownMs
+            },
+            jobHistory: [{
+                jobId: a.id,
+                title: a.title,
+                reward: a.reward,
+                completedAt: Date.now(),
+                success: true,
+                duration: s.durationMs
+            }, ...c.jobHistory].slice(0, 40)
+        }), set({
+            activeGig: null,
+            career: c,
+            cash: Math.round((i.cash + a.reward) * 100) / 100,
+            notice: `Quart · ${a.title} · +${a.reward}\u00a0$`,
+            ledger: pushLedger(i.ledger, a.title, a.reward)
+        }), persist()
+    },
+    grantCareerLicense: n => {
+        let r = get();
+        set({
+            career: {
+                ...r.career,
+                licenses: grantGigLicense(r.career.licenses, n)
+            }
+        }), persist()
+    },
+    openFirm: () => set({
+        firmOpen: true,
+        paused: true
+    }),
+    closeFirm: () => set({
+        firmOpen: false,
+        paused: false
+    }),
+    foundFirm: (n, r) => {
+        let i = get(),
+            a = startupTotal(n);
+        if (i.cash < a) return set({
+            notice: `Fonds insuffisants`
+        }), false;
+        let o = nearestVillageName(i.x, i.z),
+            s = {
+                id: `firm-${Date.now()}`,
+                neq: generateNEQ(),
+                tradeName: r || n,
+                type: n,
+                village: o,
+                x: i.x,
+                z: i.z,
+                status: `en_demarrage`,
+                balance: 0,
+                taxOwed: 0,
+                permits: [],
+                stock: {},
+                isOpen: false,
+                lifetimeRevenue: 0,
+                staff: 0,
+                grants: {}
+            };
+        return set({
+            cash: Math.round((i.cash - a) * 100) / 100,
+            firm: s,
+            notice: `Immatriculée · NEQ ${s.neq}`,
+            ledger: pushLedger(i.ledger, `Immatriculation REQ`, -a)
+        }), persist(), true
+    },
+    buyPermit: n => {
+        let r = get();
+        if (!r.firm || r.firm.permits.some(e => e.type === n)) return false;
+        let i = PERMIT_FEES[n].fee;
+        if (r.cash < i) return set({
+            notice: `Pas assez d'espèces`
+        }), false;
+        let a = [...r.firm.permits, {
+                type: n,
+                number: generatePermitNumber(n)
+            }],
+            o = canOperate({
+                ...r.firm,
+                permits: a,
+                status: `active`
+            }).ok;
+        return set({
+            cash: Math.round((r.cash - i) * 100) / 100,
+            firm: {
+                ...r.firm,
+                permits: a,
+                status: o ? `active` : r.firm.status
+            },
+            notice: PERMIT_FEES[n].label,
+            ledger: pushLedger(r.ledger, PERMIT_FEES[n].label, -i)
+        }), persist(), true
+    },
+    toggleFirmOpen: () => {
+        let n = get().firm;
+        n && (set({
+            firm: {
+                ...n,
+                isOpen: !n.isOpen
+            }
+        }), persist())
+    },
+    stockIn: n => {
+        let r = get();
+        if (!r.firm || (r.inventory[n] ?? 0) < 1) return;
+        let i = {
+            ...r.firm.stock,
+            [n]: (r.firm.stock[n] ?? 0) + 1
+        };
+        set({
+            firm: {
+                ...r.firm,
+                stock: i
+            },
+            inventory: takeInv(r.inventory, n, 1)
+        }), persist()
+    },
+    stockOut: n => {
+        let r = get();
+        if (!r.firm || (r.firm.stock[n] ?? 0) < 1) return;
+        let i = {
+            ...r.firm.stock
+        };
+        --i[n], i[n] <= 0 && delete i[n];
+        let a = {
+            ...r.inventory,
+            [n]: (r.inventory[n] ?? 0) + 1
+        };
+        set({
+            firm: {
+                ...r.firm,
+                stock: i
+            },
+            inventory: a
+        }), persist()
+    },
+    withdrawFirm: () => {
+        let n = get();
+        if (!n.firm || n.firm.balance < 1) return;
+        let r = Math.floor(n.firm.balance);
+        set({
+            firm: {
+                ...n.firm,
+                balance: Math.round((n.firm.balance - r) * 100) / 100
+            },
+            cash: Math.round((n.cash + r) * 100) / 100,
+            notice: `Retrait caisse · ${r}\u00a0$`,
+            ledger: pushLedger(n.ledger, `Retrait enseigne`, r)
+        }), persist()
+    },
+    payFirmTax: () => {
+        let n = get();
+        if (!(!n.firm || n.firm.taxOwed <= 0)) {
+            if (n.firm.balance < n.firm.taxOwed) {
+                set({
+                    notice: `Caisse insuffisante`
+                });
+                return
+            }
+            set({
+                firm: {
+                    ...n.firm,
+                    balance: Math.round((n.firm.balance - n.firm.taxOwed) * 100) / 100,
+                    taxOwed: 0
+                },
+                notice: `Remise TPS+TVQ`
+            }), persist()
+        }
+    },
+    tickFirm: n => {
+        let r = get();
+        if (!r.firm || !r.firm.isOpen || !canOperate(r.firm).ok) return;
+        let i = nextFirmSale(r.firm, n);
+        if (i.take <= 0 && !i.sold) return;
+        let a = {
+            ...r.firm.stock
+        };
+        i.sold && a[i.sold] && (--a[i.sold], a[i.sold] <= 0 && delete a[i.sold]), set({
+            firm: {
+                ...r.firm,
+                stock: a,
+                balance: Math.round((r.firm.balance + i.take) * 100) / 100,
+                taxOwed: Math.round((r.firm.taxOwed + i.tax) * 100) / 100,
+                lifetimeRevenue: Math.round((r.firm.lifetimeRevenue + i.take) * 100) / 100
+            }
+        })
+    },
+    hireStaff: () => {
+        let n = get();
+        if (!n.firm) return false;
+        if ((n.firm.staff ?? 0) >= 6) return set({
+            notice: `Effectif plein`
+        }), false;
+        if (n.firm.balance < 80 && n.cash < 80) return set({
+            notice: `Pas de fonds pour embaucher`
+        }), false;
+        let r = n.firm.balance >= 80;
+        return set({
+            cash: r ? n.cash : Math.round((n.cash - 80) * 100) / 100,
+            firm: {
+                ...n.firm,
+                staff: (n.firm.staff ?? 0) + 1,
+                balance: r ? Math.round((n.firm.balance - 80) * 100) / 100 : n.firm.balance
+            },
+            notice: `Embauche · 80 $`
+        }), persist(), true
+    },
+    fireStaff: () => {
+        let n = get();
+        return !n.firm || (n.firm.staff ?? 0) < 1 ? false : (set({
+            firm: {
+                ...n.firm,
+                staff: n.firm.staff - 1
+            },
+            notice: `Employé congédié`
+        }), persist(), true)
+    },
+    applyMapaqGrant: n => {
+        let r = get();
+        if (!r.firm) return set({
+            notice: `Immatriculez au REQ`
+        }), false;
+        let i = canApplyGrant(r.firm, n);
+        if (!i.ok) return set({
+            notice: i.reason
+        }), false;
+        if (r.cash < 8 && r.firm.balance < 8) return set({
+            notice: `Frais de dossier 8 $`
+        }), false;
+        let a = r.firm.balance >= 8;
+        return set({
+            cash: a ? r.cash : Math.round((r.cash - 8) * 100) / 100,
+            firm: {
+                ...r.firm,
+                balance: Math.round((r.firm.balance + i.amount - (a ? 8 : 0)) * 100) / 100,
+                grants: {
+                    ...r.firm.grants ?? {},
+                    [n]: i.amount
+                }
+            },
+            notice: i.reason,
+            ledger: pushLedger(r.ledger, i.reason, i.amount)
+        }), persist(), true
+    },
+    toggleHotelTv: () => {
+        let t = hotelSecurity.toggleTv();
+        set({
+            hotelTvOn: t,
+            notice: t ? `TV · Best Life` : `TV éteinte`
+        })
+    },
+    addToCart: n => {
+        let r = itemById(n);
+        if (!r) return false;
+        let i = get(),
+            a = (i.cart[n] ?? 0) + 1;
+        return set({
+            cart: {
+                ...i.cart,
+                [n]: a
+            },
+            notice: `${r.name} · panier`
+        }), true
+    },
+    removeFromCart: n => {
+        let r = get(),
+            i = (r.cart[n] ?? 0) - 1,
+            a = {
+                ...r.cart
+            };
+        i <= 0 ? delete a[n] : a[n] = i, set({
+            cart: a
+        })
+    },
+    clearCart: () => set({
+        cart: {}
+    }),
+    openCart: () => set({
+        cartOpen: true,
+        paused: true
+    }),
+    closeCart: () => set({
+        cartOpen: false,
+        paused: false
+    }),
+    checkoutCart: () => {
+        let n = get(),
+            r = cartTotals(n.cart);
+        if (r.count < 1) return false;
+        if (n.cash < r.total) return set({
+            notice: `Pas assez d'espèces`
+        }), false;
+        let i = r.lines.find(e => e.item.restricted);
+        if (i && !(n.inventory.identite ?? 0)) return set({
+            notice: `${i.item.restricted} ans · pièce d'identité requise`
+        }), false;
+        for (let t of r.lines) {
+            let r = canPurchase(n.licenses, t.item.id, n.rpJob);
+            if (!r.ok) return set({
+                notice: r.message ?? `Permis requis`
+            }), false
+        }
+        let a = {
+                ...n.inventory
+            },
+            o = n.licenses;
+        for (let e of r.lines) {
+            a[e.item.id] = (a[e.item.id] ?? 0) + e.qty;
+            let t = licenseFromItem(e.item.id);
+            t && (o = grantLicense(o, t))
+        }
+        return set({
+            cash: Math.round((n.cash - r.total) * 100) / 100,
+            inventory: a,
+            licenses: o,
+            cart: {},
+            cartOpen: false,
+            paused: false,
+            notice: `Caisse · ${r.total}\u00a0$`,
+            ledger: pushLedger(n.ledger, `Panier Éther`, -r.total)
+        }), persist(), true
+    },
+    tickSurvival: (n, r) => set({
+        surv: tickSurvival(get().surv, n, r)
+    }),
+    openAtm: t => set({
+        atmOpen: true,
+        atmId: t,
+        paused: true,
+        showMap: false,
+        phoneOpen: false,
+        shopOpen: false
+    }),
+    closeAtm: () => set({
+        atmOpen: false,
+        atmId: null,
+        paused: false
+    }),
+    atmOp: (n, r) => {
+        let i = get(),
+            a = n === `deposit` ? opDeposit(i.economy, i.cash, i.bank, r, i.atmId) : opWithdraw(i.economy, i.cash, i.bank, r, i.atmId);
+        return a.ok ? (set({
+            cash: a.cash ?? i.cash,
+            bank: a.bank ?? i.bank,
+            economy: a.economy ?? i.economy,
+            notice: n === `deposit` ? `Dépôt · ${Math.round(r)}\u00a0$` : `Retrait · ${Math.round(r)}\u00a0$`,
+            ledger: pushLedger(i.ledger, n === `deposit` ? `Dépôt Caisse populaire` : `Retrait Caisse populaire`, n === `deposit` ? -Math.round(r) : Math.round(r))
+        }), persist(), true) : (set({
+            notice: a.reason ?? `Opération refusée`
+        }), false)
+    },
+    transferBank: (n, r) => {
+        let i = get();
+        if (!i.firm) return set({
+            notice: `Aucune entreprise REQ`
+        }), false;
+        let a = n === `to-firm` ? opTransferPersonalToFirm(i.economy, i.bank, i.firm.balance, r) : opTransferFirmToPersonal(i.economy, i.bank, i.firm.balance, r);
+        return a.ok ? (set({
+            bank: a.bank ?? i.bank,
+            economy: a.economy ?? i.economy,
+            firm: {
+                ...i.firm,
+                balance: a.firmBalance ?? i.firm.balance
+            },
+            notice: n === `to-firm` ? `Virement REQ · ${Math.round(r)}\u00a0$` : `Revenu REQ · ${Math.round(r)}\u00a0$`,
+            ledger: pushLedger(i.ledger, n === `to-firm` ? `Virement entreprise` : `Revenu entreprise`, n === `to-firm` ? -Math.round(r) : Math.round(r))
+        }), persist(), true) : (set({
+            notice: a.reason ?? `Virement refusé`
+        }), false)
+    },
+    requestLoan: n => {
+        let r = get(),
+            i = r.appearance.name || `Membre`,
+            a = opRequestLoan(r.economy, r.bank, `local`, i, n);
+        return a.ok ? (set({
+            bank: a.bank ?? r.bank,
+            economy: a.economy ?? r.economy,
+            notice: `Prêt versé · ${Math.round((a.bank??r.bank)-r.bank)}\u00a0$`,
+            ledger: pushLedger(r.ledger, `Prêt Caisse populaire`, (a.bank ?? r.bank) - r.bank)
+        }), persist(), true) : (set({
+            notice: a.reason ?? `Prêt refusé`
+        }), false)
+    },
+    investBank: (n, r) => {
+        let i = get(),
+            a = opInvest(i.economy, i.bank, `local`, n, r);
+        return a.ok ? (set({
+            bank: a.bank ?? i.bank,
+            economy: a.economy ?? i.economy,
+            notice: `Placement · ${Math.round(r)}\u00a0$`,
+            ledger: pushLedger(i.ledger, `Placement Caisse`, -Math.round(r))
+        }), persist(), true) : (set({
+            notice: a.reason ?? `Placement refusé`
+        }), false)
+    },
+    sellInvestment: n => {
+        let r = get(),
+            i = opSellInvestment(r.economy, r.bank, n);
+        return i.ok ? (set({
+            bank: i.bank ?? r.bank,
+            economy: i.economy ?? r.economy,
+            notice: `Placement racheté`,
+            ledger: pushLedger(r.ledger, `Rachat placement`, (i.bank ?? r.bank) - r.bank)
+        }), persist(), true) : (set({
+            notice: i.reason ?? `Rachat refusé`
+        }), false)
+    },
+    tickEconomy: n => {
+        let r = get(),
+            i = tickEconomy(r.economy, r.bank, n),
+            a = i.economy.day !== r.economy.day;
+        if (!a && i.bank === r.bank) {
+            Math.abs(r.economy.lastHours - n) > .25 && set({
+                economy: {
+                    ...r.economy,
+                    lastHours: n
+                }
+            });
+            return
+        }
+        let o = i.bank,
+            s = r.realty,
+            c = i.notice,
+            l = i.notice ? pushLedger(r.ledger, i.notice, i.bank - r.bank) : r.ledger;
+        if (a) {
+            let e = propertyById(s, r.ownedProps);
+            s = e.realty, e.rentIncome > 0 && (o = Math.round((o + e.rentIncome) * 100) / 100, l = pushLedger(l, `Loyers`, e.rentIncome)), e.mortgageDue > 0 && (o >= e.mortgageDue ? (o = Math.round((o - e.mortgageDue) * 100) / 100, l = pushLedger(l, `Hypothèque`, -e.mortgageDue)) : c = `Hypothèque impayée`), e.notice && (c = e.notice)
+        }
+        set({
+            economy: i.economy,
+            realty: s,
+            bank: o,
+            notice: c ?? r.notice,
+            ledger: l
+        })
+    },
+    openDeed: t => set({
+        propertyOpen: true,
+        deedId: t,
+        paused: true,
+        showMap: false,
+        phoneOpen: false
+    }),
+    closeDeed: () => set({
+        propertyOpen: false,
+        deedId: null,
+        paused: false
+    }),
+    buyDeed: () => get().buyProperty(`cash`),
+    buyProperty: (r = `cash`) => {
+        let i = get(),
+            a = propertyById(i.deedId ?? ``);
+        if (!a || ownedIds(i.ownedProps, i.realty).includes(a.id)) return false;
+        let {
+            tax: o,
+            total: s
+        } = withTax(a.price), c = i.cash, l = i.bank, u = i.realty, d = s;
+        if (r === `mortgage`) {
+            let t = Math.max(80, Math.round(s * .2));
+            if (l < t) return set({
+                notice: `Mise de fonds insuffisante`
+            }), false;
+            l = Math.round((l - t) * 100) / 100, u = addMortgage(u, a.id, s - t), d = t
+        } else if (r === `bank`) {
+            if (l < s) return set({
+                notice: `Solde Caisse insuffisant`
+            }), false;
+            l = Math.round((l - s) * 100) / 100
+        } else {
+            if (c < s) return set({
+                notice: `Fonds insuffisants`
+            }), false;
+            c = Math.round((c - s) * 100) / 100
+        }
+        let f = {
+                ...i.houses
+            },
+            p = i.ownedProps;
+        isHouseDeed(a.id) ? (p = [...i.ownedProps, a.id], f[a.id] = i.houses[a.id] ?? emptyHouse(a.id, a.town)) : u = {
+            ...u,
+            commercials: [...u.commercials, a.id]
+        }, u = {
+            ...u,
+            condition: {
+                ...u.condition,
+                [a.id]: 100
+            }
+        };
+        let m = isHouseDeed(a.id) ? {
+            ...i.inventory,
+            cle_maison: (i.inventory.cle_maison ?? 0) + 1
+        } : i.inventory;
+        return set({
+            cash: c,
+            bank: l,
+            realty: u,
+            houses: f,
+            ownedProps: p,
+            inventory: m,
+            propertyOpen: true,
+            paused: true,
+            notice: r === `mortgage` ? `Hypothèque · ${a.name}` : `Acte · ${a.name}`,
+            ledger: pushLedger(i.ledger, `${a.name}`, -d)
+        }), persist(), isHouseDeed(a.id) && void import("./net").then(({ rpNet }) => {
+            rpNet.publishProperty({
+                id: a.id,
+                name: a.name,
+                ownerId: rpNet.selfId,
+                price: a.price,
+                locked: true
+            })
+        }), true
+    },
+    listProperty: n => {
+        let r = get(),
+            i = r.deedId ?? ``,
+            a = propertyById(i);
+        if (!a || !ownedIds(r.ownedProps, r.realty).includes(i)) return false;
+        let o = n ?? Math.round(a.price * 1.15);
+        return set({
+            realty: listForSale(r.realty, i, o, `À vendre · ${a.town}`),
+            notice: `MLS · ${a.name} · ${o}\u00a0$`
+        }), persist(), true
+    },
+    unlistProperty: () => {
+        let n = get(),
+            r = n.deedId ?? ``;
+        r && (set({
+            realty: unlist(n.realty, r),
+            notice: `Retiré du MLS`
+        }), persist())
+    },
+    rentOut: () => {
+        let n = get(),
+            r = n.deedId ?? ``;
+        if (!ownedIds(n.ownedProps, n.realty).includes(r)) return false;
+        let i = startRental(n.realty, r);
+        return !i.ok || !i.realty ? (set({
+            notice: i.reason ?? `Location refusée`
+        }), false) : (set({
+            realty: i.realty,
+            notice: `Loué · ${i.realty.rentals[r]?.tenantName}`
+        }), persist(), true)
+    },
+    evictTenant: () => {
+        let n = get(),
+            r = n.deedId ?? ``;
+        return n.realty.rentals[r] ? (set({
+            realty: evictRental(n.realty, r),
+            notice: `Locataire évincé`
+        }), persist(), true) : false
+    },
+    maintainRealty: () => {
+        let n = get(),
+            r = n.deedId ?? ``;
+        if (!ownedIds(n.ownedProps, n.realty).includes(r)) return false;
+        if (n.cash < 40 && n.bank < 40) return set({
+            notice: `Entretien 40 $`
+        }), false;
+        let i = n.cash < 40;
+        return set({
+            cash: i ? n.cash : Math.round((n.cash - 40) * 100) / 100,
+            bank: i ? Math.round((n.bank - 40) * 100) / 100 : n.bank,
+            realty: maintainProperty(n.realty, r),
+            notice: `Entretien · condition +50`,
+            ledger: pushLedger(n.ledger, `Entretien immeuble`, -40)
+        }), persist(), true
+    },
+    bookVisit: () => {
+        let n = get(),
+            r = n.deedId ?? ``,
+            i = propertyById(r);
+        return i ? (set({
+            realty: requestVisit(n.realty, r, n.appearance.name),
+            notice: `Visite demandée · ${i.name}`
+        }), persist(), true) : false
+    },
+    grantRealtyAccess: n => {
+        let r = get(),
+            i = r.deedId ?? ``,
+            a = n.trim();
+        return !a || !ownedIds(r.ownedProps, r.realty).includes(i) ? false : (set({
+            realty: grantAccess(r.realty, i, a),
+            notice: `Accès · ${a}`
+        }), persist(), true)
+    },
+    revokeRealtyAccess: n => {
+        let r = get(),
+            i = r.deedId ?? ``;
+        return i ? (set({
+            realty: revokeAccess(r.realty, i, n),
+            notice: `Accès retiré · ${n}`
+        }), persist(), true) : false
+    },
+    buyReno: n => {
+        let r = get(),
+            i = deedById(r.deedId ?? ``);
+        if (!i || !r.ownedProps.includes(i.id)) return false;
+        let a = renoById(n),
+            o = r.houses[i.id] ?? emptyHouse(i.id);
+        if (o.renos.includes(n)) return set({
+            notice: `Déjà fait`
+        }), false;
+        let {
+            tax: s,
+            total: c
+        } = withTax(a.price);
+        if (r.cash < c) return set({
+            notice: `Fonds insuffisants`
+        }), false;
+        let l = {
+            ...o,
+            renos: [...o.renos, n]
+        };
+        return set({
+            cash: Math.round((r.cash - c) * 100) / 100,
+            houses: {
+                ...r.houses,
+                [i.id]: l
+            },
+            notice: `Travaux · ${a.label} · TPS+TVQ ${s}\u00a0$`,
+            ledger: pushLedger(r.ledger, `Reno · ${a.label}`, -c)
+        }), persist(), true
+    },
+    installHeat: n => {
+        let r = get(),
+            i = deedById(r.deedId ?? ``);
+        if (!i || !r.ownedProps.includes(i.id)) return false;
+        let a = heatById(n),
+            o = r.houses[i.id] ?? emptyHouse(i.id, i.town);
+        if (o.heat === n) return set({
+            notice: `Déjà installé`
+        }), false;
+        let s = a.price;
+        n === `thermopompe` && (s = Math.max(0, s - 80));
+        let {
+            tax: c,
+            total: l
+        } = withTax(s);
+        if (s > 0 && r.cash < l) return set({
+            notice: `Fonds insuffisants`
+        }), false;
+        let u = {
+            ...o,
+            heat: n,
+            heatOn: true,
+            broke: false,
+            wood: a.needsWood ? Math.max(o.wood, 2) : o.wood
+        };
+        return set({
+            cash: s > 0 ? Math.round((r.cash - l) * 100) / 100 : r.cash,
+            houses: {
+                ...r.houses,
+                [i.id]: u
+            },
+            notice: n === `thermopompe` ? `Thermopompe · LogisVert −80\xA0$` : `Chauffage · ${a.label}`,
+            ledger: s > 0 ? pushLedger(r.ledger, `Chauffage · ${a.label}`, -l) : r.ledger
+        }), persist(), true
+    },
+    setWater: n => {
+        let r = get(),
+            i = deedById(r.deedId ?? ``);
+        if (!i || !r.ownedProps.includes(i.id)) return false;
+        let a = r.houses[i.id] ?? emptyHouse(i.id, i.town);
+        if (a.water === n) return true;
+        let {
+            total: o
+        } = withTax(n === `puits` ? 120 : 40);
+        return r.cash < o ? (set({
+            notice: `Fonds insuffisants`
+        }), false) : (set({
+            cash: Math.round((r.cash - o) * 100) / 100,
+            houses: {
+                ...r.houses,
+                [i.id]: {
+                    ...a,
+                    water: n,
+                    waterOn: true,
+                    frozen: false
+                }
+            },
+            notice: waterById(n).label,
+            ledger: pushLedger(r.ledger, waterById(n).label, -o)
+        }), persist(), true)
+    },
+    toggleHeat: () => {
+        let n = get(),
+            r = n.deedId ?? n.ownedProps[0];
+        if (!r || !n.ownedProps.includes(r)) return false;
+        let i = n.houses[r] ?? emptyHouse(r),
+            a = heatById(i.heat);
+        return !i.heatOn && a.needsWood && i.wood <= 0 ? (set({
+            notice: `Plus de bois`
+        }), false) : !i.heatOn && a.needsHydro && (!i.hydroOn || n.gridOutage) ? (set({
+            notice: `Hydro coupé · pas d'électrique`
+        }), false) : (set({
+            houses: {
+                ...n.houses,
+                [r]: {
+                    ...i,
+                    heatOn: !i.heatOn
+                }
+            },
+            notice: i.heatOn ? `Chauffage coupé` : `Chauffage · ${a.label}`
+        }), persist(), true)
+    },
+    toggleHydro: () => {
+        let n = get(),
+            r = n.deedId ?? n.ownedProps[0];
+        if (!r || !n.ownedProps.includes(r)) return false;
+        let i = n.houses[r] ?? emptyHouse(r),
+            a = !i.hydroOn;
+        return set({
+            houses: {
+                ...n.houses,
+                [r]: {
+                    ...i,
+                    hydroOn: a,
+                    heatOn: a || heatById(i.heat).panneProof ? i.heatOn : false
+                }
+            },
+            notice: a ? `Panneau Hydro · sous tension` : `Disjoncteur · coupé`
+        }), persist(), true
+    },
+    toggleWater: () => {
+        let n = get(),
+            r = n.deedId ?? n.ownedProps[0];
+        if (!r || !n.ownedProps.includes(r)) return false;
+        let i = n.houses[r] ?? emptyHouse(r);
+        return i.frozen && i.waterOn ? (set({
+            notice: `Tuyaux gelés · dégeler d'abord`
+        }), false) : (set({
+            houses: {
+                ...n.houses,
+                [r]: {
+                    ...i,
+                    waterOn: !i.waterOn
+                }
+            },
+            notice: i.waterOn ? `Entrée d'eau fermée` : `Eau ouverte`
+        }), persist(), true)
+    },
+    loadWood: (n = 1) => {
+        let r = get(),
+            i = r.deedId ?? r.ownedProps[0];
+        if (!i || !r.ownedProps.includes(i)) return set({
+            notice: `Chargez le poêle chez vous`
+        }), false;
+        let a = r.houses[i] ?? emptyHouse(i);
+        if (!heatById(a.heat).needsWood) return set({
+            notice: `Pas de poêle ni foyer`
+        }), false;
+        if ((r.inventory.corde_bois ?? 0) < n) return set({
+            notice: `Pas de corde de bois`
+        }), false;
+        if (a.wood >= 8) return set({
+            notice: `Bûcher plein`
+        }), false;
+        let o = Math.min(n, 8 - Math.floor(a.wood));
+        return set({
+            inventory: takeInv(r.inventory, `corde_bois`, o),
+            houses: {
+                ...r.houses,
+                [i]: {
+                    ...a,
+                    wood: Math.min(8, a.wood + o)
+                }
+            },
+            notice: `Bois · ${Math.min(8,a.wood+o).toFixed(0)} cordes`
+        }), persist(), true
+    },
+    repairFurnace: () => {
+        let n = get(),
+            r = n.deedId ?? n.ownedProps[0];
+        if (!r || !n.ownedProps.includes(r)) return false;
+        let i = n.houses[r] ?? emptyHouse(r);
+        if (!i.broke) return set({
+            notice: `Fournaise ok`
+        }), false;
+        let {
+            total: a
+        } = withTax(85);
+        return n.cash < a ? (set({
+            notice: `Réparation · fonds insuffisants`
+        }), false) : (set({
+            cash: Math.round((n.cash - a) * 100) / 100,
+            houses: {
+                ...n.houses,
+                [r]: {
+                    ...i,
+                    broke: false,
+                    heatOn: true
+                }
+            },
+            notice: `Fournaise réparée`,
+            ledger: pushLedger(n.ledger, `Fournaise`, -a)
+        }), persist(), true)
+    },
+    thawPipes: () => {
+        let n = get(),
+            r = n.deedId ?? n.ownedProps[0];
+        if (!r || !n.ownedProps.includes(r)) return false;
+        let i = n.houses[r] ?? emptyHouse(r);
+        if (!i.frozen) return set({
+            notice: `Tuyaux ok`
+        }), false;
+        let {
+            total: a
+        } = withTax(60);
+        return n.cash < a ? (set({
+            notice: `Plombier · fonds insuffisants`
+        }), false) : (set({
+            cash: Math.round((n.cash - a) * 100) / 100,
+            houses: {
+                ...n.houses,
+                [r]: {
+                    ...i,
+                    frozen: false,
+                    waterOn: true
+                }
+            },
+            notice: `Tuyaux dégelés`,
+            ledger: pushLedger(n.ledger, `Plombier`, -a)
+        }), persist(), true)
+    },
+    tickUtilities: (n, r) => {
+        let i = get();
+        if (i.ownedProps.length === 0 && !i.gridOutage) return;
+        let a = {};
+        for (let e of i.ownedProps) a[e] = i.houses[e] ?? emptyHouse(e);
+        let o = tickHouseUtils(a, i.ownedProps, i.gridOutage, n, {
+                ambient: r.ambient,
+                weather: r.weather,
+                month: r.month,
+                elapsed: r.elapsed
+            }),
+            s = {
+                ...i.houses
+            };
+        for (let [e, t] of Object.entries(o.houses)) s[e] = {
+            ...s[e] ?? emptyHouse(e),
+            ...t
+        };
+        let c = i.cash,
+            l = i.bank,
+            u = i.ledger,
+            d = o.notice;
+        if (o.debit > 0) {
+            if (l >= o.debit) l = Math.round((l - o.debit) * 100) / 100;
+            else if (c + l >= o.debit) {
+                let e = o.debit - l;
+                l = 0, c = Math.round((c - e) * 100) / 100
+            } else {
+                for (let e of i.ownedProps) {
+                    let t = s[e];
+                    s[e] = {
+                        ...t,
+                        hydroOn: false,
+                        heatOn: heatById(t.heat).panneProof ? t.heatOn : false
+                    }
+                }
+                d = `Hydro-Québec · coupure pour non-paiement`
+            }
+            o.label && (u = pushLedger(u, o.label, -o.debit)), d ||= o.label
+        }
+        set({
+            houses: s,
+            gridOutage: o.grid,
+            cash: c,
+            bank: l,
+            ledger: u,
+            ...d ? {
+                notice: d
+            } : {}
+        }), (o.debit > 0 || o.notice || o.grid !== i.gridOutage) && persist()
+    },
+    setBasement: n => {
+        let r = get(),
+            i = r.deedId;
+        if (!i || !r.ownedProps.includes(i)) return false;
+        let a = r.houses[i] ?? emptyHouse(i);
+        return hasReno(a, `soussol`) ? (set({
+            houses: {
+                ...r.houses,
+                [i]: {
+                    ...a,
+                    basement: n
+                }
+            },
+            notice: `Sous-sol · ${n}`
+        }), persist(), true) : (set({
+            notice: `Finissez le sous-sol d'abord`
+        }), false)
+    },
+    toggleGarageFit: n => {
+        let r = get(),
+            i = r.deedId;
+        if (!i || !r.ownedProps.includes(i)) return false;
+        let a = r.houses[i] ?? emptyHouse(i);
+        if (!hasReno(a, `garage`)) return set({
+            notice: `Bâtissez le garage d'abord`
+        }), false;
+        if (a.garageFits.includes(n)) set({
+            houses: {
+                ...r.houses,
+                [i]: {
+                    ...a,
+                    garageFits: a.garageFits.filter(e => e !== n)
+                }
+            },
+            notice: `Retiré · ${n}`
+        });
+        else {
+            let t = {
+                    etabli: 60,
+                    outils: 45,
+                    rangement: 40,
+                    compresseur: 90,
+                    deco: 35,
+                    mecanique: 120
+                } [n],
+                {
+                    total: o
+                } = withTax(t);
+            if (r.cash < o) return set({
+                notice: `Fonds insuffisants`
+            }), false;
+            set({
+                cash: Math.round((r.cash - o) * 100) / 100,
+                houses: {
+                    ...r.houses,
+                    [i]: {
+                        ...a,
+                        garageFits: [...a.garageFits, n]
+                    }
+                },
+                notice: `Garage · ${n}`,
+                ledger: pushLedger(r.ledger, `Garage · ${n}`, -o)
+            })
+        }
+        return persist(), true
+    },
+    setGarageBays: n => {
+        let r = get(),
+            i = r.deedId;
+        if (!i || !r.ownedProps.includes(i)) return false;
+        let a = r.houses[i] ?? emptyHouse(i);
+        if (!hasReno(a, `garage`)) return set({
+            notice: `Bâtissez le garage d'abord`
+        }), false;
+        if (n === a.garageBays) return true;
+        let o = (n === 3 ? 320 : n === 2 ? 180 : 0) - (a.garageBays === 3 ? 320 : a.garageBays === 2 ? 180 : 0);
+        if (o > 0) {
+            let {
+                total: t
+            } = withTax(o);
+            if (r.cash < t) return set({
+                notice: `Fonds insuffisants`
+            }), false;
+            set({
+                cash: Math.round((r.cash - t) * 100) / 100,
+                houses: {
+                    ...r.houses,
+                    [i]: {
+                        ...a,
+                        garageBays: n,
+                        parked: a.parked.slice(0, n)
+                    }
+                },
+                notice: `Garage · ${n} places`,
+                ledger: pushLedger(r.ledger, `Garage ${n} places`, -t)
+            })
+        } else set({
+            houses: {
+                ...r.houses,
+                [i]: {
+                    ...a,
+                    garageBays: n,
+                    parked: a.parked.slice(0, n)
+                }
+            },
+            notice: `Garage · ${n} places`
+        });
+        return persist(), true
+    },
+    cutHouseKey: n => {
+        let r = get(),
+            i = r.deedId;
+        if (!i || !r.ownedProps.includes(i)) return false;
+        if (n === `owner` || n === `guest`) return set({
+            notice: `Invité n'a pas de clé permanente`
+        }), false;
+        let a = r.houses[i] ?? emptyHouse(i);
+        if (a.keychain.includes(n)) return set({
+            notice: `Double déjà taillé`
+        }), false;
+        let {
+            total: o
+        } = withTax(25);
+        if (r.cash < o) return set({
+            notice: `Fonds insuffisants`
+        }), false;
+        let s = {
+            ...r.inventory,
+            double_cle: (r.inventory.double_cle ?? 0) + 1
+        };
+        return set({
+            cash: Math.round((r.cash - o) * 100) / 100,
+            inventory: s,
+            houses: {
+                ...r.houses,
+                [i]: {
+                    ...a,
+                    keychain: [...a.keychain, n]
+                }
+            },
+            notice: `Double · ${n}`,
+            ledger: pushLedger(r.ledger, `Double de clés`, -o)
+        }), persist(), true
+    },
+    toggleDoorLock: n => {
+        let r = get(),
+            i = r.deedId;
+        if (!i || !r.ownedProps.includes(i)) return false;
+        let a = r.houses[i] ?? emptyHouse(i),
+            o = {
+                ...a.doors,
+                [n]: !a.doors[n]
+            };
+        return set({
+            houses: {
+                ...r.houses,
+                [i]: {
+                    ...a,
+                    doors: o
+                }
+            },
+            notice: o[n] ? `Verrouillée · ${n}` : `Ouverte · ${n}`
+        }), persist(), true
+    },
+    parkInGarage: n => {
+        let r = get(),
+            i = r.ownedProps[0],
+            a = r.deedId ?? i;
+        if (!a || !r.ownedProps.includes(a)) return false;
+        let o = r.houses[a] ?? emptyHouse(a);
+        return hasReno(o, `garage`) ? o.parked.length >= o.garageBays ? (set({
+            notice: `Garage plein`
+        }), false) : o.parked.includes(n) ? true : (set({
+            houses: {
+                ...r.houses,
+                [a]: {
+                    ...o,
+                    parked: [...o.parked, n]
+                }
+            },
+            notice: `Véhicule rangé`
+        }), persist(), true) : false
+    },
+    takeFromGarage: n => {
+        let r = get(),
+            i = r.deedId ?? r.ownedProps[0];
+        if (!i) return false;
+        let a = r.houses[i] ?? emptyHouse(i);
+        return set({
+            houses: {
+                ...r.houses,
+                [i]: {
+                    ...a,
+                    parked: a.parked.filter(e => e !== n)
+                }
+            },
+            notice: `Véhicule sorti`
+        }), persist(), true
+    },
+    setRpJob: n => {
+        let r = jobById(n).id,
+            i = get(),
+            a = {
+                ...i.inventory
+            };
+        if (r === `policier`)
+            for (let e of Nm) a[e] = Math.max(a[e] ?? 0, 1);
+        let o = i.career;
+        r === `policier` && (o = {
+            ...o,
+            licenses: grantGigLicense(o.licenses, `badge_police`),
+            faction: o.faction ?? joinCareerFaction(`spvq`, `SPVQ`)
+        }), r === `ambulancier` && (o = {
+            ...o,
+            licenses: grantGigLicense(o.licenses, `diplome_sante`),
+            faction: o.faction ?? joinCareerFaction(`sante_publique`, `Santé publique`)
+        }), (r === `taxi` || r === `livreur`) && (o = {
+            ...o,
+            licenses: grantGigLicense(o.licenses, `permis_c`)
+        }), set({
+            rpJob: r,
+            inventory: a,
+            career: o,
+            staffRoster: snapshotStaff(),
+            notice: r === `policier` ? `Emploi · Policier · kit SQ versé` : `Emploi · ${jobById(r).name}`
+        }), setUserJob(LOCAL_PLAYER_ID, rpJobToRole(r)), persist()
+    },
+    setAdminRole: n => {
+        let r = parseAdminRole(n) ?? get().adminRole;
+        setUserRole(LOCAL_PLAYER_ID, r);
+        set({
+            adminRole: r,
+            staffRoster: snapshotStaff(),
+            notice: `Grade · ${getRoleBadgeStyle(r).label}`
+        }), persist()
+    },
+    syncStaff: id => {
+        let n = get();
+        if (n.appearance?.name) setDisplayName(LOCAL_PLAYER_ID, n.appearance.name);
+        if (!id || id === LOCAL_PLAYER_ID) {
+            const job =
+                getUserRole(LOCAL_PLAYER_ID) === AdminRole.INTELLECTUS_AI && n.rpJob === `civil`
+                    ? RpJobRole.ETHER_ARCHITECT
+                    : rpJobToRole(n.rpJob);
+            setUserJob(LOCAL_PLAYER_ID, job);
+            set({
+                adminRole: getUserRole(LOCAL_PLAYER_ID),
+                staffRoster: snapshotStaff()
+            })
+        } else set({
+            staffRoster: snapshotStaff()
+        });
+        persist()
+    },
+    promoteStaff: id => {
+        let t = id || LOCAL_PLAYER_ID;
+        let r = promoteUser(t);
+        set(t === LOCAL_PLAYER_ID ? {
+            adminRole: r,
+            staffRoster: snapshotStaff(),
+            notice: `Promotion · ${getRoleBadgeStyle(r).label}`
+        } : {
+            staffRoster: snapshotStaff(),
+            notice: `Promotion · ${t}`
+        }), persist();
+        return r
+    },
+    demoteStaff: id => {
+        let t = id || LOCAL_PLAYER_ID;
+        let r = demoteUser(t);
+        set(t === LOCAL_PLAYER_ID ? {
+            adminRole: r,
+            staffRoster: snapshotStaff(),
+            notice: `Rétrogradation · ${getRoleBadgeStyle(r).label}`
+        } : {
+            staffRoster: snapshotStaff(),
+            notice: `Rétrogradation · ${t}`
+        }), persist();
+        return r
+    },
+    joinGang: t => {
+        let n = crimeById(t);
+        return n ? (set({
+            gangId: n.id,
+            notice: `Rejoint · ${n.name}`
+        }), persist(), true) : false
+    },
+    leaveGang: () => {
+        set({
+            gangId: null,
+            notice: `Plus de gang`
+        }), persist()
+    },
+    commitCrime: (n, r) => {
+        let i = get();
+        if (i.rpJob === `policier`) return set({
+            notice: `Vous êtes de la SQ.`
+        }), false;
+        let a = qb(n),
+            o = a.id === `bank_robbery` ? `robbery` : a.id;
+        if (Math.random() * 6 < a.stars) return Gj.report(o, r), set({
+            notice: `Repéré · ${a.name}`
+        }), false;
+        let s = a.reward;
+        return i.gangId && (s = Math.round(s * 1.2)), set({
+            cash: Math.round((i.cash + s) * 100) / 100,
+            notice: `${a.name} · +${s}\u00a0$`,
+            ledger: pushLedger(i.ledger, a.name, s)
+        }), Math.random() < .35 && Gj.report(`theft`, r), persist(), true
+    },
+    tickPayroll: () => {
+        let n = get(),
+            r = Xb(n.rpJob);
+        r <= 0 || (set({
+            bank: Math.round((n.bank + r) * 100) / 100,
+            notice: `Paie · ${jobById(n.rpJob).name} · +${r}\u00a0$`,
+            ledger: pushLedger(n.ledger, `Paie ${jobById(n.rpJob).name}`, r)
+        }), persist())
+    },
+    openElevator: () => set({
+        elevatorOpen: true,
+        paused: true
+    }),
+    closeElevator: () => set({
+        elevatorOpen: false,
+        paused: false
+    }),
+    sit: () => set({
+        sitting: true,
+        notice: `Assis`
+    }),
+    stand: () => set({
+        sitting: false,
+        notice: `Debout`
+    }),
+    toggleLobbyLights: () => {
+        let n = !get().lobbyLights;
+        set({
+            lobbyLights: n,
+            notice: n ? `Lustres allumés` : `Lustres éteints`
+        })
+    },
+    ringBell: () => set({
+        notice: `Ding — réception prévenue`
+    }),
+    toggleBuild: () => {
+        let n = !get().buildOpen;
+        set({
+            buildOpen: n,
+            paused: false,
+            notice: n ? `Builder · E pour placer` : `Builder fermé`
+        })
+    },
+    selectProp: t => set({
+        buildType: t
+    }),
+    rotateGhost: () => set({
+        buildYaw: (get().buildYaw + Math.PI / 4) % (Math.PI * 2)
+    }),
+    scaleGhost: n => set({
+        buildScale: Math.max(.25, Math.min(6, get().buildScale + n * .25))
+    }),
+    addPlaced: n => {
+        set({
+            placed: [...get().placed, n].slice(-80),
+            notice: `Placé · ${n.type}`
+        }), persist()
+    },
+    removePlaced: n => {
+        set({
+            placed: get().placed.filter(e => e.id !== n),
+            notice: `Objet retiré`
+        }), persist()
+    },
+    clearPlaced: () => {
+        set({
+            placed: [],
+            notice: `Terrain vidé`
+        }), persist()
     }
-    persist();
-    return true;
-  },
-  setGarageBays: (n) => {
-    const s = get();
-    const id = s.deedId;
-    if (!id || !s.ownedProps.includes(id)) return false;
-    const cur = s.houses[id] ?? emptyHouse(id);
-    if (!hasReno(cur, "garage")) { set({ notice: "Bâtissez le garage d'abord" }); return false; }
-    if (n === cur.garageBays) return true;
-    const price = n === 3 ? 320 : n === 2 ? 180 : 0;
-    const curPrice = cur.garageBays === 3 ? 320 : cur.garageBays === 2 ? 180 : 0;
-    const delta = price - curPrice;
-    if (delta > 0) {
-      const { total } = withTax(delta);
-      if (s.cash < total) { set({ notice: "Fonds insuffisants" }); return false; }
-      set({
-        cash: Math.round((s.cash - total) * 100) / 100,
-        houses: { ...s.houses, [id]: { ...cur, garageBays: n, parked: cur.parked.slice(0, n) } },
-        notice: `Garage · ${n} places`,
-        ledger: pushLedger(s.ledger, `Garage ${n} places`, -total),
-      });
-    } else {
-      set({ houses: { ...s.houses, [id]: { ...cur, garageBays: n, parked: cur.parked.slice(0, n) } }, notice: `Garage · ${n} places` });
-    }
-    persist();
-    return true;
-  },
-  cutHouseKey: (role) => {
-    const s = get();
-    const id = s.deedId;
-    if (!id || !s.ownedProps.includes(id)) return false;
-    if (role === "owner" || role === "guest") { set({ notice: "Invité n'a pas de clé permanente" }); return false; }
-    const cur = s.houses[id] ?? emptyHouse(id);
-    if (cur.keychain.includes(role)) { set({ notice: "Double déjà taillé" }); return false; }
-    const { total } = withTax(25);
-    if (s.cash < total) { set({ notice: "Fonds insuffisants" }); return false; }
-    const inv = { ...s.inventory, double_cle: (s.inventory.double_cle ?? 0) + 1 };
-    set({
-      cash: Math.round((s.cash - total) * 100) / 100,
-      inventory: inv,
-      houses: { ...s.houses, [id]: { ...cur, keychain: [...cur.keychain, role] } },
-      notice: `Double · ${role}`,
-      ledger: pushLedger(s.ledger, "Double de clés", -total),
-    });
-    persist();
-    return true;
-  },
-  toggleDoorLock: (slot) => {
-    const s = get();
-    const id = s.deedId;
-    if (!id || !s.ownedProps.includes(id)) return false;
-    const cur = s.houses[id] ?? emptyHouse(id);
-    const next = { ...cur.doors, [slot]: !cur.doors[slot] };
-    set({
-      houses: { ...s.houses, [id]: { ...cur, doors: next } },
-      notice: next[slot] ? `Verrouillée · ${slot}` : `Ouverte · ${slot}`,
-    });
-    persist();
-    return true;
-  },
-  parkInGarage: (vehicleId) => {
-    const s = get();
-    const id = s.ownedProps[0];
-    const deedId = s.deedId ?? id;
-    if (!deedId || !s.ownedProps.includes(deedId)) return false;
-    const cur = s.houses[deedId] ?? emptyHouse(deedId);
-    if (!hasReno(cur, "garage")) return false;
-    if (cur.parked.length >= cur.garageBays) { set({ notice: "Garage plein" }); return false; }
-    if (cur.parked.includes(vehicleId)) return true;
-    set({
-      houses: { ...s.houses, [deedId]: { ...cur, parked: [...cur.parked, vehicleId] } },
-      notice: "Véhicule rangé",
-    });
-    persist();
-    return true;
-  },
-  takeFromGarage: (vehicleId) => {
-    const s = get();
-    const deedId = s.deedId ?? s.ownedProps[0];
-    if (!deedId) return false;
-    const cur = s.houses[deedId] ?? emptyHouse(deedId);
-    set({
-      houses: { ...s.houses, [deedId]: { ...cur, parked: cur.parked.filter((p) => p !== vehicleId) } },
-      notice: "Véhicule sorti",
-    });
-    persist();
-    return true;
-  },
-  setRpJob: (id) => { set({ rpJob: jobById(id).id, notice: `Emploi · ${jobById(id).name}` }); persist(); },
-  joinGang: (id) => {
-    const g = gangById(id);
-    if (!g) return false;
-    set({ gangId: g.id, notice: `Rejoint · ${g.name}` });
-    persist();
-    return true;
-  },
-  leaveGang: () => { set({ gangId: null, notice: "Plus de gang" }); persist(); },
-  commitCrime: (crime, elapsed) => {
-    const s = get();
-    if (s.rpJob === "policier") { set({ notice: "Vous êtes de la SQ." }); return false; }
-    const spec = crimeById(crime as "theft");
-    const kind = spec.id === "bank_robbery" ? "robbery" : spec.id;
-    const caught = Math.random() * 6 < spec.stars;
-    if (caught) {
-      police.report(kind, elapsed);
-      set({ notice: `Repéré · ${spec.name}` });
-      return false;
-    }
-    let reward = spec.reward;
-    if (s.gangId) reward = Math.round(reward * 1.2);
-    set({
-      cash: Math.round((s.cash + reward) * 100) / 100,
-      notice: `${spec.name} · +${reward}\u00a0$`,
-      ledger: pushLedger(s.ledger, spec.name, reward),
-    });
-    if (Math.random() < 0.35) police.report("theft", elapsed);
-    persist();
-    return true;
-  },
-  tickPayroll: () => {
-    const s = get();
-    const net = payrollNet(s.rpJob);
-    if (net <= 0) return;
-    set({
-      bank: Math.round((s.bank + net) * 100) / 100,
-      notice: `Paie · ${jobById(s.rpJob).name} · +${net}\u00a0$`,
-      ledger: pushLedger(s.ledger, `Paie ${jobById(s.rpJob).name}`, net),
-    });
-    persist();
-  },
-  openElevator: () => set({ elevatorOpen: true, paused: true }),
-  closeElevator: () => set({ elevatorOpen: false, paused: false }),
-  sit: () => set({ sitting: true, notice: "Assis" }),
-  stand: () => set({ sitting: false, notice: "Debout" }),
-  toggleLobbyLights: () => {
-    const on = !get().lobbyLights;
-    set({ lobbyLights: on, notice: on ? "Lustres allumés" : "Lustres éteints" });
-  },
-  ringBell: () => set({ notice: "Ding — réception prévenue" }),
-  toggleBuild: () => {
-    const on = !get().buildOpen;
-    set({ buildOpen: on, paused: false, notice: on ? "Builder · E pour placer" : "Builder fermé" });
-  },
-  selectProp: (id) => set({ buildType: id }),
-  rotateGhost: () => set({ buildYaw: (get().buildYaw + Math.PI / 4) % (Math.PI * 2) }),
-  scaleGhost: (dir) => set({ buildScale: Math.max(0.25, Math.min(6, get().buildScale + dir * 0.25)) }),
-  addPlaced: (p) => {
-    const placed = [...get().placed, p].slice(-80);
-    set({ placed, notice: `Placé · ${p.type}` });
-    persist();
-  },
-  removePlaced: (id) => {
-    set({ placed: get().placed.filter((p) => p.id !== id), notice: "Objet retiré" });
-    persist();
-  },
-  clearPlaced: () => {
-    set({ placed: [], notice: "Terrain vidé" });
-    persist();
-  },
 }));
 
 export function persist() {
-  if (typeof localStorage === "undefined") return;
-  const s = useGameStore.getState();
-  try {
-    localStorage.setItem(
-      SAVE,
-      JSON.stringify({
-        visited: s.visited,
-        km: Math.round(s.km * 10) / 10,
-        fines: s.fines,
-        x: Math.round(s.x * 10) / 10,
-        z: Math.round(s.z * 10) / 10,
-        yaw: s.yaw,
-        night: s.night,
-        weather: s.weather,
-        leaves: s.leaves,
-        cash: s.cash,
-        inventory: s.inventory,
-        licenses: s.licenses,
-        notes: s.notes,
-        ledger: s.ledger.slice(0, 16),
-        unlockedDoors: hotelSecurity.snapshot().unlockedDoors,
-        hotelTvOn: s.hotelTvOn,
-        radioOn: s.radioOn,
-        radioId: s.radioId,
-        tickets: s.tickets.slice(0, 8),
-        appearance: s.appearance,
-        vehicleId: s.vehicleId,
-        ownedVehicles: s.ownedVehicles,
-        equippedTool: s.equippedTool,
-        equippedPack: s.equippedPack,
-        firm: s.firm,
-        cart: s.cart,
-        surv: s.surv,
-        bank: s.bank,
-        rpJob: s.rpJob,
-        gangId: s.gangId,
-        ownedProps: s.ownedProps,
-        placed: s.placed,
-        selectedSeed: s.selectedSeed,
-        houses: s.houses,
-        gridOutage: s.gridOutage,
-      }),
-    );
-  } catch {
-    /* ignore */
-  }
+    if (typeof localStorage === "undefined") return;
+    let e = useGameStore.getState();
+    try {
+        localStorage.setItem(SAVE, JSON.stringify({
+            visited: e.visited,
+            km: Math.round(e.km * 10) / 10,
+            fines: e.fines,
+            x: Math.round(e.x * 10) / 10,
+            z: Math.round(e.z * 10) / 10,
+            yaw: e.yaw,
+            night: e.night,
+            weather: e.weather,
+            leaves: e.leaves,
+            lootedItems: e.lootedItems ?? [],
+            cash: e.cash,
+            inventory: e.inventory,
+            licenses: e.licenses,
+            notes: e.notes,
+            ledger: e.ledger.slice(0, 16),
+            unlockedDoors: hotelSecurity.snapshot().unlockedDoors,
+            hotelTvOn: e.hotelTvOn,
+            radioOn: e.radioOn,
+            radioId: e.radioId,
+            tickets: e.tickets.slice(0, 8),
+            demeritPoints: e.demeritPoints ?? 0,
+            licenseSuspendedUntil: e.licenseSuspendedUntil ?? 0,
+            appearance: e.appearance,
+            vehicleId: e.vehicleId,
+            ownedVehicles: e.ownedVehicles,
+            equippedTool: e.equippedTool,
+            equippedPack: e.equippedPack,
+            firm: e.firm,
+            cart: e.cart,
+            surv: e.surv,
+            bank: e.bank,
+            economy: e.economy,
+            realty: e.realty,
+            rpJob: e.rpJob,
+            gangId: e.gangId,
+            ownedProps: e.ownedProps,
+            placed: e.placed,
+            selectedSeed: e.selectedSeed,
+            houses: e.houses,
+            gridOutage: e.gridOutage,
+            career: e.career,
+            adminRole: e.adminRole,
+            staffRoster: snapshotStaff()
+        }))
+    } catch {}
 }
