@@ -10,33 +10,464 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminBusRouteImport } from './routes/admin/bus'
+import { Route as AdminCommandsRouteImport } from './routes/admin/commands'
+import { Route as AdminIntellectusRouteImport } from './routes/admin/intellectus'
+import { Route as AdminSchedulerRouteImport } from './routes/admin/scheduler'
+import { Route as ApiRtcRouteImport } from './routes/api/rtc'
+import { Route as AdminMemoryIndexRouteImport } from './routes/admin/memory/index'
+import { Route as AdminMemoryRestoreRouteImport } from './routes/admin/memory/restore'
+import { Route as AdminMemorySnapshotRouteImport } from './routes/admin/memory/snapshot'
+import { Route as AdminThirdeyeStatsRouteImport } from './routes/admin/thirdeye/stats'
+import { Route as AdminThirdeyeUnbanRouteImport } from './routes/admin/thirdeye/unban'
+import { Route as ApiCharactersIndexRouteImport } from './routes/api/characters/index'
+import { Route as ApiCharactersIdRouteImport } from './routes/api/characters/$id'
+import { Route as ApiJobsIndexRouteImport } from './routes/api/jobs/index'
+import { Route as ApiJobsIdRouteImport } from './routes/api/jobs/$id'
+import { Route as ApiPropertiesIndexRouteImport } from './routes/api/properties/index'
+import { Route as ApiPropertiesIdRouteImport } from './routes/api/properties/$id'
+import { Route as ApiRpBankingRouteImport } from './routes/api/rp/banking'
+import { Route as ApiRpDispatchRouteImport } from './routes/api/rp/dispatch'
+import { Route as ApiRpGangsRouteImport } from './routes/api/rp/gangs'
+import { Route as ApiRpHeartbeatRouteImport } from './routes/api/rp/heartbeat'
+import { Route as ApiRpJobsRouteImport } from './routes/api/rp/jobs'
+import { Route as ApiRpPlayersRouteImport } from './routes/api/rp/players'
+import { Route as ApiRpPrisonRouteImport } from './routes/api/rp/prison'
+import { Route as ApiRpPropertiesRouteImport } from './routes/api/rp/properties'
+import { Route as ApiRpSqdcRouteImport } from './routes/api/rp/sqdc'
+import { Route as ApiVehiclesIndexRouteImport } from './routes/api/vehicles/index'
+import { Route as ApiVehiclesIdRouteImport } from './routes/api/vehicles/$id'
+import { Route as ApiWeaponsIndexRouteImport } from './routes/api/weapons/index'
+import { Route as ApiWeaponsIdRouteImport } from './routes/api/weapons/$id'
+import { Route as ApiCharactersIdEmploymentRouteImport } from './routes/api/characters/$id.employment'
+import { Route as ApiCharactersIdInventoryRouteImport } from './routes/api/characters/$id.inventory'
+import { Route as ApiCharactersIdLogsRouteImport } from './routes/api/characters/$id.logs'
+import { Route as ApiCharactersIdVehiclesRouteImport } from './routes/api/characters/$id.vehicles'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminBusRoute = AdminBusRouteImport.update({
+  id: '/admin/bus',
+  path: '/admin/bus',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminCommandsRoute = AdminCommandsRouteImport.update({
+  id: '/admin/commands',
+  path: '/admin/commands',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIntellectusRoute = AdminIntellectusRouteImport.update({
+  id: '/admin/intellectus',
+  path: '/admin/intellectus',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminSchedulerRoute = AdminSchedulerRouteImport.update({
+  id: '/admin/scheduler',
+  path: '/admin/scheduler',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRtcRoute = ApiRtcRouteImport.update({
+  id: '/api/rtc',
+  path: '/api/rtc',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminMemoryIndexRoute = AdminMemoryIndexRouteImport.update({
+  id: '/admin/memory/',
+  path: '/admin/memory/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminMemoryRestoreRoute = AdminMemoryRestoreRouteImport.update({
+  id: '/admin/memory/restore',
+  path: '/admin/memory/restore',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminMemorySnapshotRoute = AdminMemorySnapshotRouteImport.update({
+  id: '/admin/memory/snapshot',
+  path: '/admin/memory/snapshot',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminThirdeyeStatsRoute = AdminThirdeyeStatsRouteImport.update({
+  id: '/admin/thirdeye/stats',
+  path: '/admin/thirdeye/stats',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminThirdeyeUnbanRoute = AdminThirdeyeUnbanRouteImport.update({
+  id: '/admin/thirdeye/unban',
+  path: '/admin/thirdeye/unban',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCharactersIndexRoute = ApiCharactersIndexRouteImport.update({
+  id: '/api/characters/',
+  path: '/api/characters/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCharactersIdRoute = ApiCharactersIdRouteImport.update({
+  id: '/api/characters/$id',
+  path: '/api/characters/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiJobsIndexRoute = ApiJobsIndexRouteImport.update({
+  id: '/api/jobs/',
+  path: '/api/jobs/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiJobsIdRoute = ApiJobsIdRouteImport.update({
+  id: '/api/jobs/$id',
+  path: '/api/jobs/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPropertiesIndexRoute = ApiPropertiesIndexRouteImport.update({
+  id: '/api/properties/',
+  path: '/api/properties/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPropertiesIdRoute = ApiPropertiesIdRouteImport.update({
+  id: '/api/properties/$id',
+  path: '/api/properties/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRpBankingRoute = ApiRpBankingRouteImport.update({
+  id: '/api/rp/banking',
+  path: '/api/rp/banking',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRpDispatchRoute = ApiRpDispatchRouteImport.update({
+  id: '/api/rp/dispatch',
+  path: '/api/rp/dispatch',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRpGangsRoute = ApiRpGangsRouteImport.update({
+  id: '/api/rp/gangs',
+  path: '/api/rp/gangs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRpHeartbeatRoute = ApiRpHeartbeatRouteImport.update({
+  id: '/api/rp/heartbeat',
+  path: '/api/rp/heartbeat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRpJobsRoute = ApiRpJobsRouteImport.update({
+  id: '/api/rp/jobs',
+  path: '/api/rp/jobs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRpPlayersRoute = ApiRpPlayersRouteImport.update({
+  id: '/api/rp/players',
+  path: '/api/rp/players',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRpPrisonRoute = ApiRpPrisonRouteImport.update({
+  id: '/api/rp/prison',
+  path: '/api/rp/prison',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRpPropertiesRoute = ApiRpPropertiesRouteImport.update({
+  id: '/api/rp/properties',
+  path: '/api/rp/properties',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRpSqdcRoute = ApiRpSqdcRouteImport.update({
+  id: '/api/rp/sqdc',
+  path: '/api/rp/sqdc',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiVehiclesIndexRoute = ApiVehiclesIndexRouteImport.update({
+  id: '/api/vehicles/',
+  path: '/api/vehicles/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiVehiclesIdRoute = ApiVehiclesIdRouteImport.update({
+  id: '/api/vehicles/$id',
+  path: '/api/vehicles/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWeaponsIndexRoute = ApiWeaponsIndexRouteImport.update({
+  id: '/api/weapons/',
+  path: '/api/weapons/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWeaponsIdRoute = ApiWeaponsIdRouteImport.update({
+  id: '/api/weapons/$id',
+  path: '/api/weapons/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCharactersIdEmploymentRoute =
+  ApiCharactersIdEmploymentRouteImport.update({
+    id: '/employment',
+    path: '/employment',
+    getParentRoute: () => ApiCharactersIdRoute,
+  } as any)
+const ApiCharactersIdInventoryRoute =
+  ApiCharactersIdInventoryRouteImport.update({
+    id: '/inventory',
+    path: '/inventory',
+    getParentRoute: () => ApiCharactersIdRoute,
+  } as any)
+const ApiCharactersIdLogsRoute = ApiCharactersIdLogsRouteImport.update({
+  id: '/logs',
+  path: '/logs',
+  getParentRoute: () => ApiCharactersIdRoute,
+} as any)
+const ApiCharactersIdVehiclesRoute = ApiCharactersIdVehiclesRouteImport.update({
+  id: '/vehicles',
+  path: '/vehicles',
+  getParentRoute: () => ApiCharactersIdRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin/bus': typeof AdminBusRoute
+  '/admin/commands': typeof AdminCommandsRoute
+  '/admin/intellectus': typeof AdminIntellectusRoute
+  '/admin/scheduler': typeof AdminSchedulerRoute
+  '/api/rtc': typeof ApiRtcRoute
+  '/admin/memory/restore': typeof AdminMemoryRestoreRoute
+  '/admin/memory/snapshot': typeof AdminMemorySnapshotRoute
+  '/admin/thirdeye/stats': typeof AdminThirdeyeStatsRoute
+  '/admin/thirdeye/unban': typeof AdminThirdeyeUnbanRoute
+  '/api/characters/$id': typeof ApiCharactersIdRouteWithChildren
+  '/api/jobs/$id': typeof ApiJobsIdRoute
+  '/api/properties/$id': typeof ApiPropertiesIdRoute
+  '/api/rp/banking': typeof ApiRpBankingRoute
+  '/api/rp/dispatch': typeof ApiRpDispatchRoute
+  '/api/rp/gangs': typeof ApiRpGangsRoute
+  '/api/rp/heartbeat': typeof ApiRpHeartbeatRoute
+  '/api/rp/jobs': typeof ApiRpJobsRoute
+  '/api/rp/players': typeof ApiRpPlayersRoute
+  '/api/rp/prison': typeof ApiRpPrisonRoute
+  '/api/rp/properties': typeof ApiRpPropertiesRoute
+  '/api/rp/sqdc': typeof ApiRpSqdcRoute
+  '/api/vehicles/$id': typeof ApiVehiclesIdRoute
+  '/api/weapons/$id': typeof ApiWeaponsIdRoute
+  '/admin/memory/': typeof AdminMemoryIndexRoute
+  '/api/characters/': typeof ApiCharactersIndexRoute
+  '/api/jobs/': typeof ApiJobsIndexRoute
+  '/api/properties/': typeof ApiPropertiesIndexRoute
+  '/api/vehicles/': typeof ApiVehiclesIndexRoute
+  '/api/weapons/': typeof ApiWeaponsIndexRoute
+  '/api/characters/$id/employment': typeof ApiCharactersIdEmploymentRoute
+  '/api/characters/$id/inventory': typeof ApiCharactersIdInventoryRoute
+  '/api/characters/$id/logs': typeof ApiCharactersIdLogsRoute
+  '/api/characters/$id/vehicles': typeof ApiCharactersIdVehiclesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin/bus': typeof AdminBusRoute
+  '/admin/commands': typeof AdminCommandsRoute
+  '/admin/intellectus': typeof AdminIntellectusRoute
+  '/admin/scheduler': typeof AdminSchedulerRoute
+  '/api/rtc': typeof ApiRtcRoute
+  '/admin/memory/restore': typeof AdminMemoryRestoreRoute
+  '/admin/memory/snapshot': typeof AdminMemorySnapshotRoute
+  '/admin/thirdeye/stats': typeof AdminThirdeyeStatsRoute
+  '/admin/thirdeye/unban': typeof AdminThirdeyeUnbanRoute
+  '/api/characters/$id': typeof ApiCharactersIdRouteWithChildren
+  '/api/jobs/$id': typeof ApiJobsIdRoute
+  '/api/properties/$id': typeof ApiPropertiesIdRoute
+  '/api/rp/banking': typeof ApiRpBankingRoute
+  '/api/rp/dispatch': typeof ApiRpDispatchRoute
+  '/api/rp/gangs': typeof ApiRpGangsRoute
+  '/api/rp/heartbeat': typeof ApiRpHeartbeatRoute
+  '/api/rp/jobs': typeof ApiRpJobsRoute
+  '/api/rp/players': typeof ApiRpPlayersRoute
+  '/api/rp/prison': typeof ApiRpPrisonRoute
+  '/api/rp/properties': typeof ApiRpPropertiesRoute
+  '/api/rp/sqdc': typeof ApiRpSqdcRoute
+  '/api/vehicles/$id': typeof ApiVehiclesIdRoute
+  '/api/weapons/$id': typeof ApiWeaponsIdRoute
+  '/admin/memory': typeof AdminMemoryIndexRoute
+  '/api/characters': typeof ApiCharactersIndexRoute
+  '/api/jobs': typeof ApiJobsIndexRoute
+  '/api/properties': typeof ApiPropertiesIndexRoute
+  '/api/vehicles': typeof ApiVehiclesIndexRoute
+  '/api/weapons': typeof ApiWeaponsIndexRoute
+  '/api/characters/$id/employment': typeof ApiCharactersIdEmploymentRoute
+  '/api/characters/$id/inventory': typeof ApiCharactersIdInventoryRoute
+  '/api/characters/$id/logs': typeof ApiCharactersIdLogsRoute
+  '/api/characters/$id/vehicles': typeof ApiCharactersIdVehiclesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin/bus': typeof AdminBusRoute
+  '/admin/commands': typeof AdminCommandsRoute
+  '/admin/intellectus': typeof AdminIntellectusRoute
+  '/admin/scheduler': typeof AdminSchedulerRoute
+  '/api/rtc': typeof ApiRtcRoute
+  '/admin/memory/restore': typeof AdminMemoryRestoreRoute
+  '/admin/memory/snapshot': typeof AdminMemorySnapshotRoute
+  '/admin/thirdeye/stats': typeof AdminThirdeyeStatsRoute
+  '/admin/thirdeye/unban': typeof AdminThirdeyeUnbanRoute
+  '/api/characters/$id': typeof ApiCharactersIdRouteWithChildren
+  '/api/jobs/$id': typeof ApiJobsIdRoute
+  '/api/properties/$id': typeof ApiPropertiesIdRoute
+  '/api/rp/banking': typeof ApiRpBankingRoute
+  '/api/rp/dispatch': typeof ApiRpDispatchRoute
+  '/api/rp/gangs': typeof ApiRpGangsRoute
+  '/api/rp/heartbeat': typeof ApiRpHeartbeatRoute
+  '/api/rp/jobs': typeof ApiRpJobsRoute
+  '/api/rp/players': typeof ApiRpPlayersRoute
+  '/api/rp/prison': typeof ApiRpPrisonRoute
+  '/api/rp/properties': typeof ApiRpPropertiesRoute
+  '/api/rp/sqdc': typeof ApiRpSqdcRoute
+  '/api/vehicles/$id': typeof ApiVehiclesIdRoute
+  '/api/weapons/$id': typeof ApiWeaponsIdRoute
+  '/admin/memory/': typeof AdminMemoryIndexRoute
+  '/api/characters/': typeof ApiCharactersIndexRoute
+  '/api/jobs/': typeof ApiJobsIndexRoute
+  '/api/properties/': typeof ApiPropertiesIndexRoute
+  '/api/vehicles/': typeof ApiVehiclesIndexRoute
+  '/api/weapons/': typeof ApiWeaponsIndexRoute
+  '/api/characters/$id/employment': typeof ApiCharactersIdEmploymentRoute
+  '/api/characters/$id/inventory': typeof ApiCharactersIdInventoryRoute
+  '/api/characters/$id/logs': typeof ApiCharactersIdLogsRoute
+  '/api/characters/$id/vehicles': typeof ApiCharactersIdVehiclesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/admin/bus'
+    | '/admin/commands'
+    | '/admin/intellectus'
+    | '/admin/scheduler'
+    | '/api/rtc'
+    | '/admin/memory/restore'
+    | '/admin/memory/snapshot'
+    | '/admin/thirdeye/stats'
+    | '/admin/thirdeye/unban'
+    | '/api/characters/$id'
+    | '/api/jobs/$id'
+    | '/api/properties/$id'
+    | '/api/rp/banking'
+    | '/api/rp/dispatch'
+    | '/api/rp/gangs'
+    | '/api/rp/heartbeat'
+    | '/api/rp/jobs'
+    | '/api/rp/players'
+    | '/api/rp/prison'
+    | '/api/rp/properties'
+    | '/api/rp/sqdc'
+    | '/api/vehicles/$id'
+    | '/api/weapons/$id'
+    | '/admin/memory/'
+    | '/api/characters/'
+    | '/api/jobs/'
+    | '/api/properties/'
+    | '/api/vehicles/'
+    | '/api/weapons/'
+    | '/api/characters/$id/employment'
+    | '/api/characters/$id/inventory'
+    | '/api/characters/$id/logs'
+    | '/api/characters/$id/vehicles'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/admin/bus'
+    | '/admin/commands'
+    | '/admin/intellectus'
+    | '/admin/scheduler'
+    | '/api/rtc'
+    | '/admin/memory/restore'
+    | '/admin/memory/snapshot'
+    | '/admin/thirdeye/stats'
+    | '/admin/thirdeye/unban'
+    | '/api/characters/$id'
+    | '/api/jobs/$id'
+    | '/api/properties/$id'
+    | '/api/rp/banking'
+    | '/api/rp/dispatch'
+    | '/api/rp/gangs'
+    | '/api/rp/heartbeat'
+    | '/api/rp/jobs'
+    | '/api/rp/players'
+    | '/api/rp/prison'
+    | '/api/rp/properties'
+    | '/api/rp/sqdc'
+    | '/api/vehicles/$id'
+    | '/api/weapons/$id'
+    | '/admin/memory'
+    | '/api/characters'
+    | '/api/jobs'
+    | '/api/properties'
+    | '/api/vehicles'
+    | '/api/weapons'
+    | '/api/characters/$id/employment'
+    | '/api/characters/$id/inventory'
+    | '/api/characters/$id/logs'
+    | '/api/characters/$id/vehicles'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin/bus'
+    | '/admin/commands'
+    | '/admin/intellectus'
+    | '/admin/scheduler'
+    | '/api/rtc'
+    | '/admin/memory/restore'
+    | '/admin/memory/snapshot'
+    | '/admin/thirdeye/stats'
+    | '/admin/thirdeye/unban'
+    | '/api/characters/$id'
+    | '/api/jobs/$id'
+    | '/api/properties/$id'
+    | '/api/rp/banking'
+    | '/api/rp/dispatch'
+    | '/api/rp/gangs'
+    | '/api/rp/heartbeat'
+    | '/api/rp/jobs'
+    | '/api/rp/players'
+    | '/api/rp/prison'
+    | '/api/rp/properties'
+    | '/api/rp/sqdc'
+    | '/api/vehicles/$id'
+    | '/api/weapons/$id'
+    | '/admin/memory/'
+    | '/api/characters/'
+    | '/api/jobs/'
+    | '/api/properties/'
+    | '/api/vehicles/'
+    | '/api/weapons/'
+    | '/api/characters/$id/employment'
+    | '/api/characters/$id/inventory'
+    | '/api/characters/$id/logs'
+    | '/api/characters/$id/vehicles'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminBusRoute: typeof AdminBusRoute
+  AdminCommandsRoute: typeof AdminCommandsRoute
+  AdminIntellectusRoute: typeof AdminIntellectusRoute
+  AdminSchedulerRoute: typeof AdminSchedulerRoute
+  ApiRtcRoute: typeof ApiRtcRoute
+  AdminMemoryRestoreRoute: typeof AdminMemoryRestoreRoute
+  AdminMemorySnapshotRoute: typeof AdminMemorySnapshotRoute
+  AdminThirdeyeStatsRoute: typeof AdminThirdeyeStatsRoute
+  AdminThirdeyeUnbanRoute: typeof AdminThirdeyeUnbanRoute
+  ApiCharactersIdRoute: typeof ApiCharactersIdRouteWithChildren
+  ApiJobsIdRoute: typeof ApiJobsIdRoute
+  ApiPropertiesIdRoute: typeof ApiPropertiesIdRoute
+  ApiRpBankingRoute: typeof ApiRpBankingRoute
+  ApiRpDispatchRoute: typeof ApiRpDispatchRoute
+  ApiRpGangsRoute: typeof ApiRpGangsRoute
+  ApiRpHeartbeatRoute: typeof ApiRpHeartbeatRoute
+  ApiRpJobsRoute: typeof ApiRpJobsRoute
+  ApiRpPlayersRoute: typeof ApiRpPlayersRoute
+  ApiRpPrisonRoute: typeof ApiRpPrisonRoute
+  ApiRpPropertiesRoute: typeof ApiRpPropertiesRoute
+  ApiRpSqdcRoute: typeof ApiRpSqdcRoute
+  ApiVehiclesIdRoute: typeof ApiVehiclesIdRoute
+  ApiWeaponsIdRoute: typeof ApiWeaponsIdRoute
+  AdminMemoryIndexRoute: typeof AdminMemoryIndexRoute
+  ApiCharactersIndexRoute: typeof ApiCharactersIndexRoute
+  ApiJobsIndexRoute: typeof ApiJobsIndexRoute
+  ApiPropertiesIndexRoute: typeof ApiPropertiesIndexRoute
+  ApiVehiclesIndexRoute: typeof ApiVehiclesIndexRoute
+  ApiWeaponsIndexRoute: typeof ApiWeaponsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +479,289 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/bus': {
+      id: '/admin/bus'
+      path: '/admin/bus'
+      fullPath: '/admin/bus'
+      preLoaderRoute: typeof AdminBusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/commands': {
+      id: '/admin/commands'
+      path: '/admin/commands'
+      fullPath: '/admin/commands'
+      preLoaderRoute: typeof AdminCommandsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/intellectus': {
+      id: '/admin/intellectus'
+      path: '/admin/intellectus'
+      fullPath: '/admin/intellectus'
+      preLoaderRoute: typeof AdminIntellectusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/scheduler': {
+      id: '/admin/scheduler'
+      path: '/admin/scheduler'
+      fullPath: '/admin/scheduler'
+      preLoaderRoute: typeof AdminSchedulerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/rtc': {
+      id: '/api/rtc'
+      path: '/api/rtc'
+      fullPath: '/api/rtc'
+      preLoaderRoute: typeof ApiRtcRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/memory/': {
+      id: '/admin/memory/'
+      path: '/admin/memory'
+      fullPath: '/admin/memory/'
+      preLoaderRoute: typeof AdminMemoryIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/memory/restore': {
+      id: '/admin/memory/restore'
+      path: '/admin/memory/restore'
+      fullPath: '/admin/memory/restore'
+      preLoaderRoute: typeof AdminMemoryRestoreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/memory/snapshot': {
+      id: '/admin/memory/snapshot'
+      path: '/admin/memory/snapshot'
+      fullPath: '/admin/memory/snapshot'
+      preLoaderRoute: typeof AdminMemorySnapshotRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/thirdeye/stats': {
+      id: '/admin/thirdeye/stats'
+      path: '/admin/thirdeye/stats'
+      fullPath: '/admin/thirdeye/stats'
+      preLoaderRoute: typeof AdminThirdeyeStatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/thirdeye/unban': {
+      id: '/admin/thirdeye/unban'
+      path: '/admin/thirdeye/unban'
+      fullPath: '/admin/thirdeye/unban'
+      preLoaderRoute: typeof AdminThirdeyeUnbanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/characters/': {
+      id: '/api/characters/'
+      path: '/api/characters'
+      fullPath: '/api/characters/'
+      preLoaderRoute: typeof ApiCharactersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/characters/$id': {
+      id: '/api/characters/$id'
+      path: '/api/characters/$id'
+      fullPath: '/api/characters/$id'
+      preLoaderRoute: typeof ApiCharactersIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/jobs/': {
+      id: '/api/jobs/'
+      path: '/api/jobs'
+      fullPath: '/api/jobs/'
+      preLoaderRoute: typeof ApiJobsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/jobs/$id': {
+      id: '/api/jobs/$id'
+      path: '/api/jobs/$id'
+      fullPath: '/api/jobs/$id'
+      preLoaderRoute: typeof ApiJobsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/properties/': {
+      id: '/api/properties/'
+      path: '/api/properties'
+      fullPath: '/api/properties/'
+      preLoaderRoute: typeof ApiPropertiesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/properties/$id': {
+      id: '/api/properties/$id'
+      path: '/api/properties/$id'
+      fullPath: '/api/properties/$id'
+      preLoaderRoute: typeof ApiPropertiesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/rp/banking': {
+      id: '/api/rp/banking'
+      path: '/api/rp/banking'
+      fullPath: '/api/rp/banking'
+      preLoaderRoute: typeof ApiRpBankingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/rp/dispatch': {
+      id: '/api/rp/dispatch'
+      path: '/api/rp/dispatch'
+      fullPath: '/api/rp/dispatch'
+      preLoaderRoute: typeof ApiRpDispatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/rp/gangs': {
+      id: '/api/rp/gangs'
+      path: '/api/rp/gangs'
+      fullPath: '/api/rp/gangs'
+      preLoaderRoute: typeof ApiRpGangsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/rp/heartbeat': {
+      id: '/api/rp/heartbeat'
+      path: '/api/rp/heartbeat'
+      fullPath: '/api/rp/heartbeat'
+      preLoaderRoute: typeof ApiRpHeartbeatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/rp/jobs': {
+      id: '/api/rp/jobs'
+      path: '/api/rp/jobs'
+      fullPath: '/api/rp/jobs'
+      preLoaderRoute: typeof ApiRpJobsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/rp/players': {
+      id: '/api/rp/players'
+      path: '/api/rp/players'
+      fullPath: '/api/rp/players'
+      preLoaderRoute: typeof ApiRpPlayersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/rp/prison': {
+      id: '/api/rp/prison'
+      path: '/api/rp/prison'
+      fullPath: '/api/rp/prison'
+      preLoaderRoute: typeof ApiRpPrisonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/rp/properties': {
+      id: '/api/rp/properties'
+      path: '/api/rp/properties'
+      fullPath: '/api/rp/properties'
+      preLoaderRoute: typeof ApiRpPropertiesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/rp/sqdc': {
+      id: '/api/rp/sqdc'
+      path: '/api/rp/sqdc'
+      fullPath: '/api/rp/sqdc'
+      preLoaderRoute: typeof ApiRpSqdcRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/vehicles/': {
+      id: '/api/vehicles/'
+      path: '/api/vehicles'
+      fullPath: '/api/vehicles/'
+      preLoaderRoute: typeof ApiVehiclesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/vehicles/$id': {
+      id: '/api/vehicles/$id'
+      path: '/api/vehicles/$id'
+      fullPath: '/api/vehicles/$id'
+      preLoaderRoute: typeof ApiVehiclesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/weapons/': {
+      id: '/api/weapons/'
+      path: '/api/weapons'
+      fullPath: '/api/weapons/'
+      preLoaderRoute: typeof ApiWeaponsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/weapons/$id': {
+      id: '/api/weapons/$id'
+      path: '/api/weapons/$id'
+      fullPath: '/api/weapons/$id'
+      preLoaderRoute: typeof ApiWeaponsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/characters/$id/employment': {
+      id: '/api/characters/$id/employment'
+      path: '/employment'
+      fullPath: '/api/characters/$id/employment'
+      preLoaderRoute: typeof ApiCharactersIdEmploymentRouteImport
+      parentRoute: typeof ApiCharactersIdRoute
+    }
+    '/api/characters/$id/inventory': {
+      id: '/api/characters/$id/inventory'
+      path: '/inventory'
+      fullPath: '/api/characters/$id/inventory'
+      preLoaderRoute: typeof ApiCharactersIdInventoryRouteImport
+      parentRoute: typeof ApiCharactersIdRoute
+    }
+    '/api/characters/$id/logs': {
+      id: '/api/characters/$id/logs'
+      path: '/logs'
+      fullPath: '/api/characters/$id/logs'
+      preLoaderRoute: typeof ApiCharactersIdLogsRouteImport
+      parentRoute: typeof ApiCharactersIdRoute
+    }
+    '/api/characters/$id/vehicles': {
+      id: '/api/characters/$id/vehicles'
+      path: '/vehicles'
+      fullPath: '/api/characters/$id/vehicles'
+      preLoaderRoute: typeof ApiCharactersIdVehiclesRouteImport
+      parentRoute: typeof ApiCharactersIdRoute
+    }
   }
 }
 
+interface ApiCharactersIdRouteChildren {
+  ApiCharactersIdEmploymentRoute: typeof ApiCharactersIdEmploymentRoute
+  ApiCharactersIdInventoryRoute: typeof ApiCharactersIdInventoryRoute
+  ApiCharactersIdLogsRoute: typeof ApiCharactersIdLogsRoute
+  ApiCharactersIdVehiclesRoute: typeof ApiCharactersIdVehiclesRoute
+}
+
+const ApiCharactersIdRouteChildren: ApiCharactersIdRouteChildren = {
+  ApiCharactersIdEmploymentRoute: ApiCharactersIdEmploymentRoute,
+  ApiCharactersIdInventoryRoute: ApiCharactersIdInventoryRoute,
+  ApiCharactersIdLogsRoute: ApiCharactersIdLogsRoute,
+  ApiCharactersIdVehiclesRoute: ApiCharactersIdVehiclesRoute,
+}
+
+const ApiCharactersIdRouteWithChildren = ApiCharactersIdRoute._addFileChildren(
+  ApiCharactersIdRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminBusRoute: AdminBusRoute,
+  AdminCommandsRoute: AdminCommandsRoute,
+  AdminIntellectusRoute: AdminIntellectusRoute,
+  AdminSchedulerRoute: AdminSchedulerRoute,
+  ApiRtcRoute: ApiRtcRoute,
+  AdminMemoryRestoreRoute: AdminMemoryRestoreRoute,
+  AdminMemorySnapshotRoute: AdminMemorySnapshotRoute,
+  AdminThirdeyeStatsRoute: AdminThirdeyeStatsRoute,
+  AdminThirdeyeUnbanRoute: AdminThirdeyeUnbanRoute,
+  ApiCharactersIdRoute: ApiCharactersIdRouteWithChildren,
+  ApiJobsIdRoute: ApiJobsIdRoute,
+  ApiPropertiesIdRoute: ApiPropertiesIdRoute,
+  ApiRpBankingRoute: ApiRpBankingRoute,
+  ApiRpDispatchRoute: ApiRpDispatchRoute,
+  ApiRpGangsRoute: ApiRpGangsRoute,
+  ApiRpHeartbeatRoute: ApiRpHeartbeatRoute,
+  ApiRpJobsRoute: ApiRpJobsRoute,
+  ApiRpPlayersRoute: ApiRpPlayersRoute,
+  ApiRpPrisonRoute: ApiRpPrisonRoute,
+  ApiRpPropertiesRoute: ApiRpPropertiesRoute,
+  ApiRpSqdcRoute: ApiRpSqdcRoute,
+  ApiVehiclesIdRoute: ApiVehiclesIdRoute,
+  ApiWeaponsIdRoute: ApiWeaponsIdRoute,
+  AdminMemoryIndexRoute: AdminMemoryIndexRoute,
+  ApiCharactersIndexRoute: ApiCharactersIndexRoute,
+  ApiJobsIndexRoute: ApiJobsIndexRoute,
+  ApiPropertiesIndexRoute: ApiPropertiesIndexRoute,
+  ApiVehiclesIndexRoute: ApiVehiclesIndexRoute,
+  ApiWeaponsIndexRoute: ApiWeaponsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
