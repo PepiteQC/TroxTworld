@@ -150,7 +150,28 @@ export class P2PRoom {
   broadcast(data: unknown): void {
     const wire = JSON.stringify({ t: "d", d: data });
     for (const slot of this.peers.values()) {
-      if (slot.state?.readyState === "open") slot.state.send(wire);
+      if (slot.state?.readyState === "open") {
+        try {
+          slot.state.send(wire);
+        } catch {
+          /* channel closing */
+        }
+      }
+    }
+  }
+
+  /** Unreliable send to a subset — AOI, 20 Hz poses. */
+  broadcastTo(ids: Iterable<string>, data: unknown): void {
+    const wire = JSON.stringify({ t: "d", d: data });
+    for (const id of ids) {
+      const slot = this.peers.get(id);
+      if (slot?.state?.readyState === "open") {
+        try {
+          slot.state.send(wire);
+        } catch {
+          /* channel closing */
+        }
+      }
     }
   }
 

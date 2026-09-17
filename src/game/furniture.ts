@@ -168,7 +168,7 @@ function addEdgeLines(parent: THREE.Group) {
   for (const road of ROADS) {
     if (road.kind === "gravel" || road.kind === "ramp") continue;
     const edge = Math.max(2.4, road.width / 2 - 0.28);
-    const div = road.kind === "highway" ? 90 : 48;
+    const div = road.kind === "highway" ? 48 : 28;
     parent.add(ribbon(road, div, 0.16, 0xf4f3e9, 0.085, -edge, true));
     parent.add(ribbon(road, div, 0.16, 0xf4f3e9, 0.085, edge, true));
     if (road.kind === "highway") {
@@ -187,7 +187,7 @@ function addShoulders(parent: THREE.Group) {
     const hw = road.width / 2;
     const ditchOff = hw + 3.1;
     const grassOff = hw + 7.4;
-    const div = road.kind === "highway" ? 72 : 40;
+    const div = road.kind === "highway" ? 40 : 24;
     for (const side of [-1, 1]) {
       parent.add(ribbon(road, div, 3.6, 0x3a3020, -0.18, side * ditchOff));
       parent.add(ribbon(road, div, 8.5, 0x4a6234, -0.04, side * grassOff));
@@ -541,7 +541,7 @@ function buildChevron(): THREE.Group {
   g.add(post);
   const plate = new THREE.Mesh(
     new THREE.PlaneGeometry(1.35, 0.85),
-    new THREE.MeshStandardMaterial({ map: getChevronTex(), roughness: 0.55, side: THREE.DoubleSide }),
+    new THREE.MeshLambertMaterial({ map: getChevronTex(), side: THREE.DoubleSide }),
   );
   plate.position.set(0, 2.35, 0.04);
   g.add(plate);
@@ -597,7 +597,7 @@ function buildNameSign(name: string): THREE.Group {
   g.add(board);
   const face = new THREE.Mesh(
     new THREE.PlaneGeometry(3.04, 1.08),
-    new THREE.MeshStandardMaterial({ map: villageTex(name), roughness: 0.55, side: THREE.DoubleSide }),
+    new THREE.MeshLambertMaterial({ map: villageTex(name), side: THREE.DoubleSide }),
   );
   face.position.set(0, 2.85, 0.05);
   g.add(face);

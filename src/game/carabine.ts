@@ -1,18 +1,25 @@
+/**
+ * Carabine de chasse du Comté de Portneuf — Modélisation mécanique et animations 3D optimisées.
+ * Fichier: src/game/carabine.ts
+ */
 import * as THREE from "three";
-import { matLib } from "./materials";
+import { matLib, type QcMat } from "./materials";
 import { tex } from "./textures";
+import { getGeo } from "./geometries";
 
 const box = new THREE.Box3();
 const size = new THREE.Vector3();
 
 let proto: THREE.Group | null = null;
-let stockMat: THREE.MeshStandardMaterial | null = null;
-let blueMat: THREE.MeshStandardMaterial | null = null;
-let padMat: THREE.MeshStandardMaterial | null = null;
-let brassMat: THREE.MeshStandardMaterial | null = null;
-let glassMat: THREE.MeshStandardMaterial | null = null;
-let copperMat: THREE.MeshStandardMaterial | null = null;
-let springMat: THREE.MeshStandardMaterial | null = null;
+let stockMat: QcMat | null = null;
+let blueMat: QcMat | null = null;
+let padMat: QcMat | null = null;
+let brassMat: QcMat | null = null;
+let glassMat: QcMat | null = null;
+let copperMat: QcMat | null = null;
+let springMat: QcMat | null = null;
+
+let cachedStockGeo: THREE.ExtrudeGeometry | null = null;
 
 function mats() {
   if (stockMat) return;
@@ -22,13 +29,7 @@ function mats() {
   brassMat = matLib.get(0xb08a48, 0.35, 0.7);
   copperMat = matLib.get(0x8a5a32, 0.4, 0.55);
   springMat = matLib.get(0x6a6e72, 0.28, 0.8);
-  glassMat = new THREE.MeshStandardMaterial({
-    color: 0x142418,
-    roughness: 0.08,
-    metalness: 0.35,
-    transparent: true,
-    opacity: 0.72,
-  });
+  glassMat = matLib.glass(0x142418, 0.72);
 }
 
 function add(
@@ -41,7 +42,7 @@ function add(
   rx = 0,
   ry = 0,
   rz = 0,
-) {
+): THREE.Mesh {
   const m = new THREE.Mesh(geo, mat);
   m.position.set(x, y, z);
   m.rotation.set(rx, ry, rz);
@@ -51,23 +52,27 @@ function add(
   return m;
 }
 
-function stockShape(): THREE.BufferGeometry {
+/** Génère et met en cache l'ExtrudeGeometry du fût en bois */
+function getStockGeometry(): THREE.BufferGeometry {
+  if (cachedStockGeo) return cachedStockGeo;
+
   const s = new THREE.Shape();
-  s.moveTo(-0.50, 0.018);
-  s.lineTo(-0.50, 0.098);
+  s.moveTo(-0.5, 0.018);
+  s.lineTo(-0.5, 0.098);
   s.lineTo(-0.36, 0.112);
   s.lineTo(-0.22, 0.092);
   s.lineTo(-0.155, 0.068);
   s.lineTo(-0.145, -0.078);
   s.lineTo(-0.095, -0.062);
   s.lineTo(-0.08, 0.016);
-  s.lineTo(0.20, 0.020);
+  s.lineTo(0.2, 0.02);
   s.lineTo(0.235, 0.048);
-  s.lineTo(0.10, 0.068);
-  s.lineTo(-0.10, 0.078);
+  s.lineTo(0.1, 0.068);
+  s.lineTo(-0.1, 0.078);
   s.lineTo(-0.22, 0.082);
   s.closePath();
-  const geo = new THREE.ExtrudeGeometry(s, {
+
+  cachedStockGeo = new THREE.ExtrudeGeometry(s, {
     depth: 0.036,
     bevelEnabled: true,
     bevelThickness: 0.005,
@@ -75,17 +80,23 @@ function stockShape(): THREE.BufferGeometry {
     bevelSegments: 2,
     curveSegments: 2,
   });
-  geo.translate(0, 0, -0.018);
-  return geo;
+  cachedStockGeo.translate(0, 0, -0.018);
+  return cachedStockGeo;
 }
 
-function makeCartridge(g: THREE.Group) {
+function makeCartridge(g: THREE.Group): THREE.Group {
   mats();
   const round = new THREE.Group();
   round.name = "mech-round";
-  add(round, new THREE.CylinderGeometry(0.0062, 0.0064, 0.046, 10), brassMat!, 0, 0, 0, 0, 0, Math.PI / 2);
-  add(round, new THREE.CylinderGeometry(0.0052, 0.006, 0.018, 8), copperMat!, 0.028, 0, 0, 0, 0, Math.PI / 2);
-  add(round, new THREE.CylinderGeometry(0.0066, 0.0066, 0.004, 10), brassMat!, -0.024, 0, 0, 0, 0, Math.PI / 2);
+
+  const caseGeo = getGeo("cylinder", { r: 0.0062, r2: 0.0064, h: 0.046, seg: 10 });
+  const bulletGeo = getGeo("cylinder", { r: 0.0052, r2: 0.006, h: 0.018, seg: 8 });
+  const rimGeo = getGeo("cylinder", { r: 0.0066, r2: 0.0066, h: 0.004, seg: 10 });
+
+  add(round, caseGeo, brassMat!, 0, 0, 0, 0, 0, Math.PI / 2);
+  add(round, bulletGeo, copperMat!, 0.028, 0, 0, 0, 0, Math.PI / 2);
+  add(round, rimGeo, brassMat!, -0.024, 0, 0, 0, 0, Math.PI / 2);
+
   round.position.set(0.04, 0.078, 0);
   round.userData.part = "round";
   round.userData.hx = 0.04;
@@ -95,32 +106,47 @@ function makeCartridge(g: THREE.Group) {
   return round;
 }
 
-function makeBolt(g: THREE.Group) {
+function makeBolt(g: THREE.Group): THREE.Group {
   mats();
   const steel = blueMat!;
   const bolt = new THREE.Group();
   bolt.name = "mech-bolt";
-  add(bolt, new THREE.CylinderGeometry(0.009, 0.0095, 0.11, 12), steel, 0, 0, 0, 0, 0, Math.PI / 2);
-  add(bolt, new THREE.BoxGeometry(0.012, 0.008, 0.02), steel, 0.048, 0, 0);
-  add(bolt, new THREE.BoxGeometry(0.01, 0.006, 0.008), steel, 0.05, 0, 0.012);
+
+  const mainGeo = getGeo("cylinder", { r: 0.009, r2: 0.0095, h: 0.11, seg: 12 });
+  const block1Geo = getGeo("box", { w: 0.012, h: 0.008, d: 0.02 });
+  const block2Geo = getGeo("box", { w: 0.01, h: 0.006, d: 0.008 });
+
+  add(bolt, mainGeo, steel, 0, 0, 0, 0, 0, Math.PI / 2);
+  add(bolt, block1Geo, steel, 0.048, 0, 0);
+  add(bolt, block2Geo, steel, 0.05, 0, 0.012);
+
   const handle = new THREE.Group();
   handle.name = "mech-handle";
-  add(handle, new THREE.CylinderGeometry(0.0045, 0.005, 0.055, 8), steel, 0, 0, 0.028, 0.15, 0, 0);
-  add(handle, new THREE.SphereGeometry(0.009, 8, 6), steel, 0, 0.01, 0.055);
+
+  const stemGeo = getGeo("cylinder", { r: 0.0045, r2: 0.005, h: 0.055, seg: 8 });
+  const knobGeo = getGeo("sphere", { r: 0.009, seg: 8, segH: 6 });
+
+  add(handle, stemGeo, steel, 0, 0, 0.028, 0.15, 0, 0);
+  add(handle, knobGeo, steel, 0, 0.01, 0.055);
   handle.userData.part = "handle";
   bolt.add(handle);
 
   const pin = new THREE.Group();
   pin.name = "mech-pin";
-  add(pin, new THREE.CylinderGeometry(0.0022, 0.0022, 0.07, 6), steel, 0, 0, 0, 0, 0, Math.PI / 2);
-  add(pin, new THREE.CylinderGeometry(0.004, 0.004, 0.01, 8), steel, -0.038, 0, 0, 0, 0, Math.PI / 2);
+
+  const pinStemGeo = getGeo("cylinder", { r: 0.0022, r2: 0.0022, h: 0.07, seg: 6 });
+  const pinCapGeo = getGeo("cylinder", { r: 0.004, r2: 0.004, h: 0.01, seg: 8 });
+
+  add(pin, pinStemGeo, steel, 0, 0, 0, 0, 0, Math.PI / 2);
+  add(pin, pinCapGeo, steel, -0.038, 0, 0, 0, 0, Math.PI / 2);
   pin.position.set(-0.012, 0, 0);
   pin.userData.part = "pin";
   pin.userData.hx = -0.012;
   bolt.add(pin);
 
+  const springTorusGeo = getGeo("torus", { r: 0.006, tube: 0.0011, seg: 8 });
   for (let i = 0; i < 5; i++) {
-    add(bolt, new THREE.TorusGeometry(0.006, 0.0011, 5, 8), springMat!, -0.02 - i * 0.006, 0, 0, 0, Math.PI / 2, 0);
+    add(bolt, springTorusGeo, springMat!, -0.02 - i * 0.006, 0, 0, 0, Math.PI / 2, 0);
   }
 
   bolt.position.set(-0.02, 0.078, 0);
@@ -131,21 +157,27 @@ function makeBolt(g: THREE.Group) {
   return bolt;
 }
 
-function makeTriggerGroup(g: THREE.Group) {
+function makeTriggerGroup(g: THREE.Group): THREE.Group {
   mats();
   const steel = blueMat!;
   const trig = new THREE.Group();
   trig.name = "mech-trigger";
-  add(trig, new THREE.BoxGeometry(0.008, 0.024, 0.006), steel, 0, -0.01, 0);
+
+  const triggerGeo = getGeo("box", { w: 0.008, h: 0.024, d: 0.006 });
+  add(trig, triggerGeo, steel, 0, -0.01, 0);
+
   trig.position.set(-0.088, 0.03, 0);
   trig.userData.part = "trigger";
   g.add(trig);
-  const sear = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.005, 0.006), steel);
+
+  const searGeo = getGeo("box", { w: 0.018, h: 0.005, d: 0.006 });
+  const sear = new THREE.Mesh(searGeo, steel);
   sear.position.set(-0.07, 0.048, 0);
   sear.name = "mech-sear";
   sear.userData.part = "sear";
   sear.castShadow = true;
   g.add(sear);
+
   return trig;
 }
 
@@ -156,36 +188,45 @@ function makeRifle(): THREE.Group {
   const wood = stockMat!;
   const steel = blueMat!;
 
-  add(g, stockShape(), wood, 0, 0, 0);
-  add(g, new THREE.BoxGeometry(0.028, 0.086, 0.042), padMat!, -0.514, 0.058, 0);
+  add(g, getStockGeometry(), wood, 0, 0, 0);
+  add(g, getGeo("box", { w: 0.028, h: 0.086, d: 0.042 }), padMat!, -0.514, 0.058, 0);
 
-  add(g, new THREE.CylinderGeometry(0.0095, 0.011, 0.52, 12), steel, 0.30, 0.062, 0, 0, 0, Math.PI / 2);
-  add(g, new THREE.CylinderGeometry(0.013, 0.013, 0.018, 10), steel, 0.56, 0.062, 0, 0, 0, Math.PI / 2);
+  // Canon et embout
+  add(g, getGeo("cylinder", { r: 0.0095, r2: 0.011, h: 0.52, seg: 12 }), steel, 0.3, 0.062, 0, 0, 0, Math.PI / 2);
+  add(g, getGeo("cylinder", { r: 0.013, r2: 0.013, h: 0.018, seg: 10 }), steel, 0.56, 0.062, 0, 0, 0, Math.PI / 2);
 
-  add(g, new THREE.BoxGeometry(0.16, 0.01, 0.032), steel, -0.02, 0.062, 0);
-  add(g, new THREE.BoxGeometry(0.16, 0.036, 0.008), steel, -0.02, 0.08, -0.016);
-  add(g, new THREE.BoxGeometry(0.05, 0.012, 0.032), steel, -0.075, 0.094, 0);
-  add(g, new THREE.BoxGeometry(0.03, 0.012, 0.032), steel, 0.045, 0.094, 0);
+  // Culasse / Boîtier de culasse
+  add(g, getGeo("box", { w: 0.16, h: 0.01, d: 0.032 }), steel, -0.02, 0.062, 0);
+  add(g, getGeo("box", { w: 0.16, h: 0.036, d: 0.008 }), steel, -0.02, 0.08, -0.016);
+  add(g, getGeo("box", { w: 0.05, h: 0.012, d: 0.032 }), steel, -0.075, 0.094, 0);
+  add(g, getGeo("box", { w: 0.03, h: 0.012, d: 0.032 }), steel, 0.045, 0.094, 0);
 
   makeBolt(g);
   makeCartridge(g);
   makeTriggerGroup(g);
 
-  add(g, new THREE.BoxGeometry(0.055, 0.01, 0.024), steel, -0.10, 0.012, 0);
-  add(g, new THREE.BoxGeometry(0.012, 0.012, 0.012), brassMat!, -0.055, 0.022, 0);
+  // Magasin et pontet
+  add(g, getGeo("box", { w: 0.055, h: 0.01, d: 0.024 }), steel, -0.1, 0.012, 0);
+  add(g, getGeo("box", { w: 0.012, h: 0.012, d: 0.012 }), brassMat!, -0.055, 0.022, 0);
 
-  add(g, new THREE.BoxGeometry(0.018, 0.022, 0.01), steel, 0.22, 0.086, 0);
-  add(g, new THREE.BoxGeometry(0.006, 0.018, 0.006), steel, 0.22, 0.104, 0);
+  // Organes de visée
+  add(g, getGeo("box", { w: 0.018, h: 0.022, d: 0.01 }), steel, 0.22, 0.086, 0);
+  add(g, getGeo("box", { w: 0.006, h: 0.018, d: 0.006 }), steel, 0.22, 0.104, 0);
 
-  add(g, new THREE.CylinderGeometry(0.014, 0.014, 0.16, 10), steel, -0.01, 0.122, 0, 0, 0, Math.PI / 2);
-  add(g, new THREE.CylinderGeometry(0.018, 0.016, 0.04, 10), steel, -0.08, 0.122, 0, 0, 0, Math.PI / 2);
-  add(g, new THREE.CylinderGeometry(0.017, 0.015, 0.034, 10), steel, 0.06, 0.122, 0, 0, 0, Math.PI / 2);
-  add(g, new THREE.CircleGeometry(0.012, 10), glassMat!, -0.101, 0.122, 0, 0, Math.PI / 2, 0);
-  add(g, new THREE.CircleGeometry(0.011, 10), glassMat!, 0.078, 0.122, 0, 0, -Math.PI / 2, 0);
-  add(g, new THREE.BoxGeometry(0.04, 0.012, 0.012), steel, -0.02, 0.102, 0);
+  // Lunette de visée télescopique
+  add(g, getGeo("cylinder", { r: 0.014, r2: 0.014, h: 0.16, seg: 10 }), steel, -0.01, 0.122, 0, 0, 0, Math.PI / 2);
+  add(g, getGeo("cylinder", { r: 0.018, r2: 0.016, h: 0.04, seg: 10 }), steel, -0.08, 0.122, 0, 0, 0, Math.PI / 2);
+  add(g, getGeo("cylinder", { r: 0.017, r2: 0.015, h: 0.034, seg: 10 }), steel, 0.06, 0.122, 0, 0, 0, Math.PI / 2);
+  
+  // Utilisation de RingGeometry à rayon interne 0 pour remplacer CircleGeometry
+  add(g, getGeo("ring", { r: 0.012, r2: 0, seg: 10 }), glassMat!, -0.101, 0.122, 0, 0, Math.PI / 2, 0);
+  add(g, getGeo("ring", { r: 0.011, r2: 0, seg: 10 }), glassMat!, 0.078, 0.122, 0, 0, -Math.PI / 2, 0);
+  add(g, getGeo("box", { w: 0.04, h: 0.012, d: 0.012 }), steel, -0.02, 0.102, 0);
 
-  add(g, new THREE.TorusGeometry(0.008, 0.0022, 6, 10), steel, -0.42, 0.02, 0, Math.PI / 2, 0, 0);
-  add(g, new THREE.TorusGeometry(0.008, 0.0022, 6, 10), steel, 0.18, 0.02, 0, Math.PI / 2, 0, 0);
+  // Attaches bretelle
+  const slingTorusGeo = getGeo("torus", { r: 0.008, tube: 0.0022, seg: 10 });
+  add(g, slingTorusGeo, steel, -0.42, 0.02, 0, Math.PI / 2, 0, 0);
+  add(g, slingTorusGeo, steel, 0.18, 0.02, 0, Math.PI / 2, 0, 0);
 
   g.userData.cycle = 0;
   g.userData.t = 0;
@@ -231,7 +272,7 @@ export function carabineHeld(): THREE.Group {
   return inner;
 }
 
-/** Déclenche le cycle verrou (tir → extraction → chambrage). */
+/** Déclenche le cycle de culasse (tir → extraction → chambrage). */
 export function cycleCarabine(root: THREE.Object3D) {
   root.traverse((o) => {
     if (o.name !== "carabine-rig") return;
@@ -240,14 +281,40 @@ export function cycleCarabine(root: THREE.Object3D) {
   });
 }
 
+/* =========================================================================
+   CACHE DES PIÈCES DE L'ARME (Évite le `.getObjectByName` par frame)
+   ========================================================================= */
+
+interface RifleParts {
+  bolt: THREE.Object3D | null;
+  handle: THREE.Object3D | null;
+  pin: THREE.Object3D | null;
+  trigger: THREE.Object3D | null;
+  round: THREE.Object3D | null;
+  sear: THREE.Object3D | null;
+}
+
+function getOrCacheRifleParts(rig: THREE.Object3D): RifleParts {
+  if (rig.userData._cachedParts) {
+    return rig.userData._cachedParts as RifleParts;
+  }
+
+  const parts: RifleParts = {
+    bolt: rig.getObjectByName("mech-bolt") ?? null,
+    handle: rig.getObjectByName("mech-handle") ?? null,
+    pin: rig.getObjectByName("mech-pin") ?? null,
+    trigger: rig.getObjectByName("mech-trigger") ?? null,
+    round: rig.getObjectByName("mech-round") ?? null,
+    sear: rig.getObjectByName("mech-sear") ?? null,
+  };
+
+  rig.userData._cachedParts = parts;
+  return parts;
+}
+
 function pose(rig: THREE.Object3D, t: number) {
-  const bolt = rig.getObjectByName("mech-bolt");
-  const handle = rig.getObjectByName("mech-handle");
-  const pin = rig.getObjectByName("mech-pin");
-  const trig = rig.getObjectByName("mech-trigger");
-  const round = rig.getObjectByName("mech-round");
-  const sear = rig.getObjectByName("mech-sear");
-  if (!bolt || !handle || !pin || !trig) return;
+  const { bolt, handle, pin, trigger, round, sear } = getOrCacheRifleParts(rig);
+  if (!bolt || !handle || !pin || !trigger) return;
 
   const hx = (bolt.userData.hx as number) ?? -0.02;
   const hy = (bolt.userData.hy as number) ?? 0.078;
@@ -256,7 +323,7 @@ function pose(rig: THREE.Object3D, t: number) {
   const ry = (round?.userData.hy as number) ?? 0.078;
 
   const trigPull = t < 0.08 ? t / 0.08 : t < 0.2 ? 1 : Math.max(0, 1 - (t - 0.2) / 0.15);
-  trig.rotation.z = -0.45 * trigPull;
+  trigger.rotation.z = -0.45 * trigPull;
   if (sear) sear.rotation.z = -0.25 * trigPull;
 
   const fired = t > 0.05 && t < 0.55;

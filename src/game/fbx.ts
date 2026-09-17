@@ -14,17 +14,21 @@ const FILES: Record<FbxId, { url: string; height: number }> = {
 
 const originals = new Map<FbxId, THREE.Group>();
 const pending = new Map<FbxId, Promise<THREE.Group>>();
-const box = new THREE.Box3();
-const size = new THREE.Vector3();
 
-function fitHeight(root: THREE.Object3D, height: number) {
-  box.setFromObject(root);
-  box.getSize(size);
-  const h = size.y || 1;
-  const s = height / h;
-  root.scale.multiplyScalar(s);
-  box.setFromObject(root);
-  root.position.y -= box.min.y;
+function fitHeight(root: THREE.Object3D, targetHeight: number) {
+  root.updateMatrixWorld(true);
+
+  const bbox = new THREE.Box3().setFromObject(root);
+  const currentHeight = bbox.max.y - bbox.min.y;
+
+  if (currentHeight > 0.001) {
+    const scaleRatio = targetHeight / currentHeight;
+    root.scale.multiplyScalar(scaleRatio);
+  }
+
+  root.updateMatrixWorld(true);
+  const bboxAfter = new THREE.Box3().setFromObject(root);
+  root.position.y -= bboxAfter.min.y;
   root.rotation.y = Math.PI;
 }
 
@@ -47,11 +51,21 @@ export async function loadFbx(id: FbxId): Promise<THREE.Group> {
   const src = await loadOriginal(id);
   const copy = cloneSkinned(src) as THREE.Group;
   markShared(copy);
+
+  copy.traverse((child: any) => {
+    if (child.isMesh || child.isSkinnedMesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+      child.frustumCulled = false;
+    }
+  });
+
   const wrap = new THREE.Group();
   wrap.name = `fbx:${id}`;
   wrap.add(copy);
   fitHeight(wrap, FILES[id].height);
   wrap.userData.sharedAsset = true;
+
   const clips = src.animations ?? [];
   if (clips.length) {
     const mixer = new THREE.AnimationMixer(copy);
@@ -65,7 +79,13 @@ export function isFbxModel(id: string): id is FbxId {
   return id in FILES && id !== "bear";
 }
 
-export function tickMixer(root: THREE.Object3D, dt: number) {
+export function tickMixer(root: THREE.Object3D, dt: number, speedMultiplier: number = 1) {
   const mixer = root.userData.mixer as THREE.AnimationMixer | undefined;
-  if (mixer) mixer.update(dt);
+  if (mixer) {
+    // N'avance l'animation que si le personnage est réellement en mouvement
+    if (speedMultiplier > 0.05) {
+      mixer.update(dt * speedMultiplier);
+    }
+  }
 }
+

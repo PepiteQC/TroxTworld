@@ -54,7 +54,7 @@ function mannequin(x: number, z: number, color: number) {
 }
 
 function productCard(id: ShopItemId, x: number, y: number, z: number) {
-  const mat = new THREE.MeshStandardMaterial({ color: 0x22242c, roughness: 0.55 });
+  const mat = new THREE.MeshLambertMaterial({ color: 0x22242c });
   const loader = new THREE.TextureLoader();
   loader.load(`/products/${id}.jpg`, (tex) => {
     finishMap(tex, "clamp");

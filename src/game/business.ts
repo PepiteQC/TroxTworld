@@ -431,7 +431,8 @@ export function countyFirms(): CountyFirm[] {
     const side = inlandSide(v);
     const setback = villageSetback(v) + 8;
     const type = industryFirm(v.industry);
-    const a = pushOffRoad(cx + dirX * 48 + perpX * side * setback, cz + dirZ * 48 + perpZ * side * setback, 14);
+    const distMultiplier = type === "transport" ? 96 : 58;
+    const a = pushOffRoad(cx + dirX * distMultiplier + perpX * side * (setback + (type === "transport" ? 12 : 0)), cz + dirZ * distMultiplier + perpZ * side * (setback + (type === "transport" ? 12 : 0)), 16);
     out.push({
       id: `biz_${v.id}`,
       type,

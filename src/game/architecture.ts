@@ -1,8 +1,10 @@
-import * as THREE from "three";
+﻿import * as THREE from "three";
 import { matLib, QC_PALETTE, WALL_COLORS, ROOF_COLORS } from "./materials";
 import { makeRng } from "./rng";
-import { buildGlassLeaf, type SwingDoor } from "./door";
+import { buildGlassLeaf, buildHouseFrontDoor, type SwingDoor } from "./door";
 import { finishMap, tex } from "./textures";
+import { commerceMat } from "./commerceMats";
+import { buildPoliceLightbar } from "./lightbar";
 
 function gableRoof(width: number, depth: number, height: number, color: number, overhang = 0.45) {
   const g = new THREE.Group();
@@ -27,7 +29,7 @@ function windowPane(w: number, h: number, lit: boolean) {
     new THREE.PlaneGeometry(w, h),
     lit
       ? matLib.getEmissive(QC_PALETTE.fenetreEclairee, QC_PALETTE.fenetreEclairee, 0.85)
-      : matLib.get(QC_PALETTE.fenetre, 0.2, 0.55),
+      : matLib.get(QC_PALETTE.fenetre, 0.85, 0),
   );
   glass.userData.isWindow = true;
   g.add(glass);
@@ -97,12 +99,9 @@ export function buildMaisonCanadienne(seed = 1, lit = 0): THREE.Group {
   awning.rotation.x = -0.08;
   g.add(awning);
 
-  const door = new THREE.Mesh(
-    new THREE.BoxGeometry(0.95, 2.05, 0.1),
-    matLib.get(QC_PALETTE.porte, 0.8),
-  );
-  door.position.set(0, 0.62 + 1.02, depth / 2 + 0.06);
-  g.add(door);
+  const doorResult = buildHouseFrontDoor(0.95, 2.05);
+  doorResult.group.position.set(0, 0.62, depth / 2 + 0.04);
+    // g.add(door); // Optionnel ou géré via d.open
 
   for (const x of [-width * 0.28, width * 0.28]) {
     const w = windowPane(1.05, 1.2, rng() < lit);
@@ -210,7 +209,7 @@ export function buildDepanneur(seed = 7, lit = 0): THREE.Group {
   for (const s of [-1, 1]) {
     const pane = new THREE.Mesh(
       new THREE.PlaneGeometry(Math.max(2.2, wing * 1.15), 2.15),
-      lit > 0.3 ? matLib.getEmissive(0xfff4d0, 0xffe0a0, 0.9) : matLib.get(0x304050, 0.14, 0.62),
+      lit > 0.3 ? matLib.getEmissive(0xfff4d0, 0xffe0a0, 0.9) : commerceMat("verre"),
     );
     pane.position.set(s * (opening / 2 + wing * 0.7 + 0.35), 1.85, d / 2 + 0.05);
     pane.userData.isWindow = true;
@@ -264,11 +263,11 @@ export function buildDepanneur(seed = 7, lit = 0): THREE.Group {
   boxNews.castShadow = true;
   g.add(boxNews);
 
-  const island = new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.18, 2.2), matLib.get(QC_PALETTE.beton, 0.95));
+  const island = new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.18, 2.2), commerceMat("beton"));
   island.position.set(0, 0.1, d / 2 + 6.15);
   g.add(island);
   for (const px of [-1.7, 1.7]) {
-    const pump = new THREE.Mesh(new THREE.BoxGeometry(0.62, 1.85, 0.48), matLib.get(0xd8dce0, 0.4, 0.35));
+    const pump = new THREE.Mesh(new THREE.BoxGeometry(0.62, 1.85, 0.48), commerceMat("acier"));
     pump.position.set(px, 1.02, d / 2 + 6.15);
     pump.castShadow = true;
     g.add(pump);
@@ -322,7 +321,7 @@ export function buildDepanneur(seed = 7, lit = 0): THREE.Group {
   return g;
 }
 
-let _depSign: THREE.MeshStandardMaterial | null = null;
+let _depSign: THREE.MeshLambertMaterial | null = null;
 function depSignMat() {
   if (_depSign) return _depSign;
   const c = document.createElement("canvas");
@@ -341,10 +340,8 @@ function depSignMat() {
   const texMap = new THREE.CanvasTexture(c);
   texMap.colorSpace = THREE.SRGBColorSpace;
   texMap.anisotropy = 4;
-  _depSign = new THREE.MeshStandardMaterial({
+  _depSign = new THREE.MeshLambertMaterial({
     map: texMap,
-    roughness: 0.45,
-    metalness: 0.08,
     emissive: new THREE.Color(0x401010),
     emissiveIntensity: 0.35,
   });
@@ -374,6 +371,20 @@ export function buildCasseCroute(): THREE.Group {
   const counter = new THREE.Mesh(new THREE.BoxGeometry(5.5, 1.05, 1.1), matLib.get(QC_PALETTE.toleArgent, 0.4, 0.4));
   counter.position.set(0, 0.55, d / 2 + 1.1);
   g.add(counter);
+
+  const opening = 2.2;
+  const swings: SwingDoor[] = [];
+  const leafW = opening / 2 - 0.05;
+  const left = buildGlassLeaf(leafW, 2.25, 1, -1);
+  left.hinge.position.set(-(opening / 2), 0, d / 2 + 0.08);
+  g.add(left.hinge);
+  swings.push(left.door);
+  const right = buildGlassLeaf(leafW, 2.25, -1, 1);
+  right.hinge.position.set(opening / 2, 0, d / 2 + 0.08);
+  g.add(right.hinge);
+  swings.push(right.door);
+  g.userData.swings = swings;
+  g.userData.entranceLocal = new THREE.Vector3(0, 0, d / 2 + 1.65);
   g.userData.footprint = { width: w, depth: d + 2.4 };
   return g;
 }
@@ -401,9 +412,7 @@ export function buildBoutique(): THREE.Group {
     const front = new THREE.Mesh(new THREE.BoxGeometry(wing, h, 0.18), wall);
     front.position.set(s * (opening / 2 + wing / 2), h / 2, d / 2);
     g.add(front);
-    const vitrine = new THREE.Mesh(new THREE.PlaneGeometry(wing * 0.72, 2.3), matLib.get(0x7dd3fc, 0.08, 0.2));
-    (vitrine.material as THREE.MeshStandardMaterial).transparent = true;
-    (vitrine.material as THREE.MeshStandardMaterial).opacity = 0.28;
+    const vitrine = new THREE.Mesh(new THREE.PlaneGeometry(wing * 0.72, 2.3), commerceMat("verre"));
     vitrine.position.set(s * (opening / 2 + wing / 2), 1.65, d / 2 + 0.12);
     g.add(vitrine);
   }
@@ -448,7 +457,7 @@ export function buildChasseShop(): THREE.Group {
   const w = 10.5;
   const d = 8.4;
   const h = 3.8;
-  const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), matLib.get(0x6b624a, 0.92));
+  const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), commerceMat("boisNaturel"));
   body.position.y = h / 2;
   body.castShadow = true;
   g.add(body);
@@ -478,16 +487,192 @@ export function buildQuincaillerie(): THREE.Group {
   const roof = new THREE.Mesh(new THREE.BoxGeometry(w + 0.4, 0.32, d + 0.4), matLib.get(QC_PALETTE.toleNoire, 0.9));
   roof.position.y = h + 0.12;
   g.add(roof);
-  const door = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.4, 0.12), matLib.get(0x2a2a2c, 0.7, 0.2));
+  const door = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.4, 0.12), commerceMat("noirMat"));
   door.position.set(-2.2, 1.25, d / 2 + 0.05);
   g.add(door);
-  const vitrine = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 2.2), matLib.get(0x3a5060, 0.12, 0.7));
+  const vitrine = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 2.2), commerceMat("verre"));
   vitrine.position.set(2.2, 1.7, d / 2 + 0.05);
   g.add(vitrine);
   const sign = new THREE.Mesh(new THREE.BoxGeometry(w * 0.7, 0.85, 0.16), matLib.getEmissive(0xc8a028, 0xf0d060, 0.7));
   sign.position.set(0, h + 0.7, d / 2 + 0.06);
   g.add(sign);
   g.userData.footprint = { width: w, depth: d };
+  return g;
+}
+
+let _sqdcSign: THREE.MeshStandardMaterial | null = null;
+function sqdcSignMat() {
+  if (_sqdcSign) return _sqdcSign;
+  const c = document.createElement("canvas");
+  c.width = 1024;
+  c.height = 256;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#1A5632";
+  ctx.fillRect(0, 0, 1024, 256);
+  ctx.fillStyle = "#f4f0e6";
+  ctx.font = "bold 128px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("SQDC", 512, 108);
+  ctx.font = "600 32px sans-serif";
+  ctx.fillText("21 ANS ET PLUS  ·  10 h – 21 h", 512, 198);
+  const texMap = new THREE.CanvasTexture(c);
+  texMap.colorSpace = THREE.SRGBColorSpace;
+  texMap.anisotropy = 4;
+  _sqdcSign = new THREE.MeshStandardMaterial({
+    map: texMap,
+    roughness: 0.45,
+    metalness: 0.08,
+    emissive: new THREE.Color(0x0a2818),
+    emissiveIntensity: 0.35,
+  });
+  _sqdcSign.userData.keepPbr = true;
+  return _sqdcSign;
+}
+
+export function buildSqdc(): THREE.Group {
+  const g = new THREE.Group();
+  g.name = "sqdc";
+  const w = 13.6;
+  const d = 9.6;
+  const h = 4.15;
+  const green = commerceMat("sqdc");
+  const steel = commerceMat("acier");
+  const black = commerceMat("noirMat");
+  const glass = commerceMat("verre");
+
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(w + 6.4, 0.08, d + 8.2), commerceMat("beton"));
+  slab.position.set(0, 0.03, 1.4);
+  slab.receiveShadow = true;
+  g.add(slab);
+
+  const found = new THREE.Mesh(new THREE.BoxGeometry(w + 0.2, 0.42, d + 0.2), commerceMat("beton"));
+  found.position.y = 0.21;
+  found.receiveShadow = true;
+  g.add(found);
+
+  const back = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.28), green);
+  back.position.set(0, 0.42 + h / 2, -d / 2);
+  back.castShadow = true;
+  g.add(back);
+  for (const s of [-1, 1]) {
+    const side = new THREE.Mesh(new THREE.BoxGeometry(0.28, h, d), green);
+    side.position.set(s * (w / 2), 0.42 + h / 2, 0);
+    side.castShadow = true;
+    g.add(side);
+  }
+
+  const opening = 2.4;
+  const wing = (w - opening) / 2;
+  for (const s of [-1, 1]) {
+    const front = new THREE.Mesh(new THREE.BoxGeometry(wing, h, 0.22), green);
+    front.position.set(s * (opening / 2 + wing / 2), 0.42 + h / 2, d / 2);
+    g.add(front);
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(wing * 0.78, 2.55, 0.1), steel);
+    frame.position.set(s * (opening / 2 + wing / 2), 1.85, d / 2 + 0.08);
+    g.add(frame);
+    const pane = new THREE.Mesh(new THREE.PlaneGeometry(wing * 0.72, 2.35), glass);
+    pane.position.set(s * (opening / 2 + wing / 2), 1.85, d / 2 + 0.14);
+    pane.userData.isWindow = true;
+    g.add(pane);
+  }
+  const lintel = new THREE.Mesh(new THREE.BoxGeometry(opening + 0.2, 0.85, 0.24), green);
+  lintel.position.set(0, h + 0.02, d / 2);
+  g.add(lintel);
+
+  const fascia = new THREE.Mesh(new THREE.BoxGeometry(w + 0.18, 0.78, 0.28), black);
+  fascia.position.set(0, h + 0.55, d / 2 + 0.04);
+  g.add(fascia);
+
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(w + 0.4, 0.28, d + 0.4), steel);
+  roof.position.y = 0.42 + h + 0.08;
+  g.add(roof);
+
+  const innerFloor = new THREE.Mesh(new THREE.BoxGeometry(w - 0.5, 0.04, d - 0.5), commerceMat("beton"));
+  innerFloor.position.y = 0.44;
+  innerFloor.receiveShadow = true;
+  g.add(innerFloor);
+  const innerBack = new THREE.Mesh(new THREE.BoxGeometry(6.2, 1.15, 0.55), commerceMat("boisClair"));
+  innerBack.position.set(0, 1.05, -d / 2 + 1.4);
+  g.add(innerBack);
+
+  const sign = new THREE.Mesh(new THREE.BoxGeometry(w * 0.58, 1.12, 0.16), sqdcSignMat());
+  sign.position.set(0, h + 0.92, d / 2 + 0.18);
+  g.add(sign);
+
+  const awning = new THREE.Mesh(new THREE.BoxGeometry(w * 0.82, 0.08, 1.7), black);
+  awning.position.set(0, 3.22, d / 2 + 0.92);
+  awning.rotation.x = -0.08;
+  g.add(awning);
+
+  const swings: SwingDoor[] = [];
+  const leafW = opening / 2 - 0.05;
+  const glassOpts = {
+    glass,
+    frame: steel,
+    neon: null as number | null,
+    handle: black,
+  };
+  const left = buildGlassLeaf(leafW, 2.4, 1, -1, glassOpts);
+  left.hinge.position.set(-(opening / 2), 0, d / 2);
+  g.add(left.hinge);
+  swings.push(left.door);
+  const right = buildGlassLeaf(leafW, 2.4, -1, 1, glassOpts);
+  right.hinge.position.set(opening / 2, 0, d / 2);
+  g.add(right.hinge);
+  swings.push(right.door);
+  g.userData.swings = swings;
+
+  const age = document.createElement("canvas");
+  age.width = 256;
+  age.height = 160;
+  const actx = age.getContext("2d")!;
+  actx.fillStyle = "#1A5632";
+  actx.fillRect(0, 0, 256, 160);
+  actx.fillStyle = "#f4f0e6";
+  actx.font = "bold 48px sans-serif";
+  actx.textAlign = "center";
+  actx.textBaseline = "middle";
+  actx.fillText("21 ANS", 128, 58);
+  actx.font = "600 28px sans-serif";
+  actx.fillText("ET PLUS", 128, 108);
+  const ageTex = new THREE.CanvasTexture(age);
+  ageTex.colorSpace = THREE.SRGBColorSpace;
+  const sticker = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.85, 0.52),
+    new THREE.MeshBasicMaterial({ map: ageTex }),
+  );
+  sticker.position.set(-4.85, 1.55, d / 2 + 0.16);
+  g.add(sticker);
+
+  const bench = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.42, 0.48), commerceMat("boisClair"));
+  bench.position.set(-5.4, 0.32, d / 2 + 2.15);
+  bench.castShadow = true;
+  g.add(bench);
+  const benchLegL = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.32, 0.42), steel);
+  benchLegL.position.set(-6.2, 0.16, d / 2 + 2.15);
+  g.add(benchLegL);
+  const benchLegR = benchLegL.clone();
+  benchLegR.position.x = -4.6;
+  g.add(benchLegR);
+
+  const dump = new THREE.Mesh(new THREE.BoxGeometry(1.55, 1.12, 1.05), commerceMat("rouille"));
+  dump.position.set(w / 2 - 0.5, 0.58, -d / 2 - 1.35);
+  dump.castShadow = true;
+  g.add(dump);
+
+  const lamp = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 3.4, 8), steel);
+  lamp.position.set(5.8, 1.7, d / 2 + 3.2);
+  g.add(lamp);
+  const head = new THREE.Mesh(
+    new THREE.BoxGeometry(0.42, 0.08, 0.28),
+    matLib.getEmissive(0xf4f0e0, 0xfff4d0, 0.7),
+  );
+  head.position.set(5.8, 3.42, d / 2 + 3.05);
+  g.add(head);
+
+  g.userData.footprint = { width: w + 4, depth: d + 6 };
+  g.userData.entranceLocal = new THREE.Vector3(0, 0, d / 2 + 1.7);
   return g;
 }
 
@@ -619,12 +804,8 @@ export function buildSqPoste(): THREE.Group {
   const door = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2.4, 0.14), matLib.get(0x1a1c18, 0.7));
   door.position.set(0, 1.2, d / 2 + 0.06);
   g.add(door);
-  const bar = new THREE.Mesh(
-    new THREE.BoxGeometry(2.4, 0.55, 0.12),
-    matLib.getEmissive(0x1d4ed8, 0x1d4ed8, 1.1),
-  );
+  const bar = buildPoliceLightbar(1.15, "SQ", false);
   bar.position.set(0, 4.55, d / 2 + 0.08);
-  bar.userData.policeBar = true;
   g.add(bar);
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 6.2, 8), matLib.get(0x5a5e62, 0.5, 0.65));
   pole.position.set(w / 2 + 1.4, 3.1, d / 2 - 1);
@@ -726,7 +907,7 @@ export function buildPickup(color = 0x3a4a3c): THREE.Group {
     rail.position.set(s, 1.4, -1.15);
     g.add(rail);
   }
-  const glass = matLib.get(0x6a88a0, 0.15, 0.65);
+  const glass = matLib.glass(0x6a88a0, 0.45);
   const wind = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.7), glass);
   wind.position.set(0, 1.55, 1.78);
   wind.rotation.x = -0.25;
@@ -742,6 +923,7 @@ export function buildPickup(color = 0x3a4a3c): THREE.Group {
   ]) {
     const wh = new THREE.Mesh(wheelGeo, tire);
     wh.position.set(wx, 0.38, wz);
+    wh.userData.wheel = 0.38;
     g.add(wh);
   }
   const lightMat = matLib.getEmissive(0xfff4d8, 0xfff4d8, 0.2);
@@ -781,20 +963,23 @@ export function buildSedan(color: number): THREE.Group {
   ]) {
     const wh = new THREE.Mesh(wheelGeo, tire);
     wh.position.set(wx, 0.32, wz);
+    wh.userData.wheel = 0.32;
     g.add(wh);
   }
   return g;
 }
 
-export function buildPolice(): THREE.Group {
+export function buildPolice(hero = false): THREE.Group {
   const g = buildSedan(0x3f4a3c);
-  const bar = new THREE.Mesh(
-    new THREE.BoxGeometry(0.95, 0.16, 0.38),
-    matLib.getEmissive(0x1d4ed8, 0x1d4ed8, 0.85),
-  );
-  bar.position.set(0, 1.72, 0.05);
-  bar.userData.policeBar = true;
+  g.name = "sq-cruiser";
+  const rack = new THREE.Mesh(new THREE.BoxGeometry(1.32, 0.05, 0.46), matLib.get(0x1a1c18, 0.7, 0.45));
+  rack.position.set(0, 1.64, 0.05);
+  rack.castShadow = false;
+  g.add(rack);
+  const bar = buildPoliceLightbar(0.84, "SQ", hero);
+  bar.position.set(0, 1.76, 0.05);
   g.add(bar);
+  g.userData.lightbar = bar.userData.lightbar;
   const stripe = new THREE.Mesh(new THREE.BoxGeometry(1.74, 0.14, 4.12), matLib.get(0xcaa24d, 0.45, 0.25));
   stripe.position.set(0, 0.78, 0);
   g.add(stripe);
@@ -830,6 +1015,7 @@ export function buildMotorcycle(color = 0x6a2018): THREE.Group {
   for (const wz of [0.62, -0.58]) {
     const wh = new THREE.Mesh(wheelGeo, tire);
     wh.position.set(0, 0.32, wz);
+    wh.userData.wheel = 0.32;
     g.add(wh);
   }
   const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.14, 0.08), matLib.getEmissive(0xfff4d8, 0xfff4d8, 0.35));
@@ -846,6 +1032,7 @@ function addWheels(g: THREE.Group, spots: [number, number][], r = 0.38) {
   for (const [wx, wz] of spots) {
     const wh = new THREE.Mesh(geo, tire);
     wh.position.set(wx, r, wz);
+    wh.userData.wheel = r;
     g.add(wh);
   }
 }
@@ -862,7 +1049,7 @@ export function buildFourgon(color = 0x4a5a68): THREE.Group {
   box.position.set(0, 1.65, -1.15);
   box.castShadow = true;
   g.add(box);
-  const glass = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.7), matLib.get(0x6a88a0, 0.15, 0.65));
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.7), matLib.glass(0x6a88a0, 0.45));
   glass.position.set(0, 1.65, 2.42);
   g.add(glass);
   addWheels(g, [
@@ -956,11 +1143,7 @@ function getArretTex() {
     ctx.beginPath();
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
-      if (i === 0) {
-        ctx.moveTo(c + Math.cos(a) * r, c + Math.sin(a) * r);
-      } else {
-        ctx.lineTo(c + Math.cos(a) * r, c + Math.sin(a) * r);
-      }
+      i === 0 ? ctx.moveTo(c + Math.cos(a) * r, c + Math.sin(a) * r) : ctx.lineTo(c + Math.cos(a) * r, c + Math.sin(a) * r);
     }
     ctx.closePath();
     ctx.fill();
@@ -1014,10 +1197,8 @@ export function buildPanneauArret(height = 2.05): THREE.Group {
   g.add(post);
   const sign = new THREE.Mesh(
     new THREE.CircleGeometry(0.38, 8),
-    new THREE.MeshStandardMaterial({
+    new THREE.MeshLambertMaterial({
       map: getArretTex(),
-      roughness: 0.55,
-      metalness: 0.08,
       side: THREE.DoubleSide,
     }),
   );
@@ -1039,9 +1220,8 @@ export function buildPanneauVitesse(limit: number, height = 2.15): THREE.Group {
   g.add(post);
   const sign = new THREE.Mesh(
     new THREE.PlaneGeometry(0.5, 0.65),
-    new THREE.MeshStandardMaterial({
+    new THREE.MeshLambertMaterial({
       map: getSpeedTex(limit),
-      roughness: 0.55,
       side: THREE.DoubleSide,
     }),
   );
@@ -1089,9 +1269,8 @@ export function buildPanneauSortie(no: string, dest: string, height = 3.4): THRE
   g.add(post);
   const sign = new THREE.Mesh(
     new THREE.PlaneGeometry(2.4, 1.55),
-    new THREE.MeshStandardMaterial({
+    new THREE.MeshLambertMaterial({
       map: getSortieTex(no, dest),
-      roughness: 0.55,
       side: THREE.DoubleSide,
     }),
   );
@@ -1166,9 +1345,8 @@ export function buildPanneauAutoroute(height = 3.2): THREE.Group {
   g.add(post);
   const sign = new THREE.Mesh(
     new THREE.PlaneGeometry(1.15, 1.25),
-    new THREE.MeshStandardMaterial({
+    new THREE.MeshLambertMaterial({
       map: getAutorouteTex(),
-      roughness: 0.55,
       side: THREE.DoubleSide,
     }),
   );
@@ -1194,9 +1372,8 @@ export function buildGantrySortie(no: string, dest: string): THREE.Group {
   g.add(beam);
   const sign = new THREE.Mesh(
     new THREE.PlaneGeometry(3.6, 1.7),
-    new THREE.MeshStandardMaterial({
+    new THREE.MeshLambertMaterial({
       map: getSortieTex(no, dest),
-      roughness: 0.55,
       side: THREE.DoubleSide,
     }),
   );

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { matLib } from "./materials";
+import { matLib, type QcMat } from "./materials";
 
 /** Catalogue Ether — définitions uniquement. GPU via matLib (cache partagé). */
 export type EtherCat =
@@ -27,9 +27,10 @@ export function getEtherDef(id?: string): EtherMatDef {
   return (id && INDEX.get(id)) || ETHER_MATS[0];
 }
 
-export function getEtherMat(id?: string): THREE.MeshStandardMaterial {
+export function getEtherMat(id?: string): QcMat {
   const d = getEtherDef(id);
   if (d.e && (d.i ?? 0) > 0) return matLib.lit(d.color, d.e, d.i ?? 1, d.r);
+  if (d.cat === "glass") return matLib.physicalGlass(d.color, 1, Math.max(0.02, d.r));
   if (d.t || (d.o ?? 1) < 1) return matLib.glass(d.color, d.o ?? 0.4, d.r, d.m);
   return matLib.hex(d.color, d.r, d.m);
 }
