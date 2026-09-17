@@ -144,10 +144,11 @@ export function fillHero(
   group.add(root);
 
   const body = new THREE.Group();
-  body.name = "ether-body";
+  body.name = "TorsoJoint";
   root.add(body);
 
   const legL = new THREE.Group();
+  legL.name = "LegLJoint";
   legL.position.set(-0.16, 0.56, 0);
   legL.userData.leg = -1;
   body.add(legL);
@@ -161,6 +162,7 @@ export function fillHero(
   lowL.add(mesh(new THREE.BoxGeometry(0.27, 0.04, 0.27), gold, 0, 0.15, 0.02));
 
   const legR = new THREE.Group();
+  legR.name = "LegRJoint";
   legR.position.set(0.16, 0.56, 0);
   legR.userData.leg = 1;
   body.add(legR);
@@ -184,6 +186,7 @@ export function fillHero(
   body.add(mesh(new THREE.BoxGeometry(0.74, 0.04, 0.44), gold, 0, 0.4, 0));
 
   const armL = new THREE.Group();
+  armL.name = "ArmLJoint";
   armL.position.set(-0.48, 1.3, 0);
   armL.userData.arm = -1;
   body.add(armL);
@@ -201,7 +204,7 @@ export function fillHero(
   const armR = new THREE.Group();
   armR.position.set(0.48, 1.3, 0);
   armR.userData.arm = 1;
-  armR.name = "ether-arm-r";
+  armR.name = "ArmRJoint";
   body.add(armR);
   armR.add(mesh(new THREE.BoxGeometry(0.2, 0.48, 0.2), shirt, 0, -0.12, 0));
   armR.add(mesh(new THREE.BoxGeometry(0.28, 0.16, 0.28), armor, 0, 0.16, 0));
@@ -230,6 +233,7 @@ export function fillHero(
   foreR.add(sword);
 
   const head = new THREE.Group();
+  head.name = "HeadJoint";
   head.position.set(0, 1.88, 0);
   body.add(head);
   head.add(mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), skin, 0, 0, 0));

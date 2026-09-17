@@ -1,53 +1,131 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #0c1210;
-  --color-surface: #141c18;
-  --color-surface-2: #1b2620;
-  --color-fg: #ece8de;
-  --color-muted: #8a9084;
-  --color-subtle: #5e665e;
-  --color-accent: #7a9aaa;
-  --color-accent-fg: #0c1210;
-  --color-danger: #c44a3a;
-  --color-ok: #6a9a62;
-  --color-clay: #a04838;
+  /* --- COULEURS DU COMTÉ DE PORTNEUF --- */
+  --color-bg: #0c1210;                  /* Fond vert-noir forestier profond */
+  --color-surface: #141c18;             /* Panneaux, boîtes de dialogue */
+  --color-surface-2: #1b2620;           /* Éléments secondaires, en-têtes */
+  --color-fg: #ece8de;                  /* Texte beige noble */
+  --color-muted: #8a9084;               /* Texte estompé */
+  --color-subtle: #5e665e;              /* Détails mineurs, bordures passives */
+  --color-accent: #7a9aaa;              /* Bleu acier (Police, Métal) */
+  --color-accent-fg: #0c1210;           /* Texte contrasté sur fond accent */
+  --color-danger: #c44a3a;              /* Rouge CNESST, alertes, HP bas */
+  --color-ok: #6a9a62;                  /* Vert d'autorisation, validation */
+  --color-sqdc: #1a5632;                /* Vert officiel SQDC */
+  --color-clay: #a04838;                /* Rouge terre cuite / brique */
   --color-border: color-mix(in oklab, #ece8de 12%, transparent);
   --color-border-strong: color-mix(in oklab, #ece8de 22%, transparent);
 
+  /* --- COULEURS NÉONS / GIROPHARES (GTA RP) --- */
+  --color-neon-amber: #f59e0b;
+  --color-neon-blue: #00e8ff;
+  --color-neon-red: #ff1a1a;
+  --color-neon-green: #22c55e;
+
+  /* --- TYPOGRAPHIE --- */
   --font-display: "Instrument Serif", "Times New Roman", serif;
   --font-sans: "Outfit", "Segoe UI", system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
+  /* --- ARRONDis & OMBRES --- */
   --radius-xs: 4px;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 24px;
+  --shadow-hud: 0 12px 40px rgba(0, 0, 0, 0.5);
+  --shadow-glow-blue: 0 0 15px rgba(0, 232, 255, 0.4);
+  --shadow-glow-red: 0 0 15px rgba(255, 26, 26, 0.5);
 
-  --shadow-hud: 0 8px 32px rgba(0, 0, 0, 0.35);
+  /* --- ANIMATIONS INTÉGRÉES --- */
+  --animate-pulse-neon: pulse-neon 2s infinite ease-in-out;
+  --animate-scanline: scanline 6s linear infinite;
+  --animate-flicker: crt-flicker 0.15s infinite;
+  --animate-slide-in: slide-in 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-shake: shake-critical 0.15s infinite;
+
+  @keyframes pulse-neon {
+    0%, 100% { opacity: 0.6; filter: drop-shadow(0 0 2px var(--color-neon-red)); }
+    50% { opacity: 1; filter: drop-shadow(0 0 10px var(--color-neon-red)); }
+  }
+  @keyframes scanline {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100%); }
+  }
+  @keyframes crt-flicker {
+    0% { opacity: 0.985; }
+    50% { opacity: 0.995; }
+    100% { opacity: 0.985; }
+  }
+  @keyframes slide-in {
+    0% { transform: translateX(120%); opacity: 0; }
+    100% { transform: translateX(0); opacity: 1; }
+  }
+  @keyframes shake-critical {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    20% { transform: translate(-2px, 1px) rotate(-0.5deg); }
+    40% { transform: translate(1px, -1px) rotate(0.5deg); }
+    60% { transform: translate(-1px, 2px) rotate(0deg); }
+    80% { transform: translate(2px, 1px) rotate(0.5deg); }
+  }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   COUCHE DE BASE & RÉINITIALISATION
+   ═══════════════════════════════════════════════════════════ */
 
 @layer base {
   html,
   body,
   #app {
     height: 100%;
+    margin: 0;
+    padding: 0;
     background: var(--color-bg);
     color: var(--color-fg);
     font-family: var(--font-sans);
+    overflow: hidden;
   }
 
   button:not(:disabled),
   [role="button"]:not(:disabled) {
     cursor: pointer;
+    transition: all 0.15s ease-out;
+  }
+  
+  button:active:not(:disabled) {
+    transform: scale(0.96);
   }
 
   * {
     -webkit-tap-highlight-color: transparent;
+    box-sizing: border-box;
+  }
+
+  /* --- BARRES DE DÉFILEMENT DE JEU PERSO (STYLE NOPIXEL) --- */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: var(--radius-xs);
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-subtle);
+    border-radius: var(--radius-xs);
+    transition: background 0.2s;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-accent);
   }
 }
 
+/* Desactive les animations si l'OS le demande */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -57,6 +135,10 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   CLASSES D'URBANISME & DE MISE EN PAGE DU JEU
+   ═══════════════════════════════════════════════════════════ */
 
 .game-root {
   position: relative;
@@ -75,14 +157,76 @@
   touch-action: none;
 }
 
+/* ═══════════════════════════════════════════════════════════
+   COMPOSANTS DE HUD & INTERFACES RP (STYLE FIVE M)
+   ═══════════════════════════════════════════════════════════ */
+
+/* Panneau de verre dépoli texturé haut de gamme */
 .hud-panel {
-  background: color-mix(in oklab, var(--color-bg) 78%, transparent);
+  background: color-mix(in oklab, var(--color-bg) 82%, transparent);
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-hud);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(14px);
+  border-top: 2px solid var(--color-border-strong); /* Reflet lumineux sur la bordure supérieure */
 }
 
+/* Chiffres stables (vitesse, argent, munitions) */
 .hud-num {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
+}
+
+/* Touches de clavier stylisées pour les invites d'interaction */
+.kbd-prompt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  color: #000000;
+  border-bottom: 3px solid #cbd5e1;
+  font-family: var(--font-mono);
+  font-weight: 800;
+  border-radius: var(--radius-xs);
+  padding: 2px 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
+  text-transform: uppercase;
+  animation: kbd-pulse 1.8s infinite ease-in-out;
+}
+
+@keyframes kbd-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); box-shadow: 0 0 10px rgba(255, 255, 255, 0.3); }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   EFFETS CRT / CAMÉRAS DE SÉCURITÉ / ORDINATEUR POLICE
+   ═══════════════════════════════════════════════════════════ */
+
+.crt-screen {
+  position: relative;
+  overflow: hidden;
+  animation: crt-flicker 0.18s infinite;
+}
+
+.crt-screen::before {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.35) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  z-index: 10;
+  background-size: 100% 4px, 6px 100%;
+  pointer-events: none;
+}
+
+.crt-scanline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100px;
+  background: linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.08) 10%, rgba(255,255,255,0) 100%);
+  animation: scanline 8s linear infinite;
+  pointer-events: none;
+  z-index: 11;
 }

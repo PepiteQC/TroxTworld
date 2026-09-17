@@ -203,7 +203,7 @@ export function ak74Prop(): THREE.Group {
   return g;
 }
 
-/** Fusil en main, canon vers l’avant. */
+/** Fusil en main, canon vers l'avant. */
 export function ak74Held(): THREE.Group {
   const inner = protoGun().clone(true);
   inner.name = "ak74-rig";

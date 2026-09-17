@@ -298,7 +298,7 @@ function buildGarageBay(bays: 1 | 2 | 3): THREE.Group {
 
 function buildPool(): THREE.Group {
   const g = new THREE.Group();
-  const water = new THREE.Mesh(new THREE.BoxGeometry(8, 0.35, 4.4), matLib.get(0x3a8aaa, 0.12, 0.05));
+  const water = new THREE.Mesh(new THREE.BoxGeometry(8, 0.35, 4.4), matLib.water(0x3a8aaa, 0.82));
   water.position.y = 0.08;
   g.add(water);
   g.add(box(8.6, 0.28, 0.28, 0, 0.22, -2.4, 0xd8d4c8));
@@ -314,7 +314,7 @@ function buildSpa(): THREE.Group {
   const tub = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.12, 0.72, 12), matLib.get(0x3a3e42, 0.4, 0.3));
   tub.position.y = 0.36;
   g.add(tub);
-  const water = new THREE.Mesh(new THREE.CylinderGeometry(0.88, 0.88, 0.12, 12), matLib.get(0x4aa0b8, 0.1, 0.05));
+  const water = new THREE.Mesh(new THREE.CylinderGeometry(0.88, 0.88, 0.12, 12), matLib.water(0x4aa0b8, 0.8));
   water.position.y = 0.62;
   g.add(water);
   return g;

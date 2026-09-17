@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { CSM } from "three/addons/csm/CSM.js";
+import { sunDirection } from "./sky";
 
 let csm: CSM | null = null;
 
@@ -9,18 +10,18 @@ export function createSunCsm(camera: THREE.PerspectiveCamera, scene: THREE.Scene
   csm = new CSM({
     camera,
     parent: scene,
-    cascades: 3,
-    maxFar: 220,
+    cascades: 2,
+    maxFar: 180,
     mode: "practical",
-    shadowMapSize: 1024,
+    shadowMapSize: 768,
     shadowBias: -0.00012,
     lightDirection: DIR.clone(),
     lightIntensity: 1.25,
     lightNear: 1,
-    lightFar: 480,
-    lightMargin: 40,
+    lightFar: 360,
+    lightMargin: 32,
   });
-  csm.fade = true;
+  csm.fade = false;
   for (const light of csm.lights) {
     light.color.setHex(0xfff1d0);
     light.shadow.normalBias = 0.035;
@@ -29,11 +30,22 @@ export function createSunCsm(camera: THREE.PerspectiveCamera, scene: THREE.Scene
   return csm;
 }
 
+function skipCascade(mat: THREE.Material) {
+  if (mat instanceof THREE.MeshBasicMaterial) return true;
+  if (mat.userData.skipCsm) return true;
+  if (mat instanceof THREE.MeshPhysicalMaterial && mat.transmission > 0.01) return true;
+  const opacity = "opacity" in mat ? (mat as THREE.MeshLambertMaterial).opacity : 1;
+  return Boolean(mat.transparent && opacity < 0.85);
+}
+
 export function wireCsm(mat: THREE.Material) {
-  if (csm && !mat.userData.csmWired) {
-    csm.setupMaterial(mat);
+  if (!csm || mat.userData.csmWired) return mat;
+  if (skipCascade(mat)) {
     mat.userData.csmWired = true;
+    return mat;
   }
+  csm.setupMaterial(mat);
+  mat.userData.csmWired = true;
   return mat;
 }
 
@@ -47,10 +59,23 @@ export function wireCsmTree(root: THREE.Object3D) {
   });
 }
 
-export function updateCsm() {
+export function updateCsm(hours?: number) {
   if (!csm) return;
+  if (hours !== undefined) sunDirection(hours, DIR);
   csm.lightDirection.copy(DIR);
   csm.update();
+}
+
+export function applySun(hours: number, intensity: number, color: number, night: boolean, visible: boolean) {
+  if (!csm) return;
+  sunDirection(hours, DIR);
+  csm.lightDirection.copy(DIR);
+  for (const light of csm.lights) {
+    light.visible = visible;
+    light.intensity = intensity;
+    light.color.setHex(color);
+    light.castShadow = visible && !night;
+  }
 }
 
 export function refreshCsmFrustums() {

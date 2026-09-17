@@ -50,13 +50,12 @@ interface TempEntry {
 }
 
 function glow(color: THREE.ColorRepresentation, intensity = 5) {
-  return new THREE.MeshStandardMaterial({
+  return new THREE.MeshBasicMaterial({
     color,
-    emissive: color,
-    emissiveIntensity: intensity,
-    roughness: 0.25,
     transparent: true,
-    opacity: 1,
+    opacity: Math.min(1, 0.22 + intensity * 0.12),
+    depthWrite: false,
+    toneMapped: false,
   });
 }
 
@@ -170,7 +169,7 @@ export class AdminFx {
     ring.position.set(x, 0.04, z);
     this.add(ring, 0.45, (mesh, _d, _t, e) => {
       mesh!.scale.setScalar(1 + (e.age / e.ttl) * 7);
-      ((mesh as THREE.Mesh).material as THREE.MeshStandardMaterial).opacity = Math.max(0, 1 - e.age / e.ttl);
+      ((mesh as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = Math.max(0, 1 - e.age / e.ttl);
     });
     for (let i = 0; i < 5; i++) {
       const a = Math.random() * Math.PI * 2;
@@ -205,7 +204,7 @@ export class AdminFx {
         glow(meta.color, 8),
       );
       this.add(bolt, 0.32 + i * 0.05, (mesh, _d, _t, e) => {
-        ((mesh as THREE.Mesh).material as THREE.MeshStandardMaterial).opacity = Math.max(0, 1 - e.age / e.ttl);
+        ((mesh as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = Math.max(0, 1 - e.age / e.ttl);
       });
     }
     const ring = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.045, 8, 36), glow(meta.color, 6));
@@ -213,7 +212,7 @@ export class AdminFx {
     ring.position.set(p.x, 0.06, p.z);
     this.add(ring, 0.9, (mesh, _d, _t, e) => {
       mesh!.scale.setScalar(1 + (e.age / e.ttl) * 4);
-      ((mesh as THREE.Mesh).material as THREE.MeshStandardMaterial).opacity = Math.max(0, 1 - e.age / e.ttl);
+      ((mesh as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = Math.max(0, 1 - e.age / e.ttl);
     });
   }
 
@@ -249,7 +248,7 @@ export class AdminFx {
     const p = this.target();
     const disc = new THREE.Mesh(
       new THREE.CircleGeometry(0.05, 32),
-      new THREE.MeshStandardMaterial({ color: 0x05000f, emissive: meta.color, emissiveIntensity: 0.7, transparent: true, opacity: 0.7 }),
+      new THREE.MeshBasicMaterial({ color: meta.color, transparent: true, opacity: 0.7, depthWrite: false, toneMapped: false }),
     );
     disc.rotation.x = -Math.PI / 2;
     disc.position.set(p.x, 0.03, p.z);
@@ -307,13 +306,13 @@ export class AdminFx {
     const p = this.target();
     const fog = new THREE.Mesh(
       new THREE.SphereGeometry(1.5, 24, 12),
-      new THREE.MeshStandardMaterial({ color: 0x0a0014, emissive: meta.color, emissiveIntensity: 0.4, transparent: true, opacity: 0.01, side: THREE.DoubleSide }),
+      new THREE.MeshBasicMaterial({ color: meta.color, transparent: true, opacity: 0.01, side: THREE.DoubleSide, depthWrite: false, toneMapped: false }),
     );
     fog.position.copy(p);
     this.add(fog, 2.5, (mesh, dt, _t, e) => {
       const k = e.age / e.ttl;
       const op = k < 0.3 ? (k / 0.3) * 0.28 : k > 0.7 ? Math.max(0, 0.28 * (1 - (k - 0.7) / 0.3)) : 0.28;
-      ((mesh as THREE.Mesh).material as THREE.MeshStandardMaterial).opacity = op;
+      ((mesh as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = op;
       mesh!.rotation.y += dt * 0.2;
     });
   }
@@ -353,13 +352,13 @@ export class AdminFx {
     const p = this.target();
     const shell = new THREE.Mesh(
       new THREE.IcosahedronGeometry(1, 1),
-      new THREE.MeshStandardMaterial({ color: meta.color, emissive: meta.color, emissiveIntensity: 0.6, transparent: true, opacity: 0.01, roughness: 0.08, metalness: 0.85, side: THREE.DoubleSide }),
+      new THREE.MeshBasicMaterial({ color: meta.color, transparent: true, opacity: 0.01, side: THREE.DoubleSide, depthWrite: false, toneMapped: false }),
     );
     shell.position.copy(p);
     this.add(shell, 2.1, (mesh, dt, _t, e) => {
       const k = e.age / e.ttl;
       const op = k < 0.25 ? (k / 0.25) * 0.5 : k > 0.8 ? Math.max(0, 0.5 * (1 - (k - 0.8) / 0.2)) : 0.5;
-      ((mesh as THREE.Mesh).material as THREE.MeshStandardMaterial).opacity = op;
+      ((mesh as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = op;
       mesh!.rotation.y += dt * 0.15;
       if (k > 0.8 && !e.hit) {
         e.hit = true;
@@ -379,7 +378,7 @@ export class AdminFx {
     ball.position.copy(p);
     this.add(ball, 0.45, (mesh, _d, _t, e) => {
       mesh!.scale.setScalar(1 + (e.age / e.ttl) * 3);
-      ((mesh as THREE.Mesh).material as THREE.MeshStandardMaterial).opacity = Math.max(0, 1 - e.age / e.ttl);
+      ((mesh as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = Math.max(0, 1 - e.age / e.ttl);
     });
     this.spark(p.x, p.z, meta.color);
     this.domImpact(ADMIN_EFFECTS.impact);
@@ -391,13 +390,13 @@ export class AdminFx {
       const a = (i / 5) * Math.PI * 2;
       const beam = new THREE.Mesh(
         new THREE.CylinderGeometry(0.07, 0.22, 4.2, 10, 1, true),
-        new THREE.MeshStandardMaterial({ color: meta.color, emissive: meta.color, emissiveIntensity: 3, transparent: true, opacity: 0.01, side: THREE.DoubleSide }),
+        new THREE.MeshBasicMaterial({ color: meta.color, transparent: true, opacity: 0.01, side: THREE.DoubleSide, depthWrite: false, toneMapped: false }),
       );
       beam.position.set(p.x + Math.cos(a) * 0.55, p.y + 2, p.z + Math.sin(a) * 0.55);
       this.add(beam, 2.6, (mesh, _d, _t, e) => {
         const k = e.age / e.ttl;
         const op = k < 0.2 ? (k / 0.2) * 0.22 : k > 0.75 ? Math.max(0, 0.22 * (1 - (k - 0.75) / 0.25)) : 0.22;
-        ((mesh as THREE.Mesh).material as THREE.MeshStandardMaterial).opacity = op;
+        ((mesh as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = op;
       });
     }
   }
@@ -405,7 +404,7 @@ export class AdminFx {
   private hammer(meta: AdminEffectMeta) {
     const p = this.target();
     const g = new THREE.Group();
-    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.05, 8), new THREE.MeshStandardMaterial({ color: 0x332211, roughness: 0.8 }));
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.05, 8), new THREE.MeshLambertMaterial({ color: 0x332211 }));
     handle.position.y = 0.52;
     const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.32, 0.32), glow(meta.color, 3));
     head.position.y = 1.1;
@@ -492,7 +491,7 @@ export class AdminFx {
       const vy = 1 + Math.random();
       this.add(flame, 1.6, (mesh, dt, _t, e) => {
         mesh!.position.y += vy * dt;
-        ((mesh as THREE.Mesh).material as THREE.MeshStandardMaterial).opacity = Math.max(0, 1 - e.age / e.ttl);
+        ((mesh as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = Math.max(0, 1 - e.age / e.ttl);
       });
     }
     this.domImpact(ADMIN_EFFECTS.impact);

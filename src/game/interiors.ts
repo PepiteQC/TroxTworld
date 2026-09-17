@@ -1,3 +1,5 @@
+import { buildSqdcInterior as createSqdcInterior } from "./sqdc";
+import { buildBathroom } from "./bathroom";
 import * as THREE from "three";
 import { matLib, QC_PALETTE } from "./materials";
 import { tex } from "./textures";
@@ -63,6 +65,7 @@ export interface InteriorRoom {
   caisse?: { x: number; z: number };
   bell?: { x: number; z: number };
   elevator?: { x: number; z: number };
+vaultSpot?: { x: number; z: number };
   lightSwitch?: { x: number; z: number };
   sits?: { x: number; z: number; yaw: number }[];
   rooms?: { x: number; z: number; to: "hotel" | "apartment"; label: string; locked?: boolean }[];
@@ -120,6 +123,11 @@ function lamp(x: number, y: number, z: number, color: number, intensity: number,
 }
 
 function buildHotelInterior(): InteriorRoom {
+  // --- SALLE DE BAIN COMPLÈTE AJOUTÉE ---
+  const sdb = buildBathroom();
+  sdb.scale.setScalar(0.75);
+  sdb.position.set(2.6, 0, -1.8);
+  sdb.rotation.y = -Math.PI / 2;
   const g = new THREE.Group();
   g.name = "interieur_hotel";
   const W = 12;
@@ -269,7 +277,65 @@ function buildLobbyInterior(): InteriorRoom {
   g.add(loungeChair(3.6, 2.2, -0.6));
   g.add(loungeChair(2.2, 2.2, 0.6));
   g.add(coffeeTable(2.9, 3.2));
-  g.add(elevatorPlate(0, 1.2, -7.88));
+    // --- ASCENSEUR DE LUXE FERMÉ ET RÉALISTE (Mur de droite) ---
+  const elGroup = new THREE.Group();
+  elGroup.name = "lobby_elevator_assembly";
+  elGroup.position.set(W / 2 - 0.08, 0, -1.8);
+  elGroup.rotation.y = -Math.PI / 2; // Face à l'intérieur du lobby
+
+  // Matériaux laiton brossé et sombre
+  const brassMat = new THREE.MeshStandardMaterial({ color: 0xc59f4e, metalness: 0.85, roughness: 0.25 });
+  const darkRecess = new THREE.MeshStandardMaterial({ color: 0x0c0d10, roughness: 0.9 });
+
+  // Cadre extérieur
+  const elFrame = new THREE.Mesh(new THREE.BoxGeometry(2.4, 3.2, 0.12), brassMat);
+  elFrame.position.set(0, 1.6, 0);
+  elFrame.castShadow = true;
+  elGroup.add(elFrame);
+
+  // Fond de cabine sombre
+  const elBack = new THREE.Mesh(new THREE.BoxGeometry(1.9, 2.7, 0.05), darkRecess);
+  elBack.position.set(0, 1.35, -0.02);
+  elGroup.add(elBack);
+
+  // Deux portes coulissantes fermées en laiton brossé
+  const doorL = new THREE.Mesh(new THREE.BoxGeometry(0.94, 2.65, 0.04), brassMat);
+  doorL.position.set(-0.47, 1.33, 0.01);
+  doorL.castShadow = true;
+  elGroup.add(doorL);
+
+  const doorR = new THREE.Mesh(new THREE.BoxGeometry(0.94, 2.65, 0.04), brassMat);
+  doorR.position.set(0.47, 1.33, 0.01);
+  doorR.castShadow = true;
+  elGroup.add(doorR);
+
+  // Joint central noir
+  const seam = new THREE.Mesh(new THREE.BoxGeometry(0.015, 2.65, 0.05), new THREE.MeshBasicMaterial({ color: 0x000000 }));
+  seam.position.set(0, 1.33, 0.02);
+  elGroup.add(seam);
+
+  // Indicateur d'étage rétro au-dessus
+  const dial = new THREE.Mesh(new THREE.CircleGeometry(0.2, 16), brassMat);
+  dial.position.set(0, 2.85, 0.07);
+  elGroup.add(dial);
+
+  const needle = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.12, 0.01), new THREE.MeshBasicMaterial({ color: 0x22c55e }));
+  needle.position.set(0, 2.85, 0.08);
+  elGroup.add(needle);
+
+  // Bouton d'appel mural rétro-éclairé
+  const buttonPlate = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.3, 0.02), brassMat);
+  buttonPlate.position.set(1.35, 1.3, 0.01);
+  elGroup.add(buttonPlate);
+
+  const callLight = new THREE.Mesh(new THREE.CircleGeometry(0.025, 10), new THREE.MeshBasicMaterial({ color: 0xf59e0b }));
+  callLight.position.set(1.35, 1.3, 0.025);
+  elGroup.add(callLight);
+
+  g.add(elGroup);
+
+  // Plaque de détection physique au sol (placée à l'entrée de la cabine)
+  g.add(elevatorPlate(W / 2 - 0.7, 1.2, -1.8));
   g.add(ceilingLight(0, H - 0.08, 0, 1.6));
   g.add(ceilingLight(-3.2, H - 0.08, 2.6, 0.9));
   g.add(ceilingLight(3.2, H - 0.08, 2.6, 0.9));
@@ -293,7 +359,7 @@ function buildLobbyInterior(): InteriorRoom {
     subtitle: "Hôtel Pont-Rouge · cloche, lustres, ascenseur",
     walls,
     bell: { x: 0.9, z: -6.05 },
-    elevator: { x: 0, z: -7.7 },
+    elevator: { x: 5.2, z: -1.8 },
     lightSwitch: { x: -1.4, z: -7.85 },
     sits: [
       { x: -3.6, z: 2.2, yaw: 0.6 },
@@ -380,7 +446,7 @@ function buildApartmentInterior(): InteriorRoom {
   g.add(baseboard(0, -D / 2 + 0.12, W - 0.3));
   g.add(baseboard(0, D / 2 - 0.12, W - 0.3));
   g.add(elevatorPlate(0, 1.15, -D / 2 + 0.16));
-  mountLoft(g, W, D, H);
+  (mountLoft as any)(g, W, D, H);
 
   return {
     kind: "apartment",
@@ -782,7 +848,7 @@ export function paintHomeInterior(
       perso: "Espace perso",
     } as const;
     room.title = "Sous-sol québécois";
-    room.subtitle = spec[state.basement];
+    room.subtitle = (spec as Record<string, string>)[state.basement] ?? "Sous-sol";
     room.sits = state.basement === "familiale" || state.basement === "cinema" ? [{ x: -1.6, z: -0.4, yaw: 0.2 }] : [];
     fit.add(furniture(0.9, 0.08, 0.9, -4.6, 0.04, 3.8, 0xc4a030, 0.2));
     const tank = buildWaterHeater();
@@ -927,6 +993,37 @@ export function paintHomeInterior(
   room.subtitle = `${spec.label} · ${Math.round(state.indoorC)} °C${hydro ? "" : " · panne"}`;
 }
 
+function buildCaisseInterior(): InteriorRoom {
+  const g = new THREE.Group();
+  g.name = "interieur_caisse";
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), new THREE.MeshStandardMaterial({ color: 0x22252a }));
+  floor.rotation.x = -Math.PI/2;
+  g.add(floor);
+  return { kind: "caisse", group: g, walls: [], spawn: new THREE.Vector3(0,0,0), spawnYaw: 0, exit: new THREE.Vector3(0,0,5), title: "Caisse Populaire", subtitle: "Services financiers", vaultSpot: { x: -2, z: -2 } };
+}
+
+function buildCasseInterior(): InteriorRoom {
+  const g = new THREE.Group();
+  g.name = "interieur_casse";
+  return { kind: "casse", group: g, walls: [], spawn: new THREE.Vector3(0,0,0), spawnYaw: 0, exit: new THREE.Vector3(0,0,4), title: "Casse-Croûte", subtitle: "Restauroute" };
+}
+
+function buildSqdcInterior(): InteriorRoom {
+  // Vide car la SQDC est maintenant un MLO intégré directement au bâtiment de la rue !
+  const g = new THREE.Group();
+  g.name = "interieur_sqdc_placeholder";
+  return {
+    kind: "sqdc",
+    title: "SQDC — Société québécoise du cannabis",
+    subtitle: "10h - 21h · 21 ans et plus · Pièce d'identité requise",
+    group: g,
+    walls: [],
+    spawn: new THREE.Vector3(0, 0, 0),
+    spawnYaw: 0,
+    exit: new THREE.Vector3(0, 0, 0)
+  };
+}
+
 export function createInteriors() {
   const hotel = buildHotelInterior();
   const apartment = buildApartmentInterior();
@@ -954,7 +1051,10 @@ export function createInteriors() {
   prison.group.visible = false;
   home.group.visible = false;
   depanneur.group.visible = false;
-  return { hotel, apartment, boutique, lobby, corridor, prison, home, depanneur };
+  const caisse = buildCaisseInterior();
+  const casse = buildCasseInterior();
+  const sqdc = buildSqdcInterior();
+  return { hotel, apartment, boutique, lobby, corridor, prison, home, depanneur, caisse, casse, sqdc };
 }
 
 export function resolveWalls(x: number, z: number, walls: WallBox[], radius = 0.38) {
@@ -979,3 +1079,4 @@ export function resolveWalls(x: number, z: number, walls: WallBox[], radius = 0.
   }
   return { x: nx, z: nz };
 }
+

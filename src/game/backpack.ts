@@ -1,8 +1,14 @@
+// ═══════════════════════════════════════════════════════════════════════════
+//  ETHERWORLD QC — SYSTÈME DE SAC À DOS & INVENTAIRE RP
+//  src/game/backpack.ts
+// ═══════════════════════════════════════════════════════════════════════════
+
 import * as THREE from "three";
 import { bagCapacity, bagWeight } from "./commerce";
 import type { HaulJob } from "./jobs";
 import { matLib } from "./materials";
 import { tex } from "./textures";
+import { useGameStore } from "./store";
 
 export type PackId = "sac" | "sac_rouge" | "sac_rando";
 
@@ -22,10 +28,11 @@ export function bagFill(inv: Record<string, number>, packId: string | null): num
 
 export function haulCargoKg(job: HaulJob | null): number {
   if (!job?.loaded) return 0;
-  if (job.kind === "taxi") return 80;
-  if (job.kind === "laitier") return 240;
-  if (job.kind === "siropier") return 180;
-  if (job.kind === "camionneur") return 720;
+  const k = (job.kind as string);
+  if (k === "taxi") return 80;
+  if (k === "laitier") return 240;
+  if (k === "siropier") return 180;
+  if (k === "camionneur" || k === "camionneur_lourd") return 720;
   return 95;
 }
 
@@ -82,4 +89,29 @@ export function buildBackpack(id: string): THREE.Group | null {
   }
   g.position.set(0, 1.04, -0.28);
   return g;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FONCTIONS GLOBALES D'ACCÈS À L'INVENTAIRE (SQDC, Prison, Illégal, etc.)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function addToInventory(itemId: string, qty: number = 1, playerId?: string): void {
+  const s = useGameStore.getState() as any;
+  if (typeof s.addItem === "function") {
+    s.addItem(itemId, typeof qty === "number" ? qty : 1);
+  }
+}
+
+export function removeFromInventory(itemId: string, qty: number = 1, playerId?: string): void {
+  const s = useGameStore.getState() as any;
+  if (typeof s.removeItem === "function") {
+    s.removeItem(itemId, typeof qty === "number" ? qty : 1);
+  }
+}
+
+export function getInventoryItem(arg1: string, arg2?: string): number {
+  const inv = (useGameStore.getState().inventory ?? {}) as Record<string, number>;
+  // Gère à la fois getInventoryItem(itemId) et getInventoryItem(playerId, itemId)
+  const itemId = arg2 !== undefined ? arg2 : arg1;
+  return inv[itemId] ?? 0;
 }
