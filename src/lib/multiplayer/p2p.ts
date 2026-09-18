@@ -143,6 +143,7 @@ export class P2PRoom {
     if (this.pingTimer) clearInterval(this.pingTimer);
 
     for (const slot of this.peers.values()) {
+<<<<<<< HEAD
       this.teardownSlot(slot);
     }
     this.peers.clear();
@@ -158,6 +159,30 @@ export class P2PRoom {
       }).catch(() => {});
     } catch {
       // Ignorer lors de la fermeture de fenêtre
+=======
+      if (slot.state?.readyState === "open") {
+        try {
+          slot.state.send(wire);
+        } catch {
+          /* channel closing */
+        }
+      }
+    }
+  }
+
+  /** Unreliable send to a subset — AOI, 20 Hz poses. */
+  broadcastTo(ids: Iterable<string>, data: unknown): void {
+    const wire = JSON.stringify({ t: "d", d: data });
+    for (const id of ids) {
+      const slot = this.peers.get(id);
+      if (slot?.state?.readyState === "open") {
+        try {
+          slot.state.send(wire);
+        } catch {
+          /* channel closing */
+        }
+      }
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     }
   }
 

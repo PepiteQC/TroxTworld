@@ -1,9 +1,28 @@
 /**
+<<<<<<< HEAD
  * ═════════════════════════════════════════════════════════════════════════════
  * USINE DE GÉOMÉTRIES PROCÉDURALES, CACHE LRU, POOL D'INSTANCES & ANIMATEUR GPU
  * Fichier : src/game/geometries.ts
  * Architecture : Zero-GC, LRU Eviction, Dirty Ranges, Import/Export State, Easings.
  * ═════════════════════════════════════════════════════════════════════════════
+=======
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  USINE DE GÉOMÉTRIES PROCÉDURALES & POOL D'INSTANCIATION (v3.0)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  Fichier : src/game/geometries.ts
+ *
+ *  Features :
+ *   - Cache VRAM avec LRU eviction (évite les fuites mémoire)
+ *   - 16 primitives procédurales (incluant wedge, hemisphere, pyramid)
+ *   - Pivot alignment (bottom/top) pour placement au sol immédiat
+ *   - Dirty range flush (transfert GPU partiel ultra-performant)
+ *   - InstancePool avec metadata, raycast resolver, animation helpers
+ *   - Helpers de positionnement (grid, circle, random, spiral)
+ *   - Palettes de couleurs prédéfinies
+ *   - Export/Import state pour sauvegarde monde
+ *   - Easing functions prêtes à l'emploi
+ * ═══════════════════════════════════════════════════════════════════════════
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
  */
 
 import * as THREE from "three";
@@ -24,11 +43,19 @@ export type GeoKind =
   | "capsule"
   | "wedge"
   | "pyramid"
+<<<<<<< HEAD
   | "arch"
   | "tetra"
   | "octa"
   | "dodeca"
   | "icosa";
+=======
+  | "tetra"
+  | "octa"
+  | "dodeca"
+  | "icosa"
+  | "arch";
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 
 export type PivotAlignment = "center" | "bottom" | "top";
 
@@ -100,7 +127,11 @@ const accessOrder: string[] = [];
 let hits = 0;
 let misses = 0;
 
+<<<<<<< HEAD
 /** Normalise strictement les paramètres pour garantir la cohérence des clés de cache */
+=======
+/** Normalise strictement les paramètres pour garantir l'unicité des clés de cache */
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 function normalizeParams(kind: GeoKind, p: GeoParams): NormalizedParams {
   const w = Math.round((p.w ?? 1) * 1000) / 1000;
   const h = Math.round((p.h ?? 1) * 1000) / 1000;
@@ -131,9 +162,13 @@ function generateKey(kind: GeoKind, n: NormalizedParams): string {
 
 function touchCache(key: string): void {
   const idx = accessOrder.indexOf(key);
+<<<<<<< HEAD
   if (idx !== -1) {
     accessOrder.splice(idx, 1);
   }
+=======
+  if (idx !== -1) accessOrder.splice(idx, 1);
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   accessOrder.push(key);
 }
 
@@ -181,7 +216,11 @@ function createWedgeGeometry(w: number, h: number, d: number): THREE.BufferGeome
   return geo;
 }
 
+<<<<<<< HEAD
 /** Arche (demi-cylindre creux) */
+=======
+/** Arche (demi-cylindre creux) — utile pour tunnels, portes, etc. */
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 function createArchGeometry(r: number, tube: number, h: number, seg: number): THREE.BufferGeometry {
   const geo = new THREE.TorusGeometry(r, tube, 8, seg, Math.PI);
   geo.rotateZ(Math.PI);
@@ -191,7 +230,11 @@ function createArchGeometry(r: number, tube: number, h: number, seg: number): TH
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+<<<<<<< HEAD
 // §4 — FABRIQUE DE GÉOMÉTRIES AVEC DÉCALAGE DE PIVOT
+=======
+// §4 — FABRIQUE DE GÉOMÉTRIES
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 // ─────────────────────────────────────────────────────────────────────────────
 
 function buildGeometry(kind: GeoKind, n: NormalizedParams): THREE.BufferGeometry {
@@ -250,7 +293,11 @@ function buildGeometry(kind: GeoKind, n: NormalizedParams): THREE.BufferGeometry
       geo = new THREE.BoxGeometry(1, 1, 1);
   }
 
+<<<<<<< HEAD
   // Calcul dynamique de la hauteur pour le décalage de pivot
+=======
+  // Ajustement du point de pivot pour placement facile
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   const height =
     kind === "sphere" || kind === "hemisphere" || kind === "tetra" || kind === "octa" || kind === "dodeca" || kind === "icosa"
       ? n.r * 2
@@ -267,7 +314,11 @@ function buildGeometry(kind: GeoKind, n: NormalizedParams): THREE.BufferGeometry
   return geo;
 }
 
+<<<<<<< HEAD
 /** Récupère ou génère une géométrie avec cache d'éviction LRU */
+=======
+/** Récupère une géométrie avec cache LRU */
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 export function getGeo(kind: GeoKind, p: GeoParams = {}): THREE.BufferGeometry {
   const norm = normalizeParams(kind, p);
   const k = generateKey(kind, norm);
@@ -290,7 +341,10 @@ export function getGeo(kind: GeoKind, p: GeoParams = {}): THREE.BufferGeometry {
 export function geoStats() {
   const total = hits + misses;
   return {
+<<<<<<< HEAD
     entries: cache.size,
+=======
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     cachedGeometries: cache.size,
     maxCached: MAX_CACHE_SIZE,
     hits,
@@ -308,9 +362,16 @@ export function disposeGeos(): void {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+<<<<<<< HEAD
 // §5 — HELPERS DE POSITIONNEMENT GÉOMÉTRIQUE
 // ─────────────────────────────────────────────────────────────────────────────
 
+=======
+// §5 — HELPERS DE POSITIONNEMENT
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Grille rectangulaire centrée */
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 export function gridPositions(
   countX: number,
   countZ: number,
@@ -334,6 +395,10 @@ export function gridPositions(
   return positions;
 }
 
+<<<<<<< HEAD
+=======
+/** Disposition circulaire */
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 export function circlePositions(
   count: number,
   radius: number,
@@ -354,6 +419,10 @@ export function circlePositions(
   return positions;
 }
 
+<<<<<<< HEAD
+=======
+/** Spirale d'Archimède (pour parkings, rond-points, etc.) */
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 export function spiralPositions(
   count: number,
   startRadius: number,
@@ -375,6 +444,10 @@ export function spiralPositions(
   return positions;
 }
 
+<<<<<<< HEAD
+=======
+/** Positions aléatoires dans une zone rectangulaire */
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 export function randomPositions(
   count: number,
   minX: number,
@@ -397,6 +470,10 @@ export function randomPositions(
   return positions;
 }
 
+<<<<<<< HEAD
+=======
+/** Ligne droite avec espacement */
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 export function linePositions(
   count: number,
   spacing: number,
@@ -437,11 +514,21 @@ export const COLOR_PALETTES = {
 
 export type PaletteName = keyof typeof COLOR_PALETTES;
 
+<<<<<<< HEAD
 export function randomColor(palette: PaletteName): number {
   const colors = COLOR_PALETTES[palette];
   return colors[Math.floor(Math.random() * colors.length)]!;
 }
 
+=======
+/** Couleur aléatoire depuis une palette */
+export function randomColor(palette: PaletteName): number {
+  const colors = COLOR_PALETTES[palette];
+  return colors[Math.floor(Math.random() * colors.length)];
+}
+
+/** Mélange linéaire entre deux couleurs */
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 export function lerpColor(a: number, b: number, t: number): number {
   const ar = (a >> 16) & 0xff,
     ag = (a >> 8) & 0xff,
@@ -456,7 +543,11 @@ export function lerpColor(a: number, b: number, t: number): number {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+<<<<<<< HEAD
 // §7 — COURBES D'ASSOUPLISSEMENT (EASING)
+=======
+// §7 — EASING FUNCTIONS
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const Easing = {
@@ -481,7 +572,11 @@ export const Easing = {
 export type EasingFn = (t: number) => number;
 
 // ─────────────────────────────────────────────────────────────────────────────
+<<<<<<< HEAD
 // §8 — INSTANCE POOL (Zero-Allocation & Dirty Ranges & Metadata & Raycast)
+=======
+// §8 — INSTANCE POOL (Zero-Allocation & Dirty Ranges)
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class InstancePool {
@@ -499,7 +594,11 @@ export class InstancePool {
   private minColorDirty = Infinity;
   private maxColorDirty = -1;
 
+<<<<<<< HEAD
   // Singletons réutilisables (Zéro allocations dans la boucle de rendu)
+=======
+  // Singletons réutilisables (Zero-GC dans les boucles)
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   private static dummy = new THREE.Object3D();
   private static tempColor = new THREE.Color();
   private static tempMatrix = new THREE.Matrix4();
@@ -543,11 +642,14 @@ export class InstancePool {
     return this.indexToId[index];
   }
 
+<<<<<<< HEAD
   /** Expose un point d'accès typé propre aux index d'instances sans passer par des variables privées */
   public getInstanceIndex(id: string): number | undefined {
     return this.ids.get(id);
   }
 
+=======
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   /** Résout un hit Raycast vers l'ID textuel de l'instance */
   resolveIntersection(hit: THREE.Intersection): string | null {
     if (hit.object !== this.mesh || hit.instanceId === undefined) return null;
@@ -571,7 +673,11 @@ export class InstancePool {
 
     if (idx === undefined) {
       if (this._count >= this.max) {
+<<<<<<< HEAD
         console.warn(`[InstancePool] Capacité max de ${this.max} de géométries atteinte pour l'instance: ${id}`);
+=======
+        console.warn(`[InstancePool] Capacité max atteinte (${this.max}) pour: ${id}`);
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
         return -1;
       }
       idx = this._count;
@@ -597,8 +703,12 @@ export class InstancePool {
     entries: Array<{ id: string; transform: TransformData; metadata?: InstanceMetadata }>
   ): number {
     let added = 0;
+<<<<<<< HEAD
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i]!;
+=======
+    for (const entry of entries) {
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
       const idx = this.set(entry.id, entry.transform, entry.metadata, false);
       if (idx >= 0) added++;
     }
@@ -661,10 +771,14 @@ export class InstancePool {
     this.mesh.setColorAt(idx, InstancePool.tempColor);
     this.markColorDirty(idx);
 
+<<<<<<< HEAD
     if (autoFlush) {
       this.flush();
     }
 
+=======
+    if (autoFlush) this.flush();
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     return true;
   }
 
@@ -691,7 +805,11 @@ export class InstancePool {
     this.flush();
   }
 
+<<<<<<< HEAD
   /** Récupère la position actuelle d'une instance */
+=======
+  /** Récupère la position actuelle d'une instance (pour logique jeu) */
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   getPosition(id: string, out = new THREE.Vector3()): THREE.Vector3 | null {
     const idx = this.ids.get(id);
     if (idx === undefined) return null;
@@ -739,7 +857,11 @@ export class InstancePool {
     }
   }
 
+<<<<<<< HEAD
   /** Flush partiel GPU */
+=======
+  /** Flush partiel optimisé (dirty ranges) — compatible Three.js r150+ */
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   flush(): void {
     if (this.maxDirty >= 0) {
       const offset = this.minDirty * 16;
@@ -789,6 +911,7 @@ export class InstancePool {
     this.mesh.frustumCulled = true;
   }
 
+<<<<<<< HEAD
   public computeBoundingBox(): THREE.Box3 {
     const box = new THREE.Box3();
 
@@ -805,6 +928,10 @@ export class InstancePool {
   }
 
   public clear(): void {
+=======
+  /** Vide le pool sans désallouer */
+  clear(): void {
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     this._count = 0;
     this.mesh.count = 0;
     this.ids.clear();
@@ -814,13 +941,22 @@ export class InstancePool {
     this.flush();
   }
 
+<<<<<<< HEAD
   public dispose(): void {
+=======
+  /** Libère définitivement le mesh et la mémoire GPU */
+  dispose(): void {
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     this.clear();
     this.mesh.dispose();
   }
 
   /** Sérialise l'état du pool (pour sauvegarde monde) */
+<<<<<<< HEAD
   public exportState(): SerializedPoolState {
+=======
+  exportState(): SerializedPoolState {
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     const instances: SerializedPoolState["instances"] = [];
 
     for (let i = 0; i < this._count; i++) {
@@ -848,11 +984,18 @@ export class InstancePool {
   }
 
   /** Restaure un état sauvegardé */
+<<<<<<< HEAD
   public importState(state: SerializedPoolState): void {
     this.clear();
 
     for (let i = 0; i < state.instances.length; i++) {
       const inst = state.instances[i]!;
+=======
+  importState(state: SerializedPoolState): void {
+    this.clear();
+
+    for (const inst of state.instances) {
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
       if (this._count >= this.max) break;
 
       const idx = this._count;
@@ -902,7 +1045,14 @@ interface AnimEntry {
   onComplete?: () => void;
 }
 
+<<<<<<< HEAD
 /** Animateur pour InstancePool — gère les interpolations de position, échelle et slerp de rotation */
+=======
+/**
+ * Animateur pour InstancePool — gère plusieurs animations en parallèle
+ * avec interpolation slerp pour les rotations.
+ */
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 export class InstanceAnimator {
   private pool: InstancePool;
   private animations = new Map<string, AnimEntry>();
@@ -925,10 +1075,17 @@ export class InstanceAnimator {
     easing: EasingFn = Easing.easeInOutCubic,
     onComplete?: () => void
   ): boolean {
+<<<<<<< HEAD
     const idx = this.pool.getInstanceIndex(id);
     if (idx === undefined) return false;
 
     // Récupère l'état actuel de manière sécurisée sans contourner le typage private
+=======
+    const idx = this.pool["ids"].get(id);
+    if (idx === undefined) return false;
+
+    // Récupère l'état actuel
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     this.pool.mesh.getMatrixAt(idx, InstanceAnimator._matrix);
     InstanceAnimator._matrix.decompose(
       InstanceAnimator._pos,
@@ -1013,8 +1170,13 @@ export class InstanceAnimator {
       }
     }
 
+<<<<<<< HEAD
     for (let i = 0; i < toRemove.length; i++) {
       this.animations.delete(toRemove[i]!);
+=======
+    for (const id of toRemove) {
+      this.animations.delete(id);
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     }
 
     if (dirty) this.pool.flush();

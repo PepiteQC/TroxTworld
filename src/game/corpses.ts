@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 import '../polyfills';
+=======
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 /**
  * ═══════════════════════════════════════════════════════════════════
  *  SYSTÈME DE CADAVRES — ULTIMATE EDITION v2.0
@@ -101,8 +104,11 @@ export interface Wound {
 
 /** Interface pour un cadavre */
 export interface Corpse {
+<<<<<<< HEAD
   toxicology?: { alcohol?: number; drugs?: string[]; poisons?: string[] };
   stomachContents?: string[];
+=======
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   id: string;
   pose: DeadPoseId;
   position: THREE.Vector3;
@@ -472,7 +478,11 @@ export class CorpseManager {
         for (let i = 0; i < numShots; i++) {
           wounds.push({
             type: "gunshot",
+<<<<<<< HEAD
             location: ["head", "torch", "stomach", "back", "left_arm", "right_arm"].random() as WoundLocation,
+=======
+            location: ["head", "torch", "stomach", "back", "left_arm", "right_arm"].random(),
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
             severity: 70 + Math.random() * 30,
             description: `Balle de calibre ${["9mm", "5.56mm", ".45", "7.62mm"].random()}`,
             timeOfInjury: Date.now() - Math.random() * 3600000, // 0-1h avant
@@ -485,7 +495,11 @@ export class CorpseManager {
         for (let i = 0; i < numStabs; i++) {
           wounds.push({
             type: "stab",
+<<<<<<< HEAD
             location: ["torch", "stomach", "back", "neck", "left_arm", "right_arm"].random() as WoundLocation,
+=======
+            location: ["torch", "stomach", "back", "neck", "left_arm", "right_arm"].random(),
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
             severity: 50 + Math.random() * 50,
             description: `Coup de couteau${numStabs > 1 ? ` (${i+1})` : ''}`,
             timeOfInjury: Date.now() - Math.random() * 3600000,
@@ -504,7 +518,11 @@ export class CorpseManager {
         if (Math.random() > 0.5) {
           wounds.push({
             type: "blunt",
+<<<<<<< HEAD
             location: ["torch", "stomach", "back"].random() as WoundLocation,
+=======
+            location: ["torch", "stomach", "back"].random(),
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
             severity: 60 + Math.random() * 40,
             description: "Contusions et fractures internes",
             timeOfInjury: Date.now() - Math.random() * 3600000,
@@ -515,7 +533,11 @@ export class CorpseManager {
         // Coup tranchant (ex: machette)
         wounds.push({
           type: "slash",
+<<<<<<< HEAD
           location: ["neck", "torch"].random() as WoundLocation,
+=======
+          location: ["neck", "torch"].random(),
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
           severity: 90 + Math.random() * 10,
           description: "Sectionnement de l'artère carotide",
           timeOfInjury: Date.now() - Math.random() * 3600000,
@@ -573,7 +595,11 @@ export class CorpseManager {
         if (Math.random() > 0.5) {
           wounds.push({
             type: "blunt",
+<<<<<<< HEAD
             location: ["left_leg", "right_leg", "torch"].random() as WoundLocation,
+=======
+            location: ["left_leg", "right_leg", "torch"].random(),
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
             severity: 50 + Math.random() * 50,
             description: "Fractures multiples",
             timeOfInjury: Date.now() - Math.random() * 3600000,
@@ -757,7 +783,11 @@ export class CorpseManager {
       .loadAsync(`/models/dead/${pose}.fbx`)
       .then((obj) => {
         this.freezeClip(obj);
+<<<<<<< HEAD
         this.restyle(obj, (obj.userData?.corpse || {}) as any);
+=======
+        this.restyle(obj, corpse);
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
         const wrap = new THREE.Group();
         wrap.name = `dead-src:${pose}`;
         wrap.add(obj);
@@ -968,7 +998,11 @@ export class CorpseManager {
     
     for (let i = 0; i < numTraces; i++) {
       const traceId = `dna_trace_${corpse.id}_${i}`;
+<<<<<<< HEAD
       const type: DNAType = ["blood", "hair", "skin", "saliva"].random() as DNAType;
+=======
+      const type: DNAType = ["blood", "hair", "skin", "saliva"].random();
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
       const angle = Math.random() * Math.PI * 2;
       const distance = 0.5 + Math.random() * 2.0; // 0.5-2.5m du cadavre
       
@@ -1494,7 +1528,10 @@ export class CorpseManager {
     
     // Générer un rapport d'autopsie
     const report: AutopsyReport = {
+<<<<<<< HEAD
       id: 'rep_' + Math.random().toString(36).substr(2, 9),
+=======
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
       corpseId,
       performedBy: coronerId,
       timePerformed: Date.now(),
@@ -1513,7 +1550,11 @@ export class CorpseManager {
     };
     
     // Ajouter des drogues ou poisons aléatoires si la cause est liée
+<<<<<<< HEAD
     if (corpse.causeOfDeath === "poison" || (corpse.causeOfDeath as any) === "drug") {
+=======
+    if (corpse.causeOfDeath === "poison" || corpse.causeOfDeath === "drug") {
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
       const substances = ["cocaïne", "héroïne", "méthamphétamine", "cyanure", "arsenic", "monoxyde_de_carbone", "ricin", "strychnine"];
       const numSubstances = 1 + Math.floor(Math.random() * 2);
       for (let i = 0; i < numSubstances; i++) {
@@ -1818,7 +1859,11 @@ export class CorpseManager {
    */
   getAutopsyReport(corpseId: string): AutopsyReport | undefined {
     for (const report of this.autopsyReports.values()) {
+<<<<<<< HEAD
       if (report.corpseId === corpseId) {
+=======
+      if (report.corpsId === corpseId) {
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
         return report;
       }
     }
@@ -2062,9 +2107,15 @@ export class CorpseManager {
           const poolData = data.dnaTraces?.find(t => t.id === poolId);
           if (poolData) {
             const pool: BodyFluidPool = {
+<<<<<<< HEAD
               ...(poolData as any),
               position: new THREE.Vector3(poolData.position.x, 0.01, poolData.position.z),
               mesh: this.createBloodPoolMesh(poolData.position.x, poolData.position.z, (poolData as any).size),
+=======
+              ...poolData as BodyFluidPool,
+              position: new THREE.Vector3(poolData.position.x, 0.01, poolData.position.z),
+              mesh: this.createBloodPoolMesh(poolData.position.x, poolData.position.z, poolData.size),
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
             };
             this.fluidPools.set(poolId, pool);
             if (this.scene) {
@@ -2140,8 +2191,13 @@ export function corpseProp(pose: string = "lie_01"): THREE.Group {
   if (!corpse) return new THREE.Group();
   
   // Récupérer le groupe du cadavre depuis la scène
+<<<<<<< HEAD
   if ((corpseManager as any).scene) {
     const group = (corpseManager as any).scene.getObjectByName(`corpse_${corpseId}`) as THREE.Group;
+=======
+  if (corpseManager.scene) {
+    const group = corpseManager.scene.getObjectByName(`corpse_${corpseId}`) as THREE.Group;
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     if (group) {
       return group;
     }
@@ -2169,7 +2225,44 @@ export const corpseManager = new CorpseManager();
 // 🎯 EXPORTS
 // ==========================================
 
+<<<<<<< HEAD
 /* Duplicate exports removed */
 
 
 
+=======
+export {
+  // Types
+  DecompositionState,
+  WoundType,
+  WoundLocation,
+  Wound,
+  Corpse,
+  BodySpot,
+  AutopsyReport,
+  CrimeSceneReport,
+  BodyFluidType,
+  BodyFluidPool,
+  DNAType,
+  DNATrace,
+  
+  // Constantes
+  DEAD_SIT,
+  DEAD_LIE,
+  DECOMPOSITION_TIMES,
+  BODY_TEMPERATURES,
+  SMELL_INTENSITIES,
+  FLY_PROBABILITIES,
+  BLOOD_COLORS,
+  FLUID_DRY_TIMES,
+  
+  // Fonctions
+  isDeadPose,
+  parseDeadPose,
+  corpseProp,
+  countyBodies,
+  
+  // Gestionnaire
+  corpseManager,
+};
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158

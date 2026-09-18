@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /**
  * ═════════════════════════════════════════════════════════════════════════════
  * ⚡ CONFIGURATION DRIZZLE ORM / DRIZZLE-KIT — TROXTWORLD (PostgreSQL)
@@ -26,3 +27,23 @@ export default defineConfig({
   verbose: true,
   strict: true,
 });
+=======
+import 'dotenv/config';
+import { defineConfig } from 'drizzle-kit';
+
+export default defineConfig({
+  schema: './src/db/schema.ts',
+  out: './migrations',
+  dialect: 'postgresql',
+  dbCredentials: {
+    host: '127.0.0.1',
+    port: 5432,
+    user: 'postgres',
+    password: 'pepite127', // 👈 Ton mot de passe postgres
+    database: 'troxt_db',
+    ssl: false,
+  },
+  verbose: true,
+  strict: true,
+});
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158

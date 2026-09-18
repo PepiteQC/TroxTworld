@@ -1,4 +1,4 @@
-import * as THREE from "three";
+﻿import * as THREE from "three";
 import { matLib, QC_PALETTE, WALL_COLORS, ROOF_COLORS } from "./materials";
 import { makeRng } from "./rng";
 import { buildGlassLeaf, buildHouseFrontDoor, type SwingDoor } from "./door";
@@ -99,9 +99,15 @@ export function buildMaisonCanadienne(seed = 1, lit = 0): THREE.Group {
   awning.rotation.x = -0.08;
   g.add(awning);
 
+<<<<<<< HEAD:src/game/city/buildings/architecture/architecture.ts
   const door = buildHouseFrontDoor(0.95, 2.05);
   door.position.set(0, 0.62, depth / 2 + 0.04);
   g.add(door);
+=======
+  const doorResult = buildHouseFrontDoor(0.95, 2.05);
+  doorResult.group.position.set(0, 0.62, depth / 2 + 0.04);
+    // g.add(door); // Optionnel ou géré via d.open
+>>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/architecture.ts
 
   for (const x of [-width * 0.28, width * 0.28]) {
     const w = windowPane(1.05, 1.2, rng() < lit);
