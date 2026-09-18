@@ -1,4 +1,0 @@
-canPurchase
-grantLicense
-licenseFromItem
-parseLicenses

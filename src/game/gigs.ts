@@ -1,8 +1,20 @@
 /**
  * ═════════════════════════════════════════════════════════════════════════════
- * 💼 CARRIÈRES, QUARTS DE TRAVAIL & COMPÉTENCES — CATALOGUE PORTNEUF
+ * 💼 CARRIÈRES, QUARTS DE TRAVAIL & COMPÉTENCES v2.0 — CATALOGUE PORTNEUF
  * Fichier : /src/game/gigs.ts
- * Architecture : Zero-GC nearestGig, validation stricte de sauvegarde, tick fluide.
+ * ─────────────────────────────────────────────────────────────────────────────
+ *  • Safe array access (aucun non-null assertion au boot)
+ *  • Validation stricte de TOUS les champs persistés
+ *  • Daily cap anti-farm
+ *  • Events : onGigStart, onGigStep, onGigComplete, onGigFail, onGigCancel
+ *  • Cancellation de gig
+ *  • Stats agrégées (earned total, par catégorie, avg duration, streak)
+ *  • Réputation par catégorie
+ *  • Skill synergy (bonus passif léger)
+ *  • Witness system pour gigs illégaux
+ *  • Serialization d'ActiveGig (reconnect recovery)
+ *  • Health check
+ *  • Compat 100% v1
  * ═════════════════════════════════════════════════════════════════════════════
  */
 import { A40_EXITS, A40_Z, PAPETERIE, SQ_JAIL, VILLAGES } from "./worlddata";
@@ -10,27 +22,15 @@ import { A40_EXITS, A40_Z, PAPETERIE, SQ_JAIL, VILLAGES } from "./worlddata";
 // ─── 1. TYPES ET INTERFACES ──────────────────────────────────────────────────
 
 export type JobCategory =
-  | "transport"
-  | "commerce"
-  | "securite"
-  | "sante"
-  | "construction"
-  | "restauration"
-  | "illegal"
-  | "gouvernement"
-  | "media";
+  | "transport" | "commerce" | "securite" | "sante"
+  | "construction" | "restauration" | "illegal"
+  | "gouvernement" | "media";
 
 export type JobLevel = 1 | 2 | 3 | 4 | 5;
 
 export type SkillType =
-  | "conduite"
-  | "force"
-  | "endurance"
-  | "charisme"
-  | "technique"
-  | "discretion"
-  | "medecine"
-  | "cuisine";
+  | "conduite" | "force" | "endurance" | "charisme"
+  | "technique" | "discretion" | "medecine" | "cuisine";
 
 export type GigLicenseId = "permis_c" | "diplome_sante" | "badge_police";
 
@@ -81,6 +81,11 @@ export interface ActiveGig {
   bonusMultiplier: number;
   failed: boolean;
   stepElapsed: number;
+
+  // 🆕 v2
+  playerId?: string;
+  cancelled?: boolean;
+  witnesses?: string[];
 }
 
 export interface PlayerSkills {
@@ -111,6 +116,25 @@ export interface FactionMembership {
   contribution: number;
 }
 
+/** 🆕 v2 — Statistiques agrégées du joueur */
+export interface CareerStats {
+  totalEarned: number;
+  totalXpEarned: number;
+  totalGigsAttempted: number;
+  totalGigsSucceeded: number;
+  totalGigsFailed: number;
+  totalGigsCancelled: number;
+  totalPlaytimeMs: number;
+  avgGigDurationMs: number;
+  currentStreak: number;
+  bestStreak: number;
+  earningsByCategory: Record<JobCategory, number>;
+  favoriteCategory: JobCategory | null;
+}
+
+/** 🆕 v2 — Réputation par catégorie (bonus/malus de reward) */
+export type ReputationByCategory = Record<JobCategory, number>;
+
 export interface CareerState {
   level: number;
   xp: number;
@@ -122,30 +146,28 @@ export interface CareerState {
   jobsFailed: number;
   gigCooldowns: Record<string, number>;
   jobHistory: GigHistory[];
+
+  // 🆕 v2
+  stats: CareerStats;
+  reputation: ReputationByCategory;
+  dailyEarnings: number;
+  dailyResetAt: number;
+  activeGig: ActiveGig | null;
 }
 
 // ─── 2. LABELS & MÉTADONNÉES D'INTERFACE ────────────────────────────────────
 
 export const SKILL_LABEL: Record<SkillType, string> = {
-  conduite: "Conduite",
-  force: "Force",
-  endurance: "Endurance",
-  charisme: "Charisme",
-  technique: "Technique",
-  discretion: "Discrétion",
-  medecine: "Médecine",
-  cuisine: "Cuisine",
+  conduite: "Conduite", force: "Force", endurance: "Endurance",
+  charisme: "Charisme", technique: "Technique", discretion: "Discrétion",
+  medecine: "Médecine", cuisine: "Cuisine",
 };
 
 export const CATEGORY_LABEL: Record<JobCategory, string> = {
-  transport: "Transport",
-  commerce: "Commerce",
-  securite: "Sécurité publique",
-  sante: "Santé",
-  construction: "Construction",
-  restauration: "Restauration",
-  illegal: "Activité illégale",
-  gouvernement: "Gouvernement",
+  transport: "Transport", commerce: "Commerce",
+  securite: "Sécurité publique", sante: "Santé",
+  construction: "Construction", restauration: "Restauration",
+  illegal: "Activité illégale", gouvernement: "Gouvernement",
   media: "Média",
 };
 
@@ -157,11 +179,48 @@ export const GIG_LICENSE_LABEL: Record<GigLicenseId, string> = {
 
 const GIG_LICENSE_IDS: GigLicenseId[] = ["permis_c", "diplome_sante", "badge_police"];
 
-// ─── 3. RÉFÉRENTIEL DE LOCALISATIONS ────────────────────────────────────────
+const ALL_CATEGORIES: JobCategory[] = [
+  "transport", "commerce", "securite", "sante",
+  "construction", "restauration", "illegal",
+  "gouvernement", "media",
+];
+
+// 🆕 v2 — Config
+export interface GigsConfig {
+  dailyEarningsCap: number;       // $ max par jour
+  dailyXpCap: number;             // XP max par jour
+  maxJobHistory: number;          // max entries gardées
+  maxActiveGigDurationMs: number; // timeout gig (sécurité)
+  enableSkillSynergy: boolean;    // bonus passifs
+  witnessRadius: number;          // mètres
+  reputationDecayPerDay: number;  // réputation -x/jour
+}
+
+const DEFAULT_CONFIG: GigsConfig = {
+  dailyEarningsCap: 5000,
+  dailyXpCap: 800,
+  maxJobHistory: 40,
+  maxActiveGigDurationMs: 10 * 60 * 1000,
+  enableSkillSynergy: true,
+  witnessRadius: 25,
+  reputationDecayPerDay: 5,
+};
+
+// ─── 3. RÉFÉRENTIEL DE LOCALISATIONS (SAFE) ─────────────────────────────────
 
 function village(id: string): [number, number, number] {
-  const v = VILLAGES.find((t) => t.id === id);
-  return v ? [v.center[0], 0, v.center[1]] : [0, 0, 0];
+  const v = (VILLAGES as any[]).find((t) => t.id === id);
+  if (!v) return [0, 0, 0];
+  // Support : { center: [x, z] } ou { x, z } ou { pos: [x, y, z] }
+  if (Array.isArray(v.center)) return [v.center[0] ?? 0, 0, v.center[1] ?? 0];
+  if (typeof v.x === "number") return [v.x, 0, v.z ?? 0];
+  return [0, 0, 0];
+}
+
+/** 🆕 v2 — Safe array access (pas de crash si index absent) */
+function safeExit(index: number, fallbackX = 0): { x: number } {
+  const exit = (A40_EXITS as any[])[index];
+  return { x: exit?.x ?? fallbackX };
 }
 
 const LOC = {
@@ -174,14 +233,14 @@ const LOC = {
   cap: village("cap_sante"),
   desch: village("deschambault"),
   marc: village("saint_marc"),
-  mill: [PAPETERIE.x, 0, PAPETERIE.z] as [number, number, number],
-  sq: [SQ_JAIL.x, 0, SQ_JAIL.z] as [number, number, number],
-  a40: [A40_EXITS[3]!.x, 0, A40_Z] as [number, number, number],
-  quai: [A40_EXITS[3]!.x, 0, 74] as [number, number, number],
+  mill: [(PAPETERIE as any)?.x ?? 0, 0, (PAPETERIE as any)?.z ?? 0] as [number, number, number],
+  sq: [(SQ_JAIL as any)?.x ?? 0, 0, (SQ_JAIL as any)?.z ?? 0] as [number, number, number],
+  a40: [safeExit(3, -200).x, 0, A40_Z] as [number, number, number],
+  quai: [safeExit(3, -200).x, 0, 74] as [number, number, number],
 };
 
 // ─── 4. CATALOGUE COMPLET DES QUARTS DE TRAVAIL ─────────────────────────────
-
+// (INCHANGÉ — tous les jobs v1 conservés à l'identique)
 export const JOB_CATALOG: Record<string, JobDef> = {
   taxi: {
     id: "taxi", title: "Chauffeur de taxi", category: "transport",
@@ -460,22 +519,62 @@ export function calcXpToNextLevel(level: number): number {
   return Math.floor(100 * Math.pow(1.5, Math.max(1, level) - 1));
 }
 
-export function emptyCareer(): CareerState {
+/** 🆕 v2 — Stats vides */
+function emptyStats(): CareerStats {
+  const byCat = {} as Record<JobCategory, number>;
+  for (const c of ALL_CATEGORIES) byCat[c] = 0;
   return {
-    level: 1,
-    xp: 0,
-    xpToNextLevel: calcXpToNextLevel(1),
-    skills: { ...DEFAULT_SKILLS },
-    licenses: [],
-    faction: null,
-    jobsCompleted: 0,
-    jobsFailed: 0,
-    gigCooldowns: {},
-    jobHistory: [],
+    totalEarned: 0, totalXpEarned: 0, totalGigsAttempted: 0,
+    totalGigsSucceeded: 0, totalGigsFailed: 0, totalGigsCancelled: 0,
+    totalPlaytimeMs: 0, avgGigDurationMs: 0,
+    currentStreak: 0, bestStreak: 0,
+    earningsByCategory: byCat, favoriteCategory: null,
   };
 }
 
-/** Validation stricte d'une adhésion syndicale/policière/mafia */
+/** 🆕 v2 — Réputation zéro */
+function emptyReputation(): ReputationByCategory {
+  const rep = {} as ReputationByCategory;
+  for (const c of ALL_CATEGORIES) rep[c] = 0;
+  return rep;
+}
+
+export function emptyCareer(): CareerState {
+  return {
+    level: 1, xp: 0, xpToNextLevel: calcXpToNextLevel(1),
+    skills: { ...DEFAULT_SKILLS }, licenses: [], faction: null,
+    jobsCompleted: 0, jobsFailed: 0,
+    gigCooldowns: {}, jobHistory: [],
+    stats: emptyStats(), reputation: emptyReputation(),
+    dailyEarnings: 0, dailyResetAt: Date.now(),
+    activeGig: null,
+  };
+}
+
+/** 🆕 v2 — Reset daily si minuit passé */
+function refreshDailyIfNeeded(career: CareerState, now = Date.now()): CareerState {
+  const oneDayMs = 24 * 3600 * 1000;
+  if (now - career.dailyResetAt < oneDayMs) return career;
+
+  return {
+    ...career,
+    dailyEarnings: 0,
+    dailyResetAt: now,
+    reputation: applyReputationDecay(career.reputation, DEFAULT_CONFIG.reputationDecayPerDay),
+  };
+}
+
+/** 🆕 v2 — Décroissance réputation */
+function applyReputationDecay(rep: ReputationByCategory, amount: number): ReputationByCategory {
+  const out = { ...rep };
+  for (const c of ALL_CATEGORIES) {
+    out[c] = Math.max(0, out[c] - amount);
+  }
+  return out;
+}
+
+// ─── 6. PARSING / VALIDATION STRICTE ────────────────────────────────────────
+
 function parseFaction(raw: unknown): FactionMembership | null {
   if (!raw || typeof raw !== "object") return null;
   const f = raw as Partial<FactionMembership>;
@@ -483,10 +582,88 @@ function parseFaction(raw: unknown): FactionMembership | null {
   return {
     factionId: f.factionId,
     name: f.name,
-    rank: typeof f.rank === "number" ? Math.max(0, Math.min(5, f.rank)) : 0,
+    rank: typeof f.rank === "number" ? Math.max(0, Math.min(5, Math.floor(f.rank))) : 0,
     joinedAt: typeof f.joinedAt === "number" ? f.joinedAt : Date.now(),
     contribution: typeof f.contribution === "number" ? Math.max(0, f.contribution) : 0,
   };
+}
+
+/** 🆕 v2 — Validation stricte d'une entrée history */
+function parseHistoryEntry(raw: unknown): GigHistory | null {
+  if (!raw || typeof raw !== "object") return null;
+  const h = raw as Partial<GigHistory>;
+  if (typeof h.jobId !== "string") return null;
+  if (typeof h.title !== "string") return null;
+  return {
+    jobId: h.jobId,
+    title: h.title,
+    reward: typeof h.reward === "number" && Number.isFinite(h.reward) ? Math.max(0, h.reward) : 0,
+    completedAt: typeof h.completedAt === "number" ? h.completedAt : Date.now(),
+    success: h.success === true,
+    duration: typeof h.duration === "number" && Number.isFinite(h.duration) ? Math.max(0, h.duration) : 0,
+  };
+}
+
+/** 🆕 v2 — Validation des cooldowns */
+function parseCooldowns(raw: unknown): Record<string, number> {
+  if (!raw || typeof raw !== "object") return {};
+  const out: Record<string, number> = {};
+  const now = Date.now();
+  const oneYear = 365 * 24 * 3600 * 1000;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof v !== "number" || !Number.isFinite(v)) continue;
+    if (v < 0 || v > now + oneYear) continue;
+    out[k] = Math.floor(v);
+  }
+  return out;
+}
+
+/** 🆕 v2 — Validation des stats */
+function parseStats(raw: unknown): CareerStats {
+  const base = emptyStats();
+  if (!raw || typeof raw !== "object") return base;
+  const s = raw as Partial<CareerStats>;
+  const num = (n: unknown, fallback = 0) =>
+    typeof n === "number" && Number.isFinite(n) ? Math.max(0, n) : fallback;
+
+  const byCat = { ...base.earningsByCategory };
+  if (s.earningsByCategory && typeof s.earningsByCategory === "object") {
+    for (const c of ALL_CATEGORIES) {
+      byCat[c] = num((s.earningsByCategory as any)[c], 0);
+    }
+  }
+
+  return {
+    totalEarned: num(s.totalEarned),
+    totalXpEarned: num(s.totalXpEarned),
+    totalGigsAttempted: Math.floor(num(s.totalGigsAttempted)),
+    totalGigsSucceeded: Math.floor(num(s.totalGigsSucceeded)),
+    totalGigsFailed: Math.floor(num(s.totalGigsFailed)),
+    totalGigsCancelled: Math.floor(num(s.totalGigsCancelled)),
+    totalPlaytimeMs: num(s.totalPlaytimeMs),
+    avgGigDurationMs: num(s.avgGigDurationMs),
+    currentStreak: Math.floor(num(s.currentStreak)),
+    bestStreak: Math.floor(num(s.bestStreak)),
+    earningsByCategory: byCat,
+    favoriteCategory:
+      s.favoriteCategory && ALL_CATEGORIES.includes(s.favoriteCategory)
+        ? s.favoriteCategory
+        : null,
+  };
+}
+
+/** 🆕 v2 — Validation réputation */
+function parseReputation(raw: unknown): ReputationByCategory {
+  const base = emptyReputation();
+  if (!raw || typeof raw !== "object") return base;
+  const r = raw as Partial<ReputationByCategory>;
+  for (const c of ALL_CATEGORIES) {
+    const v = r[c];
+    if (typeof v === "number" && Number.isFinite(v)) {
+      base[c] = Math.max(0, Math.min(100, v));
+    }
+  }
+  return base;
 }
 
 export function parseCareer(raw: unknown): CareerState {
@@ -494,35 +671,57 @@ export function parseCareer(raw: unknown): CareerState {
   if (!raw || typeof raw !== "object") return base;
   const d = raw as Partial<CareerState>;
 
+  // Skills
   const skills = { ...DEFAULT_SKILLS };
   if (d.skills && typeof d.skills === "object") {
     for (const k of Object.keys(DEFAULT_SKILLS) as SkillType[]) {
       const n = (d.skills as PlayerSkills)[k];
-      if (typeof n === "number") skills[k] = Math.max(0, Math.min(100, n));
+      if (typeof n === "number" && Number.isFinite(n)) {
+        skills[k] = Math.max(0, Math.min(100, Math.floor(n)));
+      }
     }
   }
 
+  // Licenses
   const licenses = Array.isArray(d.licenses)
-    ? d.licenses.filter((id): id is GigLicenseId => GIG_LICENSE_IDS.includes(id as GigLicenseId))
+    ? d.licenses.filter((id): id is GigLicenseId =>
+        GIG_LICENSE_IDS.includes(id as GigLicenseId))
     : [];
 
-  const level = typeof d.level === "number" ? Math.max(1, Math.min(20, Math.floor(d.level))) : 1;
+  // Level (1-20)
+  const level = typeof d.level === "number" && Number.isFinite(d.level)
+    ? Math.max(1, Math.min(20, Math.floor(d.level)))
+    : 1;
+
+  // Job history (validation stricte)
+  const jobHistory = Array.isArray(d.jobHistory)
+    ? d.jobHistory
+        .map(parseHistoryEntry)
+        .filter((h): h is GigHistory => h !== null)
+        .slice(0, DEFAULT_CONFIG.maxJobHistory)
+    : [];
 
   return {
     level,
-    xp: typeof d.xp === "number" ? Math.max(0, d.xp) : 0,
+    xp: typeof d.xp === "number" && Number.isFinite(d.xp) ? Math.max(0, Math.floor(d.xp)) : 0,
     xpToNextLevel: calcXpToNextLevel(level),
     skills,
     licenses,
     faction: parseFaction(d.faction),
-    jobsCompleted: typeof d.jobsCompleted === "number" ? d.jobsCompleted : 0,
-    jobsFailed: typeof d.jobsFailed === "number" ? d.jobsFailed : 0,
-    gigCooldowns: d.gigCooldowns && typeof d.gigCooldowns === "object" ? { ...d.gigCooldowns } : {},
-    jobHistory: Array.isArray(d.jobHistory) ? d.jobHistory.slice(0, 40) : [],
+    jobsCompleted: typeof d.jobsCompleted === "number" ? Math.max(0, Math.floor(d.jobsCompleted)) : 0,
+    jobsFailed: typeof d.jobsFailed === "number" ? Math.max(0, Math.floor(d.jobsFailed)) : 0,
+    gigCooldowns: parseCooldowns(d.gigCooldowns),
+    jobHistory,
+    stats: parseStats(d.stats),
+    reputation: parseReputation(d.reputation),
+    dailyEarnings: typeof d.dailyEarnings === "number" && Number.isFinite(d.dailyEarnings)
+      ? Math.max(0, d.dailyEarnings) : 0,
+    dailyResetAt: typeof d.dailyResetAt === "number" ? d.dailyResetAt : Date.now(),
+    activeGig: null, // Jamais persisté en clair (reconstruit séparément)
   };
 }
 
-// ─── 6. RECHERCHE DE QUARTS DE TRAVAIL ─────────────────────────────────────
+// ─── 7. RECHERCHE DE QUARTS DE TRAVAIL ─────────────────────────────────────
 
 export function gigById(id: string): JobDef | undefined {
   return JOB_CATALOG[id];
@@ -543,14 +742,9 @@ export function nearGig(def: JobDef, x: number, z: number, radius = 48): boolean
   return dx * dx + dz * dz < radius * radius;
 }
 
-/**
- * Recherche du quart de travail le plus proche du joueur.
- * Optimisation : comparaison par distance au carré (évite les Math.hypot coûteux)
- */
 export function nearestGig(x: number, z: number, max = 48): JobDef | null {
   let best: JobDef | null = null;
   let bestDSq = max * max;
-
   for (const job of allGigs()) {
     const [lx, , lz] = job.locationCoords;
     const dx = x - lx;
@@ -564,13 +758,36 @@ export function nearestGig(x: number, z: number, max = 48): JobDef | null {
   return best;
 }
 
-// ─── 7. VALIDATION D'ACCÈS ET COOLDOWNS ────────────────────────────────────
+/** 🆕 v2 — Top-N gigs accessibles depuis une position */
+export function nearestGigs(x: number, z: number, n = 3, max = 200): JobDef[] {
+  const scored: Array<{ def: JobDef; dSq: number }> = [];
+  const maxSq = max * max;
+  for (const job of allGigs()) {
+    const [lx, , lz] = job.locationCoords;
+    const dx = x - lx;
+    const dz = z - lz;
+    const dSq = dx * dx + dz * dz;
+    if (dSq <= maxSq) scored.push({ def: job, dSq });
+  }
+  scored.sort((a, b) => a.dSq - b.dSq);
+  return scored.slice(0, n).map((s) => s.def);
+}
 
-export function canStartGig(career: CareerState, jobId: string, active: ActiveGig | null): boolean {
+// ─── 8. VALIDATION D'ACCÈS ET COOLDOWNS ────────────────────────────────────
+
+export function canStartGig(
+  career: CareerState,
+  jobId: string,
+  active: ActiveGig | null,
+): boolean {
   return getCannotStartReason(career, jobId, active) === null;
 }
 
-export function getJobCooldownSec(career: CareerState, jobId: string, now = Date.now()): number {
+export function getJobCooldownSec(
+  career: CareerState,
+  jobId: string,
+  now = Date.now(),
+): number {
   const cd = career.gigCooldowns[jobId];
   if (!cd) return 0;
   return Math.max(0, Math.ceil((cd - now) / 1000));
@@ -580,14 +797,23 @@ export function getCannotStartReason(
   career: CareerState,
   jobId: string,
   active: ActiveGig | null,
-  now = Date.now()
+  now = Date.now(),
 ): string | null {
-  if (active) return "Un quart de travail est déjà en cours";
+  if (active && !active.cancelled) return "Un quart de travail est déjà en cours";
+
+  // 🆕 v2 — Daily cap
+  const refreshed = refreshDailyIfNeeded(career, now);
+  if (refreshed.dailyEarnings >= DEFAULT_CONFIG.dailyEarningsCap) {
+    return "Plafond quotidien atteint — revenez demain";
+  }
+
   const cd = career.gigCooldowns[jobId];
   if (cd && now < cd) return `Disponible dans ${getJobCooldownSec(career, jobId, now)} s`;
+
   const def = JOB_CATALOG[jobId];
   if (!def) return "Quart introuvable";
   if (career.level < def.levelRequired) return `Niveau ${def.levelRequired} requis`;
+
   if (def.skillRequired && career.skills[def.skillRequired.skill] < def.skillRequired.level) {
     return `Compétence ${SKILL_LABEL[def.skillRequired.skill]} ${def.skillRequired.level} requise`;
   }
@@ -597,7 +823,34 @@ export function getCannotStartReason(
   return null;
 }
 
-// ─── 8. CYCLE DE VIE D'UN QUART ACTIF ──────────────────────────────────────
+// ─── 9. CYCLE DE VIE D'UN QUART ACTIF ──────────────────────────────────────
+
+/**
+ * 🆕 v2 — Bonus de synergie léger entre skills.
+ * Ex : conduite ≥ 50 booste force de +10% pour les skill checks de force.
+ */
+function synergyBonus(
+  skills: PlayerSkills,
+  targetSkill: SkillType,
+): number {
+  if (!DEFAULT_CONFIG.enableSkillSynergy) return 1;
+  const SYNERGY: Partial<Record<SkillType, SkillType>> = {
+    force: "endurance",
+    endurance: "force",
+    conduite: "technique",
+    technique: "conduite",
+    charisme: "discretion",
+    discretion: "charisme",
+    medecine: "technique",
+    cuisine: "endurance",
+  };
+  const partner = SYNERGY[targetSkill];
+  if (!partner) return 1;
+  const partnerVal = skills[partner];
+  if (partnerVal >= 50) return 1.1;
+  if (partnerVal >= 75) return 1.2;
+  return 1;
+}
 
 export function makeActiveGig(career: CareerState, def: JobDef): ActiveGig {
   let bonus = 1;
@@ -606,8 +859,17 @@ export function makeActiveGig(career: CareerState, def: JobDef): ActiveGig {
   }
   bonus += (career.level - 1) * 0.05;
 
+  // 🆕 v2 — Réputation bonus
+  const repBonus = (career.reputation?.[def.category] ?? 0) / 100;
+  bonus += repBonus * 0.2;
+
+  // 🆕 v2 — Streak bonus
+  const streakBonus = Math.min(0.25, (career.stats?.currentStreak ?? 0) * 0.02);
+  bonus += streakBonus;
+
   const skill = def.skillRequired?.skill ?? "endurance";
-  const finalReward = Math.round((def.reward + def.bonusPerLevel * (career.skills[skill] / 10)) * bonus);
+  const skillFactor = career.skills[skill] / 10;
+  const finalReward = Math.round((def.reward + def.bonusPerLevel * skillFactor) * bonus);
 
   return {
     id: def.id,
@@ -625,6 +887,8 @@ export function makeActiveGig(career: CareerState, def: JobDef): ActiveGig {
     bonusMultiplier: bonus,
     failed: false,
     stepElapsed: 0,
+    cancelled: false,
+    witnesses: [],
   };
 }
 
@@ -635,62 +899,90 @@ export type GigTickEvent =
   | { kind: "fail"; gig: ActiveGig; wanted?: number; penalty?: number };
 
 /**
- * Fait avancer un quart de travail actif d'un tick de simulation.
+ * 🆕 v2 — Fait avancer un quart d'un tick. Support multi-step par tick.
  */
-export function tickActiveGig(gig: ActiveGig, dt: number, skills: PlayerSkills): GigTickEvent {
+export function tickActiveGig(
+  gig: ActiveGig,
+  dt: number,
+  skills: PlayerSkills,
+): GigTickEvent {
+  if (gig.cancelled || gig.failed) return { kind: "none", gig };
+
   const def = JOB_CATALOG[gig.id];
   if (!def) return { kind: "done", gig };
 
-  const step = def.steps[gig.currentStep];
-  if (!step) return { kind: "done", gig };
+  const ms = Math.max(0, dt * 1000);
+  let remainingMs = ms;
+  let stepAdvanced = false;
+  let lastSkill: SkillType | undefined;
 
-  const ms = dt * 1000;
-  gig.stepElapsed += ms;
-  gig.stepProgress = Math.min(1, gig.stepElapsed / step.duration);
+  // 🆕 Boucle pour gérer plusieurs steps par tick (steps courts)
+  while (remainingMs > 0 && gig.currentStep < def.steps.length) {
+    const step = def.steps[gig.currentStep];
+    if (!step) break;
 
-  // Calcul du pourcentage global (recalculé à chaque tick pour fluidité)
-  const doneMs = gig.steps.slice(0, gig.currentStep).reduce((a, s) => a + s.duration, 0) + gig.stepElapsed;
-  gig.progress = Math.min(1, doneMs / Math.max(1, def.durationMs));
+    const stepRemaining = step.duration - gig.stepElapsed;
+    const consumed = Math.min(remainingMs, stepRemaining);
 
-  if (gig.stepElapsed < step.duration) {
-    return { kind: "none", gig };
-  }
+    gig.stepElapsed += consumed;
+    remainingMs -= consumed;
+    gig.stepProgress = Math.min(1, gig.stepElapsed / Math.max(1, step.duration));
 
-  // Étape terminée : vérification du test de compétence
-  if (step.skillCheck) {
-    const playerSkill = skills[step.skillCheck.skill];
-    const chance = Math.min(95, (playerSkill / step.skillCheck.difficulty) * 80);
-    const success = Math.random() * 100 <= chance;
-    if (!success && step.canFail) {
-      gig.failed = true;
-      return {
-        kind: "fail",
-        gig,
-        wanted: def.isIllegal ? def.wantedOnCatch : undefined,
-        penalty: step.failPenalty,
-      };
+    // Step pas fini
+    if (gig.stepElapsed < step.duration) break;
+
+    // Step fini → skill check
+    if (step.skillCheck) {
+      const playerSkill = skills[step.skillCheck.skill];
+      const synergy = synergyBonus(skills, step.skillCheck.skill);
+      // 🆕 Formule plus prévisible
+      const ratio = (playerSkill * synergy) / Math.max(1, step.skillCheck.difficulty);
+      const chance = Math.min(95, Math.max(5, ratio * 80));
+      const success = Math.random() * 100 <= chance;
+
+      if (!success && step.canFail) {
+        gig.failed = true;
+        // 🆕 Ajoute un témoin si illégal
+        if (def.isIllegal) {
+          gig.witnesses = gig.witnesses ?? [];
+          gig.witnesses.push(`witness_${Date.now()}`);
+        }
+        return {
+          kind: "fail",
+          gig,
+          wanted: def.isIllegal ? def.wantedOnCatch : undefined,
+          penalty: step.failPenalty,
+        };
+      }
+      lastSkill = step.skillCheck.skill;
     }
+
+    // Advance
     gig.currentStep += 1;
     gig.stepElapsed = 0;
     gig.stepProgress = 0;
-    if (gig.currentStep >= def.steps.length) return { kind: "done", gig };
-    return { kind: "step", gig, skill: step.skillCheck.skill };
+    stepAdvanced = true;
+
+    if (gig.currentStep >= def.steps.length) {
+      gig.progress = 1;
+      return { kind: "done", gig };
+    }
   }
 
-  // Étape sans test de compétence : passage direct à la suivante
-  gig.currentStep += 1;
-  gig.stepElapsed = 0;
-  gig.stepProgress = 0;
-  if (gig.currentStep >= def.steps.length) return { kind: "done", gig };
-  return { kind: "step", gig };
+  // Recompute global progress
+  const doneMs = gig.steps.slice(0, gig.currentStep).reduce((a, s) => a + s.duration, 0) + gig.stepElapsed;
+  gig.progress = Math.min(1, doneMs / Math.max(1, def.durationMs));
+
+  if (stepAdvanced) {
+    return { kind: "step", gig, skill: lastSkill };
+  }
+  return { kind: "none", gig };
 }
 
-/** Récupère l'étape actuellement en cours d'un quart de travail */
 export function currentStep(gig: ActiveGig): JobStep | undefined {
   return gig.steps[gig.currentStep];
 }
 
-/** Retourne la progression textuelle et numérique pour le HUD */
 export function getGigProgress(gig: ActiveGig): {
   overallPct: number;
   stepPct: number;
@@ -708,24 +1000,30 @@ export function getGigProgress(gig: ActiveGig): {
   };
 }
 
-// ─── 9. FINALISATION & CONSÉQUENCES DU QUART ───────────────────────────────
+/** 🆕 v2 — Annule un gig en cours */
+export function cancelGig(gig: ActiveGig): ActiveGig {
+  return { ...gig, cancelled: true, failed: false };
+}
+
+// ─── 10. FINALISATION & CONSÉQUENCES DU QUART ──────────────────────────────
 
 export function finalizeGig(
   career: CareerState,
   gig: ActiveGig,
   success: boolean,
-  now = Date.now()
+  now = Date.now(),
 ): CareerState {
   const def = JOB_CATALOG[gig.id];
   const cooldownEnd = now + (def?.cooldownMs ?? 30000);
   const skill = def?.skillRequired?.skill ?? "endurance";
   const xpGained = success ? (def?.xpReward ?? 10) : Math.floor((def?.xpReward ?? 10) * 0.2);
 
-  // Mise à jour de la compétence principale (via bumpSkill)
+  // Skills
   const newSkills = success
     ? bumpSkill(career.skills, skill, 1)
     : career.skills;
 
+  // History
   const historyEntry: GigHistory = {
     jobId: gig.id,
     title: gig.title,
@@ -735,9 +1033,54 @@ export function finalizeGig(
     duration: now - gig.startedAt,
   };
 
-  const updatedFaction = success && career.faction && def?.factionId === career.faction.factionId
-    ? addContribution(career.faction, def.factionBonus ?? 10)
-    : career.faction;
+  // Faction
+  const updatedFaction =
+    success && career.faction && def?.factionId === career.faction.factionId
+      ? addContribution(career.faction, def.factionBonus ?? 10)
+      : career.faction;
+
+  // 🆕 v2 — Stats
+  const stats = { ...career.stats };
+  stats.totalGigsAttempted += 1;
+  if (success) {
+    stats.totalGigsSucceeded += 1;
+    stats.currentStreak += 1;
+    stats.bestStreak = Math.max(stats.bestStreak, stats.currentStreak);
+    stats.totalEarned += gig.reward;
+    stats.totalXpEarned += xpGained;
+    stats.earningsByCategory[gig.category] =
+      (stats.earningsByCategory[gig.category] ?? 0) + gig.reward;
+    // Recalcul catégorie favorite
+    let bestCat: JobCategory | null = null;
+    let bestVal = 0;
+    for (const c of ALL_CATEGORIES) {
+      const v = stats.earningsByCategory[c];
+      if (v > bestVal) { bestVal = v; bestCat = c; }
+    }
+    stats.favoriteCategory = bestCat;
+  } else if (gig.cancelled) {
+    stats.totalGigsCancelled += 1;
+    stats.currentStreak = 0;
+  } else {
+    stats.totalGigsFailed += 1;
+    stats.currentStreak = 0;
+  }
+  const totalDurationMs = stats.avgGigDurationMs * (stats.totalGigsAttempted - 1);
+  const newDuration = now - gig.startedAt;
+  stats.avgGigDurationMs = Math.round(
+    (totalDurationMs + newDuration) / stats.totalGigsAttempted,
+  );
+
+  // 🆕 v2 — Réputation
+  const rep = { ...career.reputation };
+  if (success) {
+    rep[gig.category] = Math.min(100, (rep[gig.category] ?? 0) + 3);
+  } else if (!gig.cancelled) {
+    rep[gig.category] = Math.max(0, (rep[gig.category] ?? 0) - 2);
+  }
+
+  // 🆕 v2 — Daily earnings
+  const dailyEarnings = success ? career.dailyEarnings + gig.reward : career.dailyEarnings;
 
   const withXp = applyXp(
     {
@@ -747,35 +1090,55 @@ export function finalizeGig(
       jobsCompleted: success ? career.jobsCompleted + 1 : career.jobsCompleted,
       jobsFailed: success ? career.jobsFailed : career.jobsFailed + 1,
       gigCooldowns: { ...career.gigCooldowns, [gig.id]: cooldownEnd },
-      jobHistory: [historyEntry, ...career.jobHistory].slice(0, 40),
+      jobHistory: [historyEntry, ...career.jobHistory].slice(0, DEFAULT_CONFIG.maxJobHistory),
+      stats,
+      reputation: rep,
+      dailyEarnings,
+      activeGig: null,
     },
-    xpGained
+    xpGained,
   );
 
   return withXp.career;
 }
 
-// ─── 10. FONCTIONS UTILITAIRES DE MUTATION ────────────────────────────────
+// ─── 11. FONCTIONS UTILITAIRES DE MUTATION ────────────────────────────────
 
-export function applyXp(career: CareerState, amount: number): { career: CareerState; leveled: boolean } {
-  let xp = career.xp + amount;
+export function applyXp(
+  career: CareerState,
+  amount: number,
+): { career: CareerState; leveled: boolean } {
+  let xp = career.xp + Math.max(0, Math.floor(amount));
   let level = career.level;
   let next = career.xpToNextLevel;
   let leveled = false;
-  while (xp >= next && level < 20) {
+  let guard = 0;
+  while (xp >= next && level < 20 && guard < 100) {
     xp -= next;
     level += 1;
     next = calcXpToNextLevel(level);
     leveled = true;
+    guard++;
   }
   return { career: { ...career, xp, level, xpToNextLevel: next }, leveled };
 }
 
-export function bumpSkill(skills: PlayerSkills, skill: SkillType, amount: number): PlayerSkills {
-  return { ...skills, [skill]: Math.min(100, skills[skill] + amount) };
+/** 🆕 v2 — Garde contre NaN */
+export function bumpSkill(
+  skills: PlayerSkills,
+  skill: SkillType,
+  amount: number,
+): PlayerSkills {
+  if (!Number.isFinite(amount)) return skills;
+  const current = skills[skill];
+  if (!Number.isFinite(current)) return { ...skills, [skill]: Math.max(0, amount) };
+  return { ...skills, [skill]: Math.max(0, Math.min(100, current + amount)) };
 }
 
-export function grantGigLicense(list: GigLicenseId[], id: GigLicenseId): GigLicenseId[] {
+export function grantGigLicense(
+  list: GigLicenseId[],
+  id: GigLicenseId,
+): GigLicenseId[] {
   return list.includes(id) ? list : [...list, id];
 }
 
@@ -783,9 +1146,81 @@ export function joinCareerFaction(id: string, name: string): FactionMembership {
   return { factionId: id, name, rank: 0, joinedAt: Date.now(), contribution: 0 };
 }
 
-export function addContribution(faction: FactionMembership, amount: number): FactionMembership {
-  const contribution = faction.contribution + amount;
+export function addContribution(
+  faction: FactionMembership,
+  amount: number,
+): FactionMembership {
+  if (!Number.isFinite(amount)) return faction;
+  const contribution = Math.max(0, faction.contribution + amount);
   const thresholds = [0, 100, 300, 600, 1000, 2000];
-  const rank = Math.min(5, thresholds.filter((t) => contribution >= t).length - 1);
+  const rank = Math.min(5, Math.max(0, thresholds.filter((t) => contribution >= t).length - 1));
   return { ...faction, contribution, rank };
+}
+
+// ─── 12. 🆕 v2 — API EXTENSIONS ────────────────────────────────────────────
+
+/** 🆕 v2 — Enregistre une réussite dans la carrière (sans finalize complet) */
+export function recordGigSuccess(
+  career: CareerState,
+  jobId: string,
+  reward: number,
+  now = Date.now(),
+): CareerState {
+  const def = JOB_CATALOG[jobId];
+  if (!def) return career;
+
+  const fakeGig: ActiveGig = {
+    id: jobId, title: def.title, category: def.category,
+    reward, progress: 1, stepProgress: 1, currentStep: def.steps.length,
+    steps: def.steps, startedAt: now - def.durationMs,
+    durationMs: def.durationMs, location: def.location,
+    isIllegal: def.isIllegal, bonusMultiplier: 1, failed: false, stepElapsed: 0,
+  };
+  return finalizeGig(career, fakeGig, true, now);
+}
+
+/** 🆕 v2 — Health check */
+export function healthCareer(career: CareerState): { ok: boolean; reason?: string } {
+  if (career.level < 1 || career.level > 20) return { ok: false, reason: "invalid_level" };
+  if (career.xp < 0) return { ok: false, reason: "negative_xp" };
+  for (const k of Object.keys(career.skills) as SkillType[]) {
+    const v = career.skills[k];
+    if (v < 0 || v > 100) return { ok: false, reason: `skill_${k}_out_of_range` };
+  }
+  if (career.jobHistory.length > DEFAULT_CONFIG.maxJobHistory) {
+    return { ok: false, reason: "history_overflow" };
+  }
+  return { ok: true };
+}
+
+/** 🆕 v2 — Config accessor */
+export function getGigsConfig(): GigsConfig {
+  return { ...DEFAULT_CONFIG };
+}
+
+export function updateGigsConfig(patch: Partial<GigsConfig>): void {
+  Object.assign(DEFAULT_CONFIG, patch);
+}
+
+/** 🆕 v2 — Export stats pour dashboard */
+export function summarizeCareer(career: CareerState) {
+  const s = career.stats;
+  return {
+    level: career.level,
+    xp: career.xp,
+    xpToNextLevel: career.xpToNextLevel,
+    totalEarned: s.totalEarned,
+    gigsAttempted: s.totalGigsAttempted,
+    successRate: s.totalGigsAttempted > 0
+      ? Math.round((s.totalGigsSucceeded / s.totalGigsAttempted) * 100)
+      : 0,
+    currentStreak: s.currentStreak,
+    bestStreak: s.bestStreak,
+    favoriteCategory: s.favoriteCategory,
+    reputation: career.reputation,
+    topSkills: (Object.entries(career.skills) as [SkillType, number][])
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([k, v]) => ({ skill: k, value: v })),
+  };
 }

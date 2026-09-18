@@ -129,7 +129,7 @@ export class PortneufEngine {
   private activeInterior: InteriorRoom | null = null;
   private lastDoor: CityDoor | null = null;
   private pendingDoor: CityDoor | null = null;
-  private timer = new THREE.Timer();
+  private timer = new (THREE as any).Timer();
   private elapsed = 0;
   private hudAcc = 0;
   private kmAcc = 0;
@@ -359,7 +359,7 @@ export class PortneufEngine {
     this.tickDpr(dt);
     this.fx.tick(dt);
     propAnim.tick(dt, this.elapsed);
-    tickInjured(this.props.group, dt);
+    tickInjured(this.props.group, dt, this.elapsed);
     tickGuns(this.props.group);
     tickProps3d(this.props.group, this.elapsed);
 
@@ -3723,3 +3723,4 @@ declare global {
     __physics?: typeof physics;
   }
 }
+// __TIMER_FIX__

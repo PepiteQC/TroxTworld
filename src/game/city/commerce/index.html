@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>TroxtWorld - Armurerie 3D</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #05050a; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #00aaff; font-size: 24px; font-weight: bold; text-shadow: 0 0 10px #00aaff; }
+    canvas { display: block; }
+    #instructions { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,0.7); background: rgba(0,0,0,0.6); padding: 10px 20px; border-radius: 20px; font-size: 14px; pointer-events: none; border: 1px solid #00aaff; }
+  </style>
+</head>
+<body>
+  <div id="loading">Chargement de l'armurerie TroxtWorld...</div>
+  <div id="instructions">🖱️ Clic gauche + glisser pour tourner | Clic droit pour déplacer | Molette pour zoomer</div>
+
+  <!-- Charger Three.js et OrbitControls depuis un CDN stable -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+
+  <script>
+    if (typeof THREE === 'undefined') {
+      document.getElementById("loading").textContent = "Erreur : Internet requis pour charger Three.js !";
+    } else {
+      // =============================================
+      // GENERATEURS DE TEXTURES PROCEDURALES
+      // =============================================
+      const TextureGenerator = {
+        generateConcreteTexture: function(size = 256) {
+          const canvas = document.createElement("canvas");
+          canvas.width = size; canvas.height = size;
+          const ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#3a3a3a"; ctx.fillRect(0, 0, size, size);
+          for (let i = 0; i < 30; i++) {
+            const x = size * Math.random();
+            const y = size * Math.random();
+            const spotSize = size * (0.05 + Math.random() * 0.1);
+            ctx.fillStyle = `rgba(20, 20, 20, ${0.15 + Math.random() * 0.25})`;
+            ctx.beginPath(); ctx.arc(x, y, spotSize, 0, Math.PI * 2); ctx.fill();
+          }
+          return new THREE.CanvasTexture(canvas);
+        },
+
+        generateWoodTexture: function(size = 256) {
+          const canvas = document.createElement("canvas");
+          canvas.width = size; canvas.height = size;
+          const ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#5c3a21"; ctx.fillRect(0, 0, size, size);
+          ctx.fillStyle = "#3b2211";
+          for (let i = 0; i < size; i += 6) {
+            ctx.fillRect(0, i + Math.random() * 3, size, 2 + Math.random() * 2);
+          }
+          return new THREE.CanvasTexture(canvas);
+        },
+
+        generateMetalTexture: function(size = 256) {
+          const canvas = document.createElement("canvas");
+          canvas.width = size; canvas.height = size;
+          const ctx = canvas.getContext("2d");
+          const grad = ctx.createLinearGradient(0, 0, size, size);
+          grad.addColorStop(0, "#2a2d30");
+          grad.addColorStop(0.5, "#43454a");
+          grad.addColorStop(1, "#1c1d1f");
+          ctx.fillStyle = grad; ctx.fillRect(0, 0, size, size);
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.04)";
+          for (let i = 0; i < 30; i++) {
+            ctx.beginPath();
+            const y = Math.random() * size;
+            ctx.moveTo(0, y);
+            ctx.lineTo(size, y + (Math.random() - 0.5) * 12);
+            ctx.stroke();
+          }
+          return new THREE.CanvasTexture(canvas);
+        },
+
+        generateNeonSign: function() {
+          const canvas = document.createElement("canvas");
+          canvas.width = 1024; canvas.height = 256;
+          const ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#101015"; ctx.fillRect(0, 0, 1024, 256);
+          ctx.strokeStyle = "#d8a15a"; ctx.lineWidth = 8;
+          ctx.strokeRect(10, 10, 1004, 236);
+          ctx.fillStyle = "#f4c98a"; ctx.font = "bold 110px sans-serif";
+          ctx.textAlign = "center"; ctx.textBaseline = "middle";
+          ctx.fillText("ARMURERIE", 512, 95);
+          ctx.fillStyle = "#a8d2d8"; ctx.font = "bold 44px sans-serif";
+          ctx.fillText("T R O X T W O R L D", 512, 185);
+          const texture = new THREE.CanvasTexture(canvas);
+          if (THREE.sRGBEncoding) texture.encoding = THREE.sRGBEncoding;
+          return texture;
+        }
+      };
+
+      // =============================================
+      // INITIALISATION DE LA SCENE
+      // =============================================
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x050510);
+      scene.fog = new THREE.FogExp2(0x050510, 0.015);
+
+      const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(15, 10, 18);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.2;
+      if (THREE.sRGBEncoding) renderer.outputEncoding = THREE.sRGBEncoding;
+      document.body.appendChild(renderer.domElement);
+
+      document.getElementById("loading").style.display = "none";
+
+      // =============================================
+      // MATERIAUX DU PROJET
+      // =============================================
+      const steelMat = new THREE.MeshStandardMaterial({
+        color: 0x333538,
+        roughness: 0.25,
+        metalness: 0.85,
+        map: TextureGenerator.generateMetalTexture()
+      });
+
+      const woodMat = new THREE.MeshStandardMaterial({
+        roughness: 0.7,
+        metalness: 0.1,
+        map: TextureGenerator.generateWoodTexture()
+      });
+
+      const glassMaterial = new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.2,
+        transmission: 0.9,
+        thickness: 0.1,
+        roughness: 0.05,
+        metalness: 0
+      });
+
+      // Fonction helper de création de mesh
+      function mesh(geo, mat, x, y, z) {
+        const m = new THREE.Mesh(geo, mat);
+        m.position.set(x, y, z);
+        m.castShadow = true;
+        m.receiveShadow = true;
+        return m;
+      }
+
+      // =============================================
+      // CONSTRUCTEUR D'ARMES (PROPRIETES INTERNES)
+      // =============================================
+      function buildRifle(spec) {
+        const g = new THREE.Group();
+        const activeSteel = steelMat;
+        const activeWood = spec.wood ? woodMat : steelMat;
+
+        // Corps principal de l'arme
+        const rec = mesh(new THREE.BoxGeometry(0.5, 0.12, 0.07), activeWood, -0.1, 0.03, 0);
+        g.add(rec);
+
+        // Canon
+        const barrel = mesh(new THREE.CylinderGeometry(0.02, 0.02, spec.barrel, 8), activeSteel, spec.barrel / 2 + 0.15, 0.05, 0);
+        barrel.rotation.z = Math.PI / 2;
+        g.add(barrel);
+
+        // Viseur avant
+        const frontSight = mesh(new THREE.BoxGeometry(0.03, 0.07, 0.02), activeSteel, spec.barrel + 0.12, 0.1, 0);
+        g.add(frontSight);
+
+        // Crosse arrière
+        const stock = mesh(new THREE.BoxGeometry(0.7, 0.16, 0.06), activeWood, -0.6, -0.02, 0);
+        stock.rotation.z = 0.08;
+        g.add(stock);
+
+        // Poignée de tir
+        const grip = mesh(new THREE.BoxGeometry(0.08, 0.22, 0.05), activeWood, -0.2, -0.12, 0);
+        grip.rotation.z = 0.25;
+        g.add(grip);
+
+        // Chargeur
+        if (spec.mag) {
+          const mag = mesh(new THREE.BoxGeometry(0.12, 0.35, 0.05), activeSteel, 0.05, -0.16, 0);
+          mag.rotation.z = -0.2;
+          g.add(mag);
+        }
+
+        // Lunette de visée / Viseur optique
+        if (spec.sight) {
+          const scopeMount = mesh(new THREE.BoxGeometry(0.04, 0.06, 0.03), activeSteel, -0.1, 0.12, 0);
+          g.add(scopeMount);
+          const scopeTube = mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.4, 8), activeSteel, -0.1, 0.16, 0);
+          scopeTube.rotation.z = Math.PI / 2;
+          g.add(scopeTube);
+        }
+
+        return g;
+      }
+
+      function buildPistol() {
+        const g = new THREE.Group();
+        // Glissière
+        const slide = mesh(new THREE.BoxGeometry(0.35, 0.07, 0.05), steelMat, 0.05, 0.08, 0);
+        g.add(slide);
+        // Poignée
+        const grip = mesh(new THREE.BoxGeometry(0.08, 0.18, 0.046), woodMat, -0.08, -0.03, 0);
+        grip.rotation.z = 0.2;
+        g.add(grip);
+        // Pontet de détente
+        const triggerGuard = mesh(new THREE.BoxGeometry(0.08, 0.06, 0.02), steelMat, 0.02, 0.01, 0);
+        g.add(triggerGuard);
+
+        g.scale.set(1.5, 1.5, 1.5);
+        return g;
+      }
+
+      // =============================================
+      // ÉCLAIRAGE DE LA SCÈNE
+      // =============================================
+      const ambientLight = new THREE.AmbientLight(0x1a1a2e, 0.5);
+      scene.add(ambientLight);
+
+      const moonLight = new THREE.DirectionalLight(0xaaccff, 0.6);
+      moonLight.position.set(-30, 40, -20);
+      moonLight.castShadow = true;
+      moonLight.shadow.mapSize.set(2048, 2048);
+      scene.add(moonLight);
+
+      // =============================================
+      // STRUCTURE DU BÂTIMENT (L'ARMURERIE)
+      // =============================================
+      const width = 12, depth = 10, height = 4, wallThickness = 0.25;
+
+      const wallMaterial = new THREE.MeshStandardMaterial({
+        color: 0x2e2f30,
+        roughness: 0.8,
+        map: TextureGenerator.generateConcreteTexture()
+      });
+
+      // Sol Extérieur
+      const ground = mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshStandardMaterial({
+        color: 0x111115, roughness: 0.9, map: TextureGenerator.generateConcreteTexture(512)
+      }), 0, 0, 0);
+      ground.rotation.x = -Math.PI / 2;
+      scene.add(ground);
+
+      // Dalle intérieure
+      const floor = mesh(new THREE.BoxGeometry(width, 0.15, depth), new THREE.MeshStandardMaterial({
+        color: 0x222325, roughness: 0.75, map: TextureGenerator.generateConcreteTexture()
+      }), 0, 0.075, 0);
+      scene.add(floor);
+
+      // Murs
+      const backWall = mesh(new THREE.BoxGeometry(width, height, wallThickness), wallMaterial, 0, height/2, -depth/2 + wallThickness/2);
+      scene.add(backWall);
+
+      const leftWall = mesh(new THREE.BoxGeometry(wallThickness, height, depth), wallMaterial, -width/2 + wallThickness/2, height/2, 0);
+      scene.add(leftWall);
+
+      const rightWall = leftWall.clone();
+      rightWall.position.x = width/2 - wallThickness/2;
+      scene.add(rightWall);
+
+      // Façade avant avec vitrines
+      const showcaseWidth = 4.5;
+      const doorWidth = 2.0;
+
+      const frontLeft = mesh(new THREE.BoxGeometry(showcaseWidth, height, wallThickness), wallMaterial, -width/2 + showcaseWidth/2, height/2, depth/2 - wallThickness/2);
+      scene.add(frontLeft);
+
+      const frontRight = mesh(new THREE.BoxGeometry(showcaseWidth, height, wallThickness), wallMaterial, width/2 - showcaseWidth/2, height/2, depth/2 - wallThickness/2);
+      scene.add(frontRight);
+
+      const frontLintel = mesh(new THREE.BoxGeometry(doorWidth, 0.8, wallThickness), wallMaterial, 0, height - 0.4, depth/2 - wallThickness/2);
+      scene.add(frontLintel);
+
+      // Portes vitrées de l'entrée
+      const doorL = mesh(new THREE.BoxGeometry(0.95, height - 0.8, 0.08), glassMaterial, -0.5, (height - 0.8)/2, depth/2 - wallThickness/2);
+      const doorR = mesh(new THREE.BoxGeometry(0.95, height - 0.8, 0.08), glassMaterial, 0.5, (height - 0.8)/2, depth/2 - wallThickness/2);
+      scene.add(doorL, doorR);
+
+      // Vitrines avant (Grandes vitres de façade)
+      const windowL = mesh(new THREE.BoxGeometry(2.5, 2.5, 0.1), glassMaterial, -width/3, 1.8, depth/2 - wallThickness/2);
+      const windowR = mesh(new THREE.BoxGeometry(2.5, 2.5, 0.1), glassMaterial, width/3, 1.8, depth/2 - wallThickness/2);
+      scene.add(windowL, windowR);
+
+      // Toit plat
+      const roof = mesh(new THREE.BoxGeometry(width + 0.4, 0.2, depth + 0.4), wallMaterial, 0, height + 0.1, 0);
+      scene.add(roof);
+
+      // =============================================
+      // ENSEIGNE NÉON ET LUMIÈRES EXTÉRIEURES
+      // =============================================
+      const sign = mesh(new THREE.BoxGeometry(4.5, 1.1, 0.1), new THREE.MeshStandardMaterial({
+        map: TextureGenerator.generateNeonSign(),
+        emissive: new THREE.Color(0xf4c98a),
+        emissiveIntensity: 0.9,
+        emissiveMap: TextureGenerator.generateNeonSign(),
+        roughness: 0.4
+      }), 0, height + 0.8, depth / 2 + 0.08);
+      scene.add(sign);
+
+      const orangeSignLight = new THREE.PointLight(0xf4c98a, 2, 12);
+      orangeSignLight.position.set(0, height + 0.8, depth / 2 + 0.6);
+      scene.add(orangeSignLight);
+
+      // Néon de toit bleu
+      const neonStrip = mesh(new THREE.BoxGeometry(width + 0.2, 0.08, 0.08), new THREE.MeshStandardMaterial({
+        color: 0x00d2ff, emissive: 0x00d2ff, emissiveIntensity: 1.8
+      }), 0, height + 0.1, depth/2 + 0.15);
+      scene.add(neonStrip);
+
+      const neonBlueLight = new THREE.PointLight(0x00d2ff, 1.5, 10);
+      neonBlueLight.position.set(0, height - 0.2, depth/2 - 0.5);
+      scene.add(neonBlueLight);
+
+      // =============================================
+      // AMÉNAGEMENT INTÉRIEUR & MOBILIER
+      // =============================================
+      // Comptoir principal en bois
+      const counter = mesh(new THREE.BoxGeometry(5.0, 0.95, 1.1), woodMat, 0, 0.475, -1.2);
+      scene.add(counter);
+
+      // Caisse enregistreuse
+      const cashRegister = mesh(new THREE.BoxGeometry(0.5, 0.25, 0.4), steelMat, 1.5, 1.05, -1.2);
+      scene.add(cashRegister);
+
+      // Grand meuble rack à fusils (sur le mur du fond)
+      const backRack = mesh(new THREE.BoxGeometry(8.0, 3.2, 0.4), woodMat, 0, 1.6, -depth/2 + 0.3);
+      scene.add(backRack);
+
+      // Étagères latérales gauches
+      for (let i = 0; i < 3; i++) {
+        const shelf = mesh(new THREE.BoxGeometry(0.4, 0.06, 2.5), woodMat, -width/2 + 0.6, 1.0 + i * 0.9, 1.0);
+        scene.add(shelf);
+      }
+
+      // Vitrines sécurisées au centre droite
+      const vitrineStructure = mesh(new THREE.BoxGeometry(1.2, 1.8, 1.2), woodMat, 3.5, 0.9, 1.0);
+      const vitrineGlass = mesh(new THREE.BoxGeometry(1.15, 1.2, 1.15), glassMaterial, 3.5, 1.1, 1.0);
+      scene.add(vitrineStructure, vitrineGlass);
+
+      // Éclairage intérieur chaleureux
+      const interiorLight = new THREE.PointLight(0xffddaa, 2.5, 15);
+      interiorLight.position.set(0, height - 0.5, -1.5);
+      scene.add(interiorLight);
+
+      const showcaseSpot = new THREE.SpotLight(0xffffff, 2, 8, Math.PI/6, 0.3);
+      showcaseSpot.position.set(3.5, height - 0.5, 1.0);
+      showcaseSpot.target = vitrineStructure;
+      scene.add(showcaseSpot);
+
+      // =============================================
+      // GENERATION ET DISPOSITION DES ARMES
+      // =============================================
+
+      // 1. Fusils d'assaut et Snipers sur le rack arrière (Arrière-plan)
+      const weaponConfigs = [
+        { barrel: 0.9, wood: true, mag: false, sight: true, posX: -2.5, rotZ: 0.1 },
+        { barrel: 0.7, wood: false, mag: true, sight: false, posX: -1.0, rotZ: 0.05 },
+        { barrel: 1.1, wood: false, mag: true, sight: true, posX: 0.5, rotZ: -0.05 },
+        { barrel: 0.8, wood: true, mag: true, sight: true, posX: 2.0, rotZ: -0.1 }
+      ];
+
+      weaponConfigs.forEach((config, idx) => {
+        const rifle = buildRifle(config);
+        // Positionner verticalement sur le rack arrière
+        rifle.position.set(config.posX, 1.6, -depth/2 + 0.5);
+        rifle.rotation.y = 0; 
+        rifle.rotation.z = Math.PI / 2 + config.rotZ; // Fusils pointés vers le haut
+        rifle.scale.set(1.2, 1.2, 1.2);
+        scene.add(rifle);
+      });
+
+      // 2. Fusils couchés sur les étagères de gauche
+      const shelfWeapons = [
+        { barrel: 0.8, wood: true, mag: false, sight: false, posY: 1.05 },
+        { barrel: 0.7, wood: false, mag: true, sight: true, posY: 1.95 },
+        { barrel: 1.0, wood: false, mag: true, sight: true, posY: 2.85 }
+      ];
+      shelfWeapons.forEach(conf => {
+        const r = buildRifle(conf);
+        r.position.set(-width/2 + 0.6, conf.posY, 1.0);
+        r.rotation.y = Math.PI / 2; // Aligné le long de l'étagère
+        r.scale.set(0.9, 0.9, 0.9);
+        scene.add(r);
+      });
+
+      // 3. Pistolets posés sur le comptoir
+      const counterPistol1 = buildPistol();
+      counterPistol1.position.set(-1.0, 1.02, -1.3);
+      counterPistol1.rotation.y = Math.PI / 4;
+      scene.add(counterPistol1);
+
+      const counterPistol2 = buildPistol();
+      counterPistol2.position.set(0.5, 1.02, -1.0);
+      counterPistol2.rotation.y = -Math.PI / 6;
+      scene.add(counterPistol2);
+
+      // 4. Pistolet d'exposition sous la vitrine centrale
+      const showcasePistol = buildPistol();
+      showcasePistol.position.set(3.5, 1.0, 1.0);
+      showcasePistol.rotation.y = Math.PI;
+      showcasePistol.scale.set(2, 2, 2); // Un peu plus grand pour l'exposition
+      scene.add(showcasePistol);
+
+      // =============================================
+      // CAMERA ET INTERACTION
+      // =============================================
+      const controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.maxPolarAngle = Math.PI / 2 - 0.05; // Empêcher de passer sous le sol
+      controls.minDistance = 3;
+      controls.maxDistance = 40;
+      controls.target.set(0, 1.5, 0);
+
+      // Effet d'oscillation/clignotement subtil des néons
+      let time = 0;
+      function animate() {
+        requestAnimationFrame(animate);
+        time += 0.05;
+
+        // Clignotement aléatoire très réaliste du néon orange
+        const flicker = Math.sin(time * 2) * Math.cos(time * 0.5) > 0.8 ? 0.4 : 1.0;
+        orangeSignLight.intensity = (2.0 + Math.sin(time) * 0.2) * flicker;
+        neonBlueLight.intensity = 1.5 + Math.cos(time * 1.5) * 0.15;
+
+        controls.update();
+        renderer.render(scene, camera);
+      }
+
+      // Ajustement dynamique au redimensionnement
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      animate();
+      console.log("🎮 Bienvenue dans l'armurerie de TroxtWorld ! Contrôles opérationnels.");
+    }
+  </script>
+</body>
+</html>

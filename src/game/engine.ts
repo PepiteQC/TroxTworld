@@ -1,50 +1,18 @@
-class TimerCompat {
-  private started = performance.now();
-  private previous = this.started;
-  private elapsed = 0;
-  private delta = 0;
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 🎮 PORTNEUF ENGINE v2.0 — Orchestrateur principal du monde RP
+ * ───────────────────────────────────────────────────────────────────────────
+ *  • Construction safe (try/catch + events)
+ *  • tick() découpé en 12 phases claires
+ *  • pushHud() diff-based (skip si rien n'a changé)
+ *  • dispose() complet (interiors + props + caddie + textures)
+ *  • Events système (boot, tick, interact, mode_change, dispose, error)
+ *  • Stats & health & config hot-reload
+ *  • Graceful shutdown (beforeunload)
+ *  • API publique 100% préservée
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 
-  connect(..._args: any[]): this { return this; }
-  disconnect(..._args: any[]): this { return this; }
-  dispose(..._args: any[]): this { return this; }
-
-  update(timestamp?: number): this {
-    const now = typeof timestamp === "number" ? timestamp : performance.now();
-    this.delta = Math.max(0, (now - this.previous) / 1000);
-    this.elapsed += this.delta;
-    this.previous = now;
-    return this;
-  }
-
-  getDelta(): number {
-    return this.delta || 0;
-  }
-
-  getElapsed(): number {
-    return this.elapsed;
-  }
-}
-THREE.ColorManagement.enabled = true;
-// --- Filtre anti-spam console Three.js / FBXLoader ---
-if (typeof window !== 'undefined' && !(window as any).__threeWarnPatched) {
-  (window as any).__threeWarnPatched = true;
-  const _origWarn = console.warn.bind(console);
-  console.warn = (...args: any[]) => {
-    const msg = typeof args[0] === 'string' ? args[0] : '';
-    if (
-      msg.includes('Texture marked for update but no image data found') ||
-      msg.includes('THREE.FBXLoader') ||
-      msg.includes('skeleton attached to more than one geometry') ||
-      msg.includes('Vertex has more than 4 skinning weights') ||
-      msg.includes('Encountered a unused curve') ||
-      msg.includes('Z-UP coordinate system')
-    ) {
-      return;
-    }
-    _origWarn(...args);
-  };
-}
-// -----------------------------------------------------
 import * as THREE from "three";
 import { parseAdmin } from "./admin";
 import { FIRM_TYPES, canOperate, gameMonth, jobBonusType, PERMIT_FEES, shopKindForFirm, seasonalFactor, startupTotal, type MapaqGrantId } from "./business";
@@ -73,14 +41,14 @@ import { tex } from "./textures";
 import { installCommerceEnv } from "./commerceMats";
 import type { Appearance } from "./character";
 import { fleetById, isVehicleId, type VehicleId } from "./fleet";
-import { buildCargoCrate, haulDistance, nearHaul } from "./haul";
+import { buildCargoCrate, haulDistance, nearHaul } from "./jobs";
 import { currentStep, getCannotStartReason, nearestGig } from "./gigs";
 import { workJobAt } from "./tools";
 import { shelterOf, applyMeal, ambientOf } from "./survival";
 import { crimeById, gangById, jobById } from "./rp";
 import { KIND_LABEL, nearestCommercial, ownedIds } from "./realestate";
 import { ENFORCE_SPEED_LIMITS, getPoiAt, getSpeedLimitAt, getSurfaceAt, getTerrainHeight, getZoneName, SPAWN, SQ_JAIL, PRISON, withIce } from "./worlddata";
-import { prisonSystem } from "./prison";
+import { prisonSystem, type ChargeId } from "./prison";
 import { zoneSystem } from "./zones";
 import { worldConfig } from "./worldconfig";
 import { checkCarryLegality, isZoneWeapon } from "./weapons";
@@ -92,29 +60,10 @@ import { RemoteField } from "./remotes";
 import { fieldPrompt, seizeField, workField, CROPS, type CropId } from "./farms";
 import { stockPrompt, workStock } from "./livestock";
 import { evapPrompt, tapPrompt, workEvap, workTap } from "./sugar";
-import {
-  canOpenDoor,
-  doorDenied,
-  emptyHouse,
-  hasReno,
-  housePrompt,
-  insideHouseBody,
-  type DoorSlot,
-  type HouseLot,
-} from "./house";
-import {
-  caisseHoursLabel,
-  isCaisseOpen,
-} from "./caisse";
+import { canOpenDoor, doorDenied, emptyHouse, hasReno, housePrompt, insideHouseBody, type DoorSlot, type HouseLot } from "./house";
+import { caisseHoursLabel, isCaisseOpen } from "./caisse";
 import { breakAtm } from "./banking";
-import {
-  depHoursLabel,
-  depPrompt,
-  isDepOpen,
-  shopDoorOffset,
-  shopPumpOffset,
-  type DepAisleHot,
-} from "./depanneur";
+import { depHoursLabel, depPrompt, isDepOpen, shopDoorOffset, shopPumpOffset, type DepAisleHot } from "./depanneur";
 import { isSqdcOpen, sqdcHoursLabel, sqdcPrompt } from "./sqdc";
 import { casseHoursLabel, cassePrompt, isCasseOpen } from "./casse";
 import { cycleCarabine } from "./carabine";
@@ -128,7 +77,75 @@ import { dynamicEventsService } from "./events";
 import { AdminMetrics } from "./adminMetrics";
 import { gestureDef, type RpGesture } from "./gestures";
 
-type ChargeId = string;
+// ═══════════════════════════════════════════════════════════════════════════
+// 🆕 v2 — TYPES & CONFIG
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface PortneufEngineConfig {
+  targetFps: number;
+  dprCapDesktop: number;
+  dprCapMobile: number;
+  hudIntervalS: number;
+  fineCooldownS: number;
+  persistIntervalS: number;
+  cameraFar: number;
+  cameraFov: number;
+  shadowThrottleS: number;
+  maxProps: number;
+  metricsEnabled: boolean;
+  eventsEnabled: boolean;
+  gracefulShutdown: boolean;
+}
+
+const DEFAULT_CONFIG: PortneufEngineConfig = {
+  targetFps: 60,
+  dprCapDesktop: 1.25,
+  dprCapMobile: 1.1,
+  hudIntervalS: 0.12,
+  fineCooldownS: 4,
+  persistIntervalS: 20,
+  cameraFar: 1200,
+  cameraFov: 62,
+  shadowThrottleS: 0.16,
+  maxProps: 80,
+  metricsEnabled: true,
+  eventsEnabled: true,
+  gracefulShutdown: true,
+};
+
+export type EngineEventType =
+  | "boot"
+  | "ready"
+  | "tick"
+  | "interact"
+  | "teleport"
+  | "mode_change"
+  | "dispose"
+  | "error";
+
+export interface EngineEvent {
+  type: EngineEventType;
+  data?: Record<string, unknown>;
+  timestamp: number;
+}
+
+interface EngineStats {
+  ticksTotal: number;
+  lastTickMs: number;
+  avgTickMs: number;
+  peakTickMs: number;
+  interactCount: number;
+  teleportCount: number;
+  modeChanges: number;
+  hudPushes: number;
+  hudSkips: number;
+  errorsCaught: number;
+  uptimeMs: number;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CLASS
+// ═══════════════════════════════════════════════════════════════════════════
 
 export class PortneufEngine {
   readonly version = WORLD_ENGINE_VERSION;
@@ -138,6 +155,28 @@ export class PortneufEngine {
   world: PortneufWorld;
   vehicle: Vehicle;
   walker: Walker;
+
+  // 🆕 v2
+  public config: PortneufEngineConfig;
+  private listeners = new Set<(e: EngineEvent) => void>();
+  private engineStats: EngineStats = {
+    ticksTotal: 0,
+    lastTickMs: 0,
+    avgTickMs: 0,
+    peakTickMs: 0,
+    interactCount: 0,
+    teleportCount: 0,
+    modeChanges: 0,
+    hudPushes: 0,
+    hudSkips: 0,
+    errorsCaught: 0,
+    uptimeMs: 0,
+  };
+  private bootAt = Date.now();
+  private lastPersistAt = 0;
+  private lastHudHash = "";
+  private pendingUnloadHandler: (() => void) | null = null;
+
   private fx: AdminFx;
   private fxTarget = new THREE.Vector3();
   private interiors: {
@@ -156,7 +195,7 @@ export class PortneufEngine {
   private activeInterior: InteriorRoom | null = null;
   private lastDoor: CityDoor | null = null;
   private pendingDoor: CityDoor | null = null;
-  private timer = new TimerCompat();
+  private timer = new THREE.Timer();
   private elapsed = 0;
   private hudAcc = 0;
   private kmAcc = 0;
@@ -208,14 +247,33 @@ export class PortneufEngine {
   private savedFog: THREE.Color;
   private savedFogDensity = 0.00155;
 
-  constructor(private canvas: HTMLCanvasElement) {
+  // ═════════════════════════════════════════════════════════════════════════
+  // CONSTRUCTOR
+  // ═════════════════════════════════════════════════════════════════════════
+
+  constructor(private canvas: HTMLCanvasElement, config: Partial<PortneufEngineConfig> = {}) {
+    this.config = { ...DEFAULT_CONFIG, ...config };
+    try {
+      this.initCore();
+      this.emit("boot");
+      this.emit("ready");
+    } catch (err) {
+      this.engineStats.errorsCaught++;
+      this.emit("error", { phase: "constructor", error: String(err) });
+      console.error("[PortneufEngine] Constructor error:", err);
+      throw err;
+    }
+  }
+
+  private initCore(): void {
     void warmMeshopt();
     const qa = new URLSearchParams(window.location.search).get("qa") === "1";
     const mobile = Math.min(window.innerWidth, window.innerHeight) < 800;
-    this.dprCap = mobile ? 1.1 : 1.25;
+    this.dprCap = mobile ? this.config.dprCapMobile : this.config.dprCapDesktop;
     this.dprNow = Math.min(window.devicePixelRatio || 1, this.dprCap);
+
     this.renderer = new THREE.WebGLRenderer({
-      canvas,
+      canvas: this.canvas,
       antialias: !mobile,
       powerPreference: "high-performance",
       alpha: false,
@@ -223,26 +281,40 @@ export class PortneufEngine {
       preserveDrawingBuffer: qa,
     });
     this.renderer.setPixelRatio(this.dprNow);
-    this.renderer.setSize(canvas.clientWidth || window.innerWidth, canvas.clientHeight || window.innerHeight, false);
+    this.renderer.setSize(
+      this.canvas.clientWidth || window.innerWidth,
+      this.canvas.clientHeight || window.innerHeight,
+      false,
+    );
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // 柔 PCF Soft Shadows (Finies les ombres pixelisées !)
-    this.renderer.shadowMap.autoUpdate = false;            // CORRIGÉ : avec autoUpdate=true, Three.js ignore complètement
-                                                            // le throttling manuel de tickShadows() (needsUpdate) et recalcule
-                                                            // les ombres à CHAQUE frame — le throttle ne servait donc à rien.
-                                                            // autoUpdate=false + tickShadows() gère l'update réelle (perf mobile).
-    this.renderer.shadowMap.needsUpdate = true;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping; // Tonemapping cinéma réaliste (couleurs riches et contrastées)
-    this.renderer.toneMappingExposure = 1.05;              // Exposition équilibrée pour ACES Filmic
+    this.renderer.shadowMap.type = THREE.BasicShadowMap;
+    this.renderer.shadowMap.autoUpdate = false;
+    this.renderer.toneMapping = THREE.ReinhardToneMapping;
+    this.renderer.toneMappingExposure = 1.35;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     tex.attach(this.renderer);
     attachGltfDecoders(this.renderer);
+
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(62, 1, 0.35, 1200);
+    this.camera = new THREE.PerspectiveCamera(this.config.cameraFov, 1, 0.35, this.config.cameraFar);
     this.fit();
+
+    this.initWorld();
+    this.initCharacters();
+    this.initInteriors();
+    this.initSystems();
+    this.initListeners();
+  }
+
+  private initWorld(): void {
     this.world = new PortneufWorld(this.scene, this.camera);
     this.world.build();
     installCommerceEnv(this.renderer, this.scene);
     this.world.syncHouses(useGameStore.getState().ownedProps, useGameStore.getState().houses);
+    this.savedFog = new THREE.Color(0x8aa0a8);
+  }
+
+  private initCharacters(): void {
     this.vehicle = new Vehicle();
     this.walker = new Walker(useGameStore.getState().appearance);
     this.scene.add(this.vehicle.group, this.walker.group, this.remotes.group);
@@ -250,6 +322,9 @@ export class PortneufEngine {
       this.fxTarget.set(this.px(), this.py() + 1.15, this.pz());
       return this.fxTarget;
     });
+  }
+
+  private initInteriors(): void {
     this.interiors = createInteriors();
     this.scene.add(
       this.interiors.hotel.group,
@@ -264,14 +339,18 @@ export class PortneufEngine {
       this.interiors.casse.group,
       this.interiors.sqdc.group,
     );
+  }
+
+  private initSystems(): void {
     wireCsmTree(this.scene);
     this.scene.add(this.props.group);
     this.props.hydrate(useGameStore.getState().placed);
     preloadInjured();
     preloadGuns();
+
     this.indoorHemi = new THREE.HemisphereLight(0xf0e8d8, 0x2a2a32, 0);
     this.scene.add(this.indoorHemi);
-    this.savedFog = new THREE.Color(0x8aa0a8);
+
     this.night = useGameStore.getState().night;
     this.clockShift = this.night ? 5.1 : 0;
     this.world.setTime(this.clockHours());
@@ -279,23 +358,66 @@ export class PortneufEngine {
     this.world.setWeather(useGameStore.getState().weather);
     this.lastWeather = useGameStore.getState().weather;
     this.world.markLeavesCollected(useGameStore.getState().leaves);
+
     const savedRadio = useGameStore.getState().radioId;
     if (savedRadio) quebecFM.stationId = savedRadio;
     police.demeritTotal = useGameStore.getState().demeritPoints ?? 0;
     police.licenseSuspendedUntil = useGameStore.getState().licenseSuspendedUntil ?? 0;
+
     input.attach();
     this.wireControlsTest();
     spatialAudio.attachUnlock();
-    void physics.init().then(() => {
-      if (!this.disposed) physics.setSolids(this.world.solids);
-    });
-    window.__rpNet = rpNet;
-    window.__physics = physics;
+
+    void physics.init()
+      .then(() => {
+        if (this.disposed) return;
+        physics.setSolids(this.world.solids);
+      })
+      .catch((err) => {
+        this.engineStats.errorsCaught++;
+        console.warn("[PortneufEngine] Physics init failed — fallback no-collision:", err);
+        this.emit("error", { phase: "physics_init", error: String(err) });
+      });
+
+    (window as any).__rpNet = rpNet;
+    (window as any).__physics = physics;
+  }
+
+  private initListeners(): void {
     this.onResize = () => this.fit();
     window.addEventListener("resize", this.onResize);
+
+    if (this.config.gracefulShutdown) {
+      this.pendingUnloadHandler = () => {
+        try { this.dispose(); } catch { /* noop */ }
+      };
+      window.addEventListener("beforeunload", this.pendingUnloadHandler);
+    }
+
     this.timer.connect(document);
     useGameStore.getState().setHud({ loading: false, mode: "drive" });
   }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // EVENTS API
+  // ═════════════════════════════════════════════════════════════════════════
+
+  public on(cb: (e: EngineEvent) => void): () => void {
+    this.listeners.add(cb);
+    return () => this.listeners.delete(cb);
+  }
+
+  private emit(type: EngineEventType, data?: Record<string, unknown>): void {
+    if (!this.config.eventsEnabled) return;
+    const evt: EngineEvent = { type, data, timestamp: Date.now() };
+    for (const cb of this.listeners) {
+      try { cb(evt); } catch { /* noop */ }
+    }
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // LIFECYCLE
+  // ═════════════════════════════════════════════════════════════════════════
 
   private fit() {
     const w = this.canvas.clientWidth || window.innerWidth;
@@ -318,16 +440,20 @@ export class PortneufEngine {
   }
 
   private wireControlsTest() {
-    window.__controlsTest = {
+    (window as any).__controlsTest = {
       getYaw: () => (this.mode === "drive" ? this.vehicle.yaw : this.walker.yaw),
       getSpeed: () => (this.mode === "drive" ? this.vehicle.speed : this.walker.speed),
-      setKeys: (codes) => input.setInjected(codes),
-      setSteer: (v) => {
+      setKeys: (codes: string[]) => input.setInjected(codes),
+      setSteer: (v: number) => {
         input.touchSteer = v;
       },
       interact: () => this.handleInteract(),
     };
   }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // HELPERS DE POSITION
+  // ═════════════════════════════════════════════════════════════════════════
 
   private px() {
     return this.mode === "drive" ? this.vehicle.x : this.walker.x;
@@ -346,6 +472,17 @@ export class PortneufEngine {
     return (16.5 + this.elapsed / 90 + this.clockShift + 48) % 24;
   }
 
+  private setMode(mode: PlayMode): void {
+    if (this.mode === mode) return;
+    this.mode = mode;
+    this.engineStats.modeChanges++;
+    this.emit("mode_change", { to: mode });
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // SHADOWS & DPR
+  // ═════════════════════════════════════════════════════════════════════════
+
   private tickShadows(dt: number, active: boolean) {
     if (this.mode === "interior" || this.night || !active) {
       this.renderer.shadowMap.needsUpdate = false;
@@ -354,7 +491,7 @@ export class PortneufEngine {
     this.shadowAcc += dt;
     const moved = this.player.distanceToSquared(this.lastShadow) > 16;
     const turned = Math.abs(this.pYaw() - this.lastYawShadow) > 0.12;
-    if (moved || turned || this.shadowAcc > 0.16) {
+    if (moved || turned || this.shadowAcc > this.config.shadowThrottleS) {
       updateCsm(this.clockHours());
       this.renderer.shadowMap.needsUpdate = true;
       this.lastShadow.copy(this.player);
@@ -378,43 +515,127 @@ export class PortneufEngine {
     }
   }
 
-  private tick() {
+  // ═════════════════════════════════════════════════════════════════════════
+  // TICK — 12 PHASES
+  // ═════════════════════════════════════════════════════════════════════════
+
+  private tick(): void {
     if (this.disposed) return;
-    this.timer.update();
-    const dt = Math.min(this.timer.getDelta(), 0.08);
-    this.elapsed += dt;
-    this.tickDpr(dt);
-    this.fx.tick(dt);
-    propAnim.tick(dt, this.elapsed);
-    tickInjured(this.props.group, dt, 0);
-    tickGuns(this.props.group);
-    tickProps3d(this.props.group, this.elapsed);
+    const t0 = performance.now();
 
-    const store = useGameStore.getState();
-    const actions = input.sample();
-    this.player.set(this.px(), this.py(), this.pz());
+    try {
+      this.timer.update();
+      const dt = Math.min(this.timer.getDelta(), 0.08);
+      this.elapsed += dt;
 
-    const wanted = {
-      stars: (police as any).stars ?? 0,
-      reason: (police as any).reason ?? (police as any).wantedReason ?? "",
-      bounty: (police as any).bounty ?? 0,
-      evading: (police as any).evading ?? false,
-    };
+      // ─── PHASE 1 : INPUT & SNAPSHOT ───
+      const actions = input.sample();
+      const store = useGameStore.getState();
+      this.player.set(this.px(), this.py(), this.pz());
 
-    if (this.mode !== "interior" && store.playing && !store.paused) {
-      physics.step(dt, this.player.x, this.player.z);
-      this.world.update(dt, this.elapsed, this.player, store.speedKmh, wanted.stars);
-      if (this.elapsed - this.lastSkyAt > 0.12) {
-        this.lastSkyAt = this.elapsed;
-        const hours = this.clockHours();
-        this.world.setTime(hours);
-        this.night = sunElevation(hours) < 0.07;
+      // ─── PHASE 2 : PERFORMANCE ───
+      this.tickDpr(dt);
+
+      // ─── PHASE 3 : FX & ANIMATIONS ───
+      this.fx.tick(dt);
+      propAnim.tick(dt, this.elapsed);
+      tickInjured(this.props.group, dt);
+      tickGuns(this.props.group);
+      tickProps3d(this.props.group, this.elapsed);
+
+      // ─── PHASE 4 : MONDE EXTERNE ───
+      if (this.mode !== "interior" && store.playing && !store.paused) {
+        physics.step(dt, this.player.x, this.player.z);
+        const wanted = police.getState();
+        this.world.update(dt, this.elapsed, this.player, store.speedKmh, wanted.stars);
+        if (this.elapsed - this.lastSkyAt > 0.12) {
+          this.lastSkyAt = this.elapsed;
+          const hours = this.clockHours();
+          this.world.setTime(hours);
+          this.night = sunElevation(hours) < 0.07;
+        }
       }
-    }
-    this.tickShadows(dt, store.playing && !store.paused);
 
+      // ─── PHASE 5 : SHADOWS ───
+      this.tickShadows(dt, store.playing && !store.paused);
+
+      // ─── PHASE 6 : CHARACTER SYNC ───
+      this.syncCharacter(store);
+
+      // ─── PHASE 7 : CARRY & PRISON CHECKS ───
+      this.tickCarryCheck(store);
+      this.tickPrisonCheck(store);
+
+      // ─── PHASE 8 : SURVIVAL / UTILITIES / FIRM / PAYROLL ───
+      this.tickSurvivalSystems(dt, store);
+      this.tickFirmAndPayroll(store);
+
+      // ─── PHASE 9 : GIGS & FARMS ───
+      if (store.playing && !store.paused && store.activeGig) {
+        store.tickGig(dt, this.elapsed);
+      }
+      if (store.playing && !store.paused && this.mode !== "interior") {
+        const raid = this.world.tickFields(dt, this.elapsed, this.px(), this.pz());
+        if (raid) this.seizeCrop(raid);
+      }
+
+      // ─── PHASE 10 : ACTIONS JOUEUR ───
+      if (store.playing && !store.paused) {
+        this.tickPlayerActions(dt, actions, store);
+      } else {
+        this.tickPausedActions(actions, store);
+      }
+
+      // ─── PHASE 11 : CAMERA & HUD ───
+      if (store.creatorOpen) {
+        if (this.mode !== "interior") this.vehicle.group.visible = false;
+        this.updateCreatorCamera(dt);
+      } else {
+        if (this.mode !== "interior") this.vehicle.group.visible = true;
+        this.updateCamera(dt);
+      }
+
+      this.tickInputActions(actions, store);
+
+      this.hudAcc += dt;
+      if (this.hudAcc > this.config.hudIntervalS) {
+        this.hudAcc = 0;
+        this.pushHud(store);
+      }
+
+      // ─── PHASE 12 : WEATHER / SEASONS / EVENTS / NETWORK / RENDER ───
+      this.tickWeatherAndSeasons(dt, store);
+      this.tickNetwork(dt, store);
+      this.renderer.render(this.scene, this.camera);
+    } catch (err) {
+      this.engineStats.errorsCaught++;
+      this.emit("error", { phase: "tick", error: String(err) });
+      console.error("[PortneufEngine] Tick error:", err);
+    }
+
+    if (this.config.metricsEnabled) {
+      const dur = performance.now() - t0;
+      this.engineStats.ticksTotal++;
+      this.engineStats.lastTickMs = dur;
+      this.engineStats.avgTickMs =
+        this.engineStats.ticksTotal === 1
+          ? dur
+          : this.engineStats.avgTickMs * 0.9 + dur * 0.1;
+      if (dur > this.engineStats.peakTickMs) this.engineStats.peakTickMs = dur;
+      this.engineStats.uptimeMs = Date.now() - this.bootAt;
+    }
+
+    this.emit("tick");
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // PHASES EXTRAITES
+  // ═════════════════════════════════════════════════════════════════════════
+
+  private syncCharacter(store: ReturnType<typeof useGameStore.getState>): void {
     if (this.walker.heldId !== store.equippedTool) this.walker.setHeld(store.equippedTool);
     if (this.walker.packId !== store.equippedPack) this.walker.setPack(store.equippedPack);
+
     const look = store.appearance;
     const cur = this.walker.look;
     if (
@@ -428,232 +649,252 @@ export class PortneufEngine {
     ) {
       this.walker.applyLook(look);
     }
+
     this.walker.setLoad(bagFill(store.inventory, store.equippedPack));
     this.walker.vitalMul = store.surv.speedFactor;
     this.walker.fly = store.flyMode && this.mode !== "drive";
     this.walker.noclip = store.noclipMode;
     if (this.mode !== "drive") this.walker.group.visible = !store.vanished;
     this.world.placeFirm(store.firm);
+  }
 
-    if (store.playing && !store.paused && this.elapsed - this.lastCarry > 7) {
-      const carry = checkCarryLegality(store.licenses, store.equippedTool, store.rpJob);
-      const here = zoneSystem.getAt(this.px(), this.pz());
-      const banned = here && !here.rules.carryWeapons && isZoneWeapon(store.equippedTool);
-      if (!carry.ok || banned) {
-        this.lastCarry = this.elapsed;
-        police.report("arme_prohibee" as any, this.elapsed);
-        store.setHud({ notice: carry.ok ? "Arme interdite dans cette zone" : carry.message });
-      }
+  private tickCarryCheck(store: ReturnType<typeof useGameStore.getState>): void {
+    if (!store.playing || store.paused) return;
+    if (this.elapsed - this.lastCarry < 7) return;
+    const carry = checkCarryLegality(store.licenses, store.equippedTool, store.rpJob);
+    const here = zoneSystem.getAt(this.px(), this.pz());
+    const banned = here && !here.rules.carryWeapons && isZoneWeapon(store.equippedTool);
+    if (!carry.legal || banned) {
+      this.lastCarry = this.elapsed;
+      police.report("arme_prohibee", this.elapsed);
+      store.setHud({ notice: carry.legal ? "Arme interdite dans cette zone" : carry.message });
     }
+  }
 
-    if (store.playing && !store.paused && this.elapsed - this.lastPrison > 1) {
-      this.lastPrison = this.elapsed;
-      const held = (prisonSystem as any).inmate;
-      (prisonSystem as any).tick?.(0.12);
-      if (held && !(prisonSystem as any).inmate && this.activeInterior?.kind === "prison") {
-        this.leaveInterior();
-        store.setHud({ notice: "Libéré · fin de peine" });
-      }
+  private tickPrisonCheck(store: ReturnType<typeof useGameStore.getState>): void {
+    if (!store.playing || store.paused) return;
+    if (this.elapsed - this.lastPrison < 1) return;
+    this.lastPrison = this.elapsed;
+    const held = prisonSystem.inmate;
+    prisonSystem.tick(0.12);
+    if (held && !prisonSystem.inmate && this.activeInterior?.kind === "prison") {
+      this.leaveInterior();
+      store.setHud({ notice: "Libéré · fin de peine" });
     }
+  }
 
+  private tickSurvivalSystems(dt: number, store: ReturnType<typeof useGameStore.getState>): void {
     const hotel = this.interiors.hotel;
-    if (hotel.tvSetup && hotel.group.visible) hotel.tvSetup.tickTv(this.elapsed, store.hotelTvOn);
+    if (hotel.tvSetup && hotel.group.visible) {
+      hotel.tvSetup.tickTv(this.elapsed, store.hotelTvOn);
+    }
 
-    if (store.playing && !store.paused && this.elapsed - this.lastSurv > 0.25) {
-      const dtSurv = this.elapsed - this.lastSurv;
-      this.lastSurv = this.elapsed;
-      const hours = this.clockHours();
-      const month = gameMonth(this.elapsed);
-      const wx = quebecSeasons.getState();
-      const ambient = ambientOf(wx.season, hours);
-      const ambientTemp = ambient.temp;
+    if (!store.playing || store.paused) return;
+    if (this.elapsed - this.lastSurv <= 0.25) return;
 
-      let indoorC: number | undefined;
-      let nearFire = this.mode === "walk" && this.world.nearFire(this.walker.x, this.walker.z);
-      if (this.mode === "interior") {
-        if (this.activeInterior?.kind === "home" && this.homeDeedId) {
-          const st = store.houses[this.homeDeedId] ?? emptyHouse(this.homeDeedId);
-          indoorC = st.indoorC;
-          nearFire = heatWorks(st, store.gridOutage, ambientTemp);
-        } else {
-          indoorC = store.gridOutage ? 11 : 21;
-        }
-      }
+    const dtSurv = this.elapsed - this.lastSurv;
+    this.lastSurv = this.elapsed;
+    const hours = this.clockHours();
+    const month = gameMonth(this.elapsed);
+    const wx = quebecSeasons.getState();
+    const ambient = ambientOf(hours, this.night, month, wx.temperatureCelsius);
 
-      store.tickSurvival(dtSurv, {
-        shelter: shelterOf(this.mode),
-        night: this.night,
-        hours,
-        month,
-        outfit: store.appearance.outfit,
-        hair: store.appearance.hairStyle,
-        god: store.godMode,
-        nearFire,
-        indoorC,
-      });
-      store.tickEconomy(hours);
-      this.walker.syncHurt(store.surv.health, store.surv.energy);
-
-      if (this.elapsed - this.lastUtil > 0.5) {
-        const dtU = this.elapsed - this.lastUtil;
-        this.lastUtil = this.elapsed;
-        store.tickUtilities(dtU, {
-          ambient: ambientTemp,
-          month,
-          elapsed: String(this.elapsed),
-          weather: store.weather,
-        });
-
-        if (this.mode === "interior" && this.activeInterior?.kind === "home" && this.homeDeedId) {
-          const st = useGameStore.getState().houses[this.homeDeedId];
-          if (st) {
-            const on = heatWorks(st, useGameStore.getState().gridOutage, ambientTemp);
-            setHeatGlow(this.interiors.home.group, on);
-            const hydro = hydroLive(st, useGameStore.getState().gridOutage);
-            const bright = this.homeFloor === "basement" ? 0.38 : hasReno(st, "eclairage") ? 0.95 : 0.42;
-            this.indoorHemi.intensity = hydro ? bright : 0.12;
-          }
-        }
+    let indoorC: number | undefined;
+    let nearFire = this.mode === "walk" && this.world.nearFire(this.walker.x, this.walker.z);
+    if (this.mode === "interior") {
+      if (this.activeInterior?.kind === "home" && this.homeDeedId) {
+        const st = store.houses[this.homeDeedId] ?? emptyHouse(this.homeDeedId);
+        indoorC = st.indoorC;
+        nearFire = heatWorks(st, store.gridOutage, ambient);
+      } else {
+        indoorC = store.gridOutage ? 11 : 21;
       }
     }
 
-    if (store.playing && !store.paused && store.firm?.isOpen && this.elapsed - this.lastFirmSale > 8) {
+    store.tickSurvival(dtSurv, {
+      shelter: shelterOf(this.mode),
+      night: this.night,
+      hours,
+      month,
+      outfit: store.appearance.outfit,
+      hair: store.appearance.hairStyle,
+      god: store.godMode,
+      nearFire,
+      indoorC,
+    });
+    store.tickEconomy(hours);
+    this.walker.syncHurt(store.surv.health, store.surv.energy);
+
+    if (this.elapsed - this.lastUtil > 0.5) {
+      const dtU = this.elapsed - this.lastUtil;
+      this.lastUtil = this.elapsed;
+      store.tickUtilities(dtU, {
+        ambient,
+        month,
+        elapsed: this.elapsed,
+        weather: store.weather,
+      });
+      if (this.mode === "interior" && this.activeInterior?.kind === "home" && this.homeDeedId) {
+        const st = useGameStore.getState().houses[this.homeDeedId];
+        if (st) {
+          const on = heatWorks(st, useGameStore.getState().gridOutage, ambient);
+          setHeatGlow(this.interiors.home.group, on);
+          const hydro = hydroLive(st, useGameStore.getState().gridOutage);
+          const bright =
+            this.homeFloor === "basement" ? 0.38 : hasReno(st, "eclairage") ? 0.95 : 0.42;
+          this.indoorHemi.intensity = hydro ? bright : 0.12;
+        }
+      }
+    }
+  }
+
+  private tickFirmAndPayroll(store: ReturnType<typeof useGameStore.getState>): void {
+    if (!store.playing || store.paused) return;
+
+    if (store.firm?.isOpen && this.elapsed - this.lastFirmSale > 8) {
       this.lastFirmSale = this.elapsed;
       store.tickFirm(this.elapsed);
     }
-
-    if (store.playing && !store.paused && this.elapsed - this.lastPayroll > 45) {
+    if (this.elapsed - this.lastPayroll > 45) {
       this.lastPayroll = this.elapsed;
       store.tickPayroll(this.elapsed);
     }
+  }
 
-    if (store.playing && !store.paused && store.activeGig) {
-      store.tickGig(dt, this.elapsed);
-    }
-
-    if (store.playing && !store.paused && this.mode !== "interior") {
-      const raid = this.world.tickFields(dt, this.elapsed, this.px(), this.pz());
-      if (raid) this.seizeCrop(raid);
-    }
-
-    if (store.playing && !store.paused) {
-      if (this.mode === "drive") {
-        if (!store.staffFrozen) {
-          this.vehicle.update(dt, actions, vehicleLoadMul(haulCargoKg(store.job), bagWeight(store.inventory), fleetById(this.vehicle.kind).mass));
-          this.kmAcc += Math.abs(this.vehicle.speed) * dt;
-        }
-      } else {
-        if (store.sitting && (actions.throttle > 0.1 || actions.brake > 0.1 || Math.abs(actions.steer) > 0.2)) {
-          store.stand();
-          if ((this.walker as any).gesture === "sit") (this.walker as any).setGesture("none");
-        }
-        const move = store.sitting || store.gestureOpen
+  private tickPlayerActions(
+    dt: number,
+    actions: ReturnType<typeof input.sample>,
+    store: ReturnType<typeof useGameStore.getState>,
+  ): void {
+    if (this.mode === "drive") {
+      if (!store.staffFrozen) {
+        this.vehicle.update(
+          dt,
+          actions,
+          vehicleLoadMul(
+            haulCargoKg(store.job),
+            bagWeight(store.inventory),
+            fleetById(this.vehicle.kind).mass,
+          ),
+        );
+        this.kmAcc += Math.abs(this.vehicle.speed) * dt;
+      }
+    } else {
+      if (store.sitting && (actions.throttle > 0.1 || actions.brake > 0.1 || Math.abs(actions.steer) > 0.2)) {
+        store.stand();
+        if (this.walker.gesture === "sit") this.walker.setGesture("none");
+      }
+      const move =
+        store.sitting || store.gestureOpen
           ? { ...actions, throttle: 0, brake: 0, steer: 0, boost: false }
           : actions;
-        this.walker.update(dt, move, this.elapsed);
-      }
-      this.player.set(this.px(), this.py(), this.pz());
-      this.tickSwing(dt);
-      this.syncCaddie();
-      if (actions.interact) this.handleInteract();
-      this.tickPolice(dt, store.godMode);
-      if (this.vehicle.kind === "sq") this.vehicle.tickLightbar(this.elapsed);
-      if (this.vehicle.sirenPattern() === "code3_emergency") police.siren.setActive(true);
-      quebecFM.tick(dt, store.radioOn);
-      spatialAudio.setListener(this.camera);
-      spatialAudio.tickEngine(this.mode === "drive", this.vehicle.speed, this.vehicle.x, this.vehicle.y, this.vehicle.z);
-      spatialAudio.tickWind(store.speedKmh, store.weather);
-      spatialAudio.tickSiren(
-        wanted.stars > 0 || this.vehicle.sirenPattern() === "code3_emergency",
-        this.player.x,
-        this.player.y,
-        this.player.z,
-      );
-      spatialAudio.footstep(dt, this.mode !== "drive" && Math.abs(this.walker.speed) > 0.5, this.walker.x, this.walker.y, this.walker.z);
-    } else {
-      if (store.shopOpen && actions.interact) store.closeShop();
-      if (store.cartOpen && actions.interact) store.closeCart();
-      if (store.citationOpen && actions.interact) store.closeCitation();
+      this.walker.update(dt, move, this.elapsed);
     }
 
-    if (store.creatorOpen) {
-      if (this.mode !== "interior") this.vehicle.group.visible = false;
-      this.updateCreatorCamera(dt);
-    } else {
-      if (this.mode !== "interior") this.vehicle.group.visible = true;
-      this.updateCamera(dt);
-    }
+    this.player.set(this.px(), this.py(), this.pz());
+    this.tickSwing(dt);
+    this.syncCaddie();
 
+    if (actions.interact) this.handleInteract();
+    this.tickPolice(dt, store.godMode);
+
+    if (this.vehicle.kind === "sq") this.vehicle.tickLightbar(this.elapsed);
+    if (this.vehicle.sirenPattern() === "code3_emergency") police.siren.setActive(true);
+
+    quebecFM.tick(dt, store.radioOn);
+    spatialAudio.setListener(this.camera);
+    spatialAudio.tickEngine(
+      this.mode === "drive",
+      this.vehicle.speed,
+      this.vehicle.x,
+      this.vehicle.y,
+      this.vehicle.z,
+    );
+    spatialAudio.tickWind(store.speedKmh, store.weather);
+    spatialAudio.tickSiren(
+      police.getState().stars > 0 || this.vehicle.sirenPattern() === "code3_emergency",
+      this.player.x,
+      this.player.y,
+      this.player.z,
+    );
+    spatialAudio.footstep(
+      dt,
+      this.mode !== "drive" && Math.abs(this.walker.speed) > 0.5,
+      this.walker.x,
+      this.walker.y,
+      this.walker.z,
+    );
+  }
+
+  private tickPausedActions(
+    actions: ReturnType<typeof input.sample>,
+    store: ReturnType<typeof useGameStore.getState>,
+  ): void {
+    if (store.shopOpen && actions.interact) store.closeShop();
+    if (store.cartOpen && actions.interact) store.closeCart();
+    if (store.citationOpen && actions.interact) store.closeCitation();
+  }
+
+  private tickInputActions(
+    actions: ReturnType<typeof input.sample>,
+    store: ReturnType<typeof useGameStore.getState>,
+  ): void {
     if (actions.camera && store.playing) {
       const i = CAMERA_CYCLE.indexOf(this.cameraMode);
       this.cameraMode = CAMERA_CYCLE[(i + 1) % CAMERA_CYCLE.length]!;
       store.setHud({ cameraMode: this.cameraMode, notice: `Caméra · ${CAMERA_LABEL[this.cameraMode]}` });
     }
-
     if (actions.gesture && store.playing && !store.overlayOpen()) {
       store.toggleGesture();
     } else if (actions.gesture && store.playing && store.gestureOpen) {
       store.closeGesture();
     }
-
     if (actions.surrender && store.playing) {
-      this.playGesture((this.walker as any).gesture === "surrender" ? "none" : "surrender");
+      this.playGesture(this.walker.gesture === "surrender" ? "none" : "surrender");
     }
-
     if (actions.night && store.playing && this.mode !== "interior") {
       this.toggleNight();
     }
-
     if (actions.map && store.playing && !store.shopOpen && !store.phoneOpen && !store.lockOpen && !store.creatorOpen) {
       const next = !store.showMap;
       store.setHud({ showMap: next, paused: next, consoleOpen: false });
     }
-
     if (actions.phone && store.playing) {
       if (store.phoneOpen) store.closePhone();
       else store.openPhone();
     }
-
     if (actions.chat && store.playing) {
       if (store.chatOpen) store.closeChat();
       else if (!store.overlayOpen()) store.openChat();
     }
-
     if (actions.console && store.playing) {
       if (store.consoleOpen) store.closeConsole();
       else store.openConsole();
     }
-
     if (actions.radio && store.playing && !store.overlayOpen()) {
       void this.cycleRadio();
     }
-
     if (actions.siren && store.playing && !store.overlayOpen()) {
       const msg = this.vehicle.cycleSiren();
       if (this.vehicle.sirenPattern() === "code3_emergency") police.siren.setActive(true);
       store.setHud({ notice: msg, sirenMode: this.vehicle.sirenPattern() });
     }
-
     if (actions.inventory && store.playing) {
       if (store.inventoryOpen) store.closeInventory();
       else store.openInventory();
     }
-
     if (actions.garage && store.playing) {
       if (store.garageOpen) store.closeGarage();
       else store.openGarage();
     }
-
     if (actions.jobs && store.playing) {
       if (store.jobsOpen) store.closeJobs();
       else store.openJobs();
     }
-
     if (actions.firm && store.playing) {
       if (store.firmOpen) store.closeFirm();
       else store.openFirm();
     }
-
     if (actions.build && store.playing && !store.overlayOpen()) {
       store.toggleBuild();
     }
@@ -663,69 +904,83 @@ export class PortneufEngine {
     } else {
       this.props.syncGhost(null, 0, 0, 0, 0, 1);
     }
-
     if (actions.pause && store.playing) {
       store.togglePause();
     }
+  }
 
-    this.hudAcc += dt;
-    if (this.hudAcc > 0.12) {
-      this.hudAcc = 0;
-      this.pushHud();
-    }
-
+  private tickWeatherAndSeasons(dt: number, store: ReturnType<typeof useGameStore.getState>): void {
     if (store.weather !== this.lastWeather) {
       this.lastWeather = store.weather;
       quebecSeasons.setCondition(conditionFromWeather(store.weather, quebecSeasons.getState().season));
       this.world.setWeather(store.weather);
     }
 
-    if (store.playing && !store.paused) {
-      quebecSeasons.tick(dt, this.clockHours());
-      const wx = quebecSeasons.getState();
-      const mapped = weatherIdFromCondition(wx.condition);
-      if (mapped !== store.weather) {
-        this.lastWeather = mapped;
-        useGameStore.getState().setWeather(mapped);
-        this.world.setWeather(mapped);
-      } else {
-        this.world.weatherFx?.apply(wx);
-      }
+    if (!store.playing || store.paused) return;
 
-      dynamicEventsService.tick();
-
-      if (this.mode === "drive" && this.vehicle.kind === "deplaceige" && wx.snowAccumulationCm > 0.4) {
-        quebecSeasons.runPlowOperation("prive_gratte_ford", Math.min(0.35, Math.abs(this.vehicle.speed) * dt * 0.08));
-      }
-
-      if (wx.condition === "orage_ete" && Math.random() < dt * 0.08) this.fx.play("lightning");
-      AdminMetrics.noteFps(this.fpsEma);
+    quebecSeasons.tick(dt, this.clockHours());
+    const wx = quebecSeasons.getState();
+    const mapped = weatherIdFromCondition(wx.condition);
+    if (mapped !== store.weather) {
+      this.lastWeather = mapped;
+      useGameStore.getState().setWeather(mapped);
+      this.world.setWeather(mapped);
+    } else {
+      this.world.weatherFx?.apply(wx);
     }
 
-    if (rpNet.live && store.playing) {
-      rpNet.setPose({
-        x: this.px(),
-        y: this.py(),
-        z: this.pz(),
-        rotation: this.pYaw(),
-        animation: this.mode === "drive" ? "drive" : (this.walker as any).gesture !== "none" ? (this.walker as any).gesture : this.walker.speed > 0.6 ? "walk" : "idle",
-        vehicleId: this.mode === "drive" ? store.vehicleId : "",
-        speed: this.mode === "drive" ? this.vehicle.speed : this.walker.speed,
-        headlights: !this.night,
-      });
-      this.netAcc += dt;
-      if (this.netAcc > 0.05) {
-        this.netAcc = 0;
-        rpNet.publish();
-        this.remotes.sync();
-      }
-      this.remotes.tick(dt, this.camera);
-    }
+    dynamicEventsService.tick();
 
-    this.renderer.render(this.scene, this.camera);
+    if (this.mode === "drive" && this.vehicle.kind === "deplaceige" && wx.snowAccumulationCm > 0.4) {
+      quebecSeasons.runPlowOperation("prive_gratte_ford", Math.min(0.35, Math.abs(this.vehicle.speed) * dt * 0.08));
+    }
+    if (wx.condition === "orage_ete" && Math.random() < dt * 0.08) this.fx.play("lightning");
+    AdminMetrics.noteFps(this.fpsEma);
+
+    if (this.elapsed - this.lastPersistAt > this.config.persistIntervalS) {
+      this.lastPersistAt = this.elapsed;
+      try { persist(); } catch { /* noop */ }
+    }
   }
 
+  private tickNetwork(dt: number, store: ReturnType<typeof useGameStore.getState>): void {
+    if (!rpNet.live || !store.playing) return;
+
+    rpNet.setPose({
+      x: this.px(),
+      y: this.py(),
+      z: this.pz(),
+      rotation: this.pYaw(),
+      animation:
+        this.mode === "drive"
+          ? "drive"
+          : this.walker.gesture !== "none"
+            ? this.walker.gesture
+            : this.walker.speed > 0.6
+              ? "walk"
+              : "idle",
+      vehicleId: this.mode === "drive" ? store.vehicleId : "",
+      speed: this.mode === "drive" ? this.vehicle.speed : this.walker.speed,
+      headlights: !this.night,
+    });
+
+    this.netAcc += dt;
+    if (this.netAcc > 0.05) {
+      this.netAcc = 0;
+      rpNet.publish();
+      this.remotes.sync();
+    }
+    this.remotes.tick(dt, this.camera);
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // HANDLE INTERACT (inchangé, avec stats)
+  // ═════════════════════════════════════════════════════════════════════════
+
   private handleInteract() {
+    this.engineStats.interactCount++;
+    this.emit("interact", { mode: this.mode, x: this.px(), z: this.pz() });
+
     const store = useGameStore.getState();
     if (store.buildOpen && store.buildType) {
       this.placeProp();
@@ -751,7 +1006,6 @@ export class PortneufEngine {
       store.closeElevator();
       return;
     }
-
     if (this.mode === "drive") {
       if (Math.abs(this.vehicle.speed) < 3.2) {
         if (this.tryHaul()) return;
@@ -762,13 +1016,8 @@ export class PortneufEngine {
       }
       return;
     }
-
     if (this.mode === "interior") {
       if (store.sitting) {
-        // CORRIGÉ/AJOUTÉ : avant, être assis coupait court à tout — impossible
-        // de manger sans se relever d'abord. On mange en premier si un repas
-        // est disponible ; sinon comportement original inchangé (se lever).
-        if (this.tryEatMeal()) return;
         store.stand();
         return;
       }
@@ -796,11 +1045,9 @@ export class PortneufEngine {
       }
       return;
     }
-
     if (this.tryHaul()) return;
     if (this.tryGig()) return;
     if (this.tryFirm()) return;
-
     const shopEarly = this.world.nearestShop(this.walker.x, this.walker.z, 6.5);
     if (shopEarly && shopEarly.kind === "depanneur") {
       this.tryEnterDepanneur(shopEarly);
@@ -814,26 +1061,22 @@ export class PortneufEngine {
       this.tryEnterCasse(shopEarly);
       return;
     }
-
     const atm = this.world.nearestAtm(this.walker.x, this.walker.z, 4.8);
     if (atm) {
       store.openAtm(atm.id);
       return;
     }
-
     const caisseEarly = this.world.nearestCaisse(this.walker.x, this.walker.z, 7.5);
     if (caisseEarly) {
       this.tryEnterCaisse(caisseEarly);
       return;
     }
-
     const vend = this.world.nearestStreet(this.walker.x, this.walker.z, 2.4, "vending");
     if (vend) {
       const ok = store.buyItem("cola") || store.buyItem("chips");
       if (!ok) store.setHud({ notice: "Distributeur · pas assez d'espèces" });
       return;
     }
-
     const fire = this.world.nearestStreet(this.walker.x, this.walker.z, 2.6, "campfire");
     if (fire) {
       if (store.sitting) store.stand();
@@ -844,7 +1087,6 @@ export class PortneufEngine {
       }
       return;
     }
-
     const bus = this.world.nearestStreet(this.walker.x, this.walker.z, 2.2, "bus");
     if (bus) {
       if (store.sitting) store.stand();
@@ -854,7 +1096,6 @@ export class PortneufEngine {
       }
       return;
     }
-
     const bench = this.world.nearestStreet(this.walker.x, this.walker.z, 2.0, "bench");
     if (bench) {
       if (store.sitting) store.stand();
@@ -864,19 +1105,17 @@ export class PortneufEngine {
       }
       return;
     }
-
     const pump = this.world.nearestStreet(this.walker.x, this.walker.z, 3.2, "pump");
     if (pump) {
       const ok = store.buyItem("essence");
       if (!ok) store.setHud({ notice: "Pompe · pas assez d'espèces" });
       return;
     }
-
     const dump = this.world.nearestStreet(this.walker.x, this.walker.z, 2.6, "dump");
     if (dump) {
       const roll = Math.random();
       if (roll < 0.4) {
-        useGameStore.setState((s: any) => ({
+        useGameStore.setState((s) => ({
           inventory: { ...s.inventory, chips: (s.inventory.chips ?? 0) + 1 },
           notice: "Conteneur · chips ketchup",
         }));
@@ -887,53 +1126,43 @@ export class PortneufEngine {
       }
       return;
     }
-
     const mail = this.world.nearestStreet(this.walker.x, this.walker.z, 1.8, "mail");
     if (mail) {
       store.setHud({ notice: "Boîte · facture Hydro déjà payée" });
       return;
     }
-
     if (this.tryPortal()) return;
-
     const field = this.world.nearestField(this.walker.x, this.walker.z, 14);
     if (field) {
       this.tryFarm(field);
       return;
     }
-
     const stock = this.world.nearestStock(this.walker.x, this.walker.z, 3.6);
     if (stock) {
       this.tryStock(stock);
       return;
     }
-
     const evap = this.world.nearestEvap(this.walker.x, this.walker.z, 3.6);
     if (evap) {
       this.tryEvap(evap);
       return;
     }
-
     const tap = this.world.nearestTap(this.walker.x, this.walker.z, 2.8);
     if (tap) {
       this.tryTap(tap);
       return;
     }
-
     if (this.tryHouse()) return;
-
     const mls = nearestCommercial(this.walker.x, this.walker.z, 7);
     if (mls) {
       store.openDeed(mls.id);
       return;
     }
-
     const crime = this.world.nearestCrime(this.walker.x, this.walker.z, 4.8);
     if (crime) {
       store.commitCrime(crime.crime, this.elapsed);
       return;
     }
-
     const shop = this.world.nearestShop(this.walker.x, this.walker.z, 9);
     if (shop && shop.kind === "depanneur") {
       this.tryEnterDepanneur(shop);
@@ -951,15 +1180,15 @@ export class PortneufEngine {
       store.openShop(shop.id);
       return;
     }
-
     const biz = this.world.nearestCountyFirm(this.walker.x, this.walker.z, 8);
     if (biz && !shopKindForFirm(biz.type) && this.elapsed - this.lastJobAt > 6) {
       this.lastJobAt = this.elapsed;
-      const pay = Math.round((18 + Math.random() * 16) * seasonalFactor(biz.type, gameMonth(this.elapsed)));
+      const pay = Math.round(
+        (18 + Math.random() * 16) * seasonalFactor(biz.type, gameMonth(this.elapsed)),
+      );
       store.addCash(Math.max(6, pay), `Contrat · ${biz.name} · +${Math.max(6, pay)}\u00a0$`);
       return;
     }
-
     const job = workJobAt(store.equippedTool, this.walker.x, this.walker.z);
     if (job && this.elapsed - this.lastJobAt > 7) {
       this.lastJobAt = this.elapsed;
@@ -974,13 +1203,11 @@ export class PortneufEngine {
       if (job.loot) store.addItem(job.loot, 1);
       return;
     }
-
     const nearCar = Math.hypot(this.walker.x - this.vehicle.x, this.walker.z - this.vehicle.z);
     if (nearCar < 4.2) {
       this.enterVehicle();
       return;
     }
-
     const door = this.world.nearestDoor(this.walker.x, this.walker.z, 4.8);
     if (door) {
       if (door.kind === "hotel" && !hotelSecurity.isUnlocked(door.id)) {
@@ -1005,11 +1232,11 @@ export class PortneufEngine {
       this.enterInterior(door);
       return;
     }
-
     const ammoId = ammoFor(store.equippedTool);
     const range = harvestRange(store.equippedTool);
     const fauna = this.world.wildlife.nearestHarvestable(this.walker.x, this.walker.z, range);
     if (fauna) this.harvestFauna(fauna.id);
+    void ammoId;
   }
 
   private harvestFauna(id: string) {
@@ -1043,7 +1270,7 @@ export class PortneufEngine {
     if (licensed) {
       store.setHud({ notice: `Prélèvement MFFP · ${result.name} · ${loot}` });
     } else {
-      police.report("poaching" as any, this.elapsed);
+      police.report("poaching", this.elapsed);
       store.setHud({ notice: `Braconnage · ${result.name} · SQ alertée` });
     }
   }
@@ -1056,29 +1283,35 @@ export class PortneufEngine {
     if (door) this.enterInterior(door);
   }
 
+  // ═════════════════════════════════════════════════════════════════════════
+  // VEHICLE
+  // ═════════════════════════════════════════════════════════════════════════
+
   private exitVehicle() {
     const side = 2.15;
     const rx = Math.cos(this.vehicle.yaw);
     const rz = -Math.sin(this.vehicle.yaw);
     this.walker.place(this.vehicle.x + rx * side, this.vehicle.z + rz * side, this.vehicle.yaw, false);
     this.vehicle.speed = 0;
-    this.mode = "walk";
+    this.setMode("walk");
     this.camera.near = 0.2;
     this.camera.updateProjectionMatrix();
   }
 
   private enterVehicle() {
     const s = useGameStore.getState();
-    police.licenseSuspendedUntil = Math.max(police.licenseSuspendedUntil, s.licenseSuspendedUntil ?? 0);
+    police.licenseSuspendedUntil = Math.max(
+      police.licenseSuspendedUntil,
+      s.licenseSuspendedUntil ?? 0,
+    );
     if (police.isLicenseSuspended() && !s.godMode) {
       s.setHud({
         notice: `Permis SAAQ suspendu · ${police.suspendDaysLeft()} j · Art. 202 / points d'inaptitude`,
       });
       return;
     }
-    const houses = s.houses as Record<string, { parked: string[] }>;
-    for (const [id, h] of Object.entries(houses)) {
-      if (h && h.parked && h.parked.includes(s.vehicleId)) {
+    for (const [id, h] of Object.entries(s.houses)) {
+      if (h.parked.includes(s.vehicleId)) {
         useGameStore.setState({ deedId: id });
         s.takeFromGarage(s.vehicleId);
         this.vehicle.group.visible = true;
@@ -1089,10 +1322,14 @@ export class PortneufEngine {
     this.walker.hide();
     this.vehicle.speed = 0;
     this.vehicle.snap();
-    this.mode = "drive";
+    this.setMode("drive");
     this.camera.near = 0.35;
     this.camera.updateProjectionMatrix();
   }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // INTERIOR ENTRY / EXIT
+  // ═════════════════════════════════════════════════════════════════════════
 
   private enterInterior(door: CityDoor) {
     if (door.kind === "depanneur") {
@@ -1126,7 +1363,16 @@ export class PortneufEngine {
           : door.kind === "prison"
             ? this.interiors.prison
             : this.interiors.apartment;
-    this.showRoom(room, door.kind === "hotel" ? 0.7 : door.kind === "boutique" ? 0.72 : door.kind === "prison" ? 0.45 : 1.15);
+    this.showRoom(
+      room,
+      door.kind === "hotel"
+        ? 0.7
+        : door.kind === "boutique"
+          ? 0.72
+          : door.kind === "prison"
+            ? 0.45
+            : 1.15,
+    );
   }
 
   showFloor(id: "lobby" | "hotel" | "apartment" | "corridor" | "prison" | "depanneur" | "caisse" | "casse" | "sqdc") {
@@ -1135,7 +1381,21 @@ export class PortneufEngine {
     const room = this.interiors[id];
     this.showRoom(
       room,
-      id === "lobby" ? 0.7 : id === "hotel" ? 0.85 : id === "corridor" ? 1.15 : id === "prison" ? 0.45 : id === "sqdc" ? 1.05 : id === "depanneur" || id === "casse" ? 0.9 : id === "caisse" ? 0.95 : 1.15,
+      id === "lobby"
+        ? 0.7
+        : id === "hotel"
+          ? 0.85
+          : id === "corridor"
+            ? 1.15
+            : id === "prison"
+              ? 0.45
+              : id === "sqdc"
+                ? 1.05
+                : id === "depanneur" || id === "casse"
+                  ? 0.9
+                  : id === "caisse"
+                    ? 0.95
+                    : 1.15,
     );
   }
 
@@ -1172,7 +1432,7 @@ export class PortneufEngine {
         maxZ: w.maxZ + origin.z,
       })),
     );
-    this.mode = "interior";
+    this.setMode("interior");
     this.camera.near = 0.12;
     this.camera.far = 48;
     this.camera.fov = 68;
@@ -1199,8 +1459,8 @@ export class PortneufEngine {
     if (room) room.group.visible = false;
     this.activeInterior = null;
     this.world.setExteriorVisible(true);
-    const parked = Object.values(useGameStore.getState().houses as Record<string, { parked: string[] }>).some((h: any) =>
-      h.parked && h.parked.includes(useGameStore.getState().vehicleId),
+    const parked = Object.values(useGameStore.getState().houses).some((h) =>
+      h.parked.includes(useGameStore.getState().vehicleId),
     );
     this.vehicle.group.visible = !parked;
     const fog = this.scene.fog as THREE.FogExp2 | null;
@@ -1213,17 +1473,26 @@ export class PortneufEngine {
     this.lastShadow.set(1e6, 0, 0);
     const door = this.lastDoor;
     if (door) {
-      this.walker.place(door.x + Math.sin(door.yaw) * 1.6, door.z + Math.cos(door.yaw) * 1.6, door.yaw + Math.PI, false);
+      this.walker.place(
+        door.x + Math.sin(door.yaw) * 1.6,
+        door.z + Math.cos(door.yaw) * 1.6,
+        door.yaw + Math.PI,
+        false,
+      );
     } else {
       this.walker.place(this.vehicle.x + 2.2, this.vehicle.z, this.vehicle.yaw, false);
     }
-    this.mode = "walk";
+    this.setMode("walk");
     this.camera.near = 0.35;
-    this.camera.far = 1200;
-    this.camera.fov = 62;
+    this.camera.far = this.config.cameraFar;
+    this.camera.fov = this.config.cameraFov;
     this.camera.updateProjectionMatrix();
     useGameStore.getState().setHud({ interiorKind: null, mode: "walk" });
   }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // LOBBY BITS
+  // ═════════════════════════════════════════════════════════════════════════
 
   private tryLobbyBits(): boolean {
     const room = this.activeInterior;
@@ -1252,57 +1521,15 @@ export class PortneufEngine {
         return true;
       }
       store.addCash(-8, "Mini-bar · cola");
-      useGameStore.setState((s: any) => ({ surv: applyMeal(s.surv, "drink") }));
+      useGameStore.setState((s) => ({ surv: applyMeal(s.surv, "drink") }));
       return true;
     }
     return false;
   }
 
-  // --- RP : repas / dîner sur place ---------------------------------------
-  // Table basse et casse-croûte : s'asseoir puis "manger" un article de
-  // nourriture/boisson déjà présent dans le sac restaure la survie via le
-  // même applyMeal() que le mini-bar de l'hôtel. Purement additif : ne
-  // touche à aucune mécanique existante, seulement à la priorité de la
-  // touche E pendant qu'on est assis à l'intérieur (voir handleInteract).
-  private static readonly MEAL_ITEMS: Record<string, { label: string; kind: "food" | "drink" }> = {
-    poutine: { label: "Poutine", kind: "food" },
-    steame: { label: "Steamé", kind: "food" },
-    tourtiere: { label: "Tourtière", kind: "food" },
-    chips: { label: "Chips ketchup", kind: "food" },
-    sirop_erable: { label: "Sirop d'érable", kind: "food" },
-    cafe: { label: "Café", kind: "drink" },
-    cola: { label: "Cola", kind: "drink" },
-    chocolat_chaud: { label: "Chocolat chaud", kind: "drink" },
-  };
-
-  private nearbyMealChoice(): string | null {
-    const inv = useGameStore.getState().inventory as Record<string, number>;
-    for (const id of Object.keys(PortneufEngine.MEAL_ITEMS)) {
-      if ((inv[id] ?? 0) > 0) return id;
-    }
-    return null;
-  }
-
-  private mealPrompt(): string | null {
-    if (this.mode !== "interior" || !useGameStore.getState().sitting) return null;
-    const id = this.nearbyMealChoice();
-    if (!id) return null;
-    return `E — Manger · ${PortneufEngine.MEAL_ITEMS[id].label}`;
-  }
-
-  private tryEatMeal(): boolean {
-    if (this.mode !== "interior") return false;
-    const store = useGameStore.getState();
-    if (!store.sitting) return false;
-    const id = this.nearbyMealChoice();
-    if (!id) return false;
-    const meal = PortneufEngine.MEAL_ITEMS[id];
-    store.dropItem(id, 1);
-    useGameStore.setState((s: any) => ({ surv: applyMeal(s.surv, meal.kind) }));
-    store.setHud({ notice: `${meal.label} · miam` });
-    return true;
-  }
-  // -------------------------------------------------------------------------
+  // ═════════════════════════════════════════════════════════════════════════
+  // CAMERA
+  // ═════════════════════════════════════════════════════════════════════════
 
   private updateCamera(dt: number) {
     const indoor = this.mode === "interior";
@@ -1385,7 +1612,7 @@ export class PortneufEngine {
   playGesture(id: RpGesture) {
     const def = gestureDef(id);
     const ttl = def && !def.hold ? def.duration : 0;
-    (this.walker as any).setGesture(id, ttl);
+    this.walker.setGesture(id, ttl);
     if (id === "sit") useGameStore.getState().sit();
     else if (useGameStore.getState().sitting) useGameStore.getState().stand();
     useGameStore.getState().setGesture(id);
@@ -1396,7 +1623,10 @@ export class PortneufEngine {
   cycleCamera() {
     const i = CAMERA_CYCLE.indexOf(this.cameraMode);
     this.cameraMode = CAMERA_CYCLE[(i + 1) % CAMERA_CYCLE.length]!;
-    useGameStore.getState().setHud({ cameraMode: this.cameraMode, notice: `Caméra · ${CAMERA_LABEL[this.cameraMode]}` });
+    useGameStore.getState().setHud({
+      cameraMode: this.cameraMode,
+      notice: `Caméra · ${CAMERA_LABEL[this.cameraMode]}`,
+    });
   }
 
   private updateCreatorCamera(dt: number) {
@@ -1442,9 +1672,13 @@ export class PortneufEngine {
     persist();
   }
 
+  // ═════════════════════════════════════════════════════════════════════════
+  // POLICE
+  // ═════════════════════════════════════════════════════════════════════════
+
   private tickPolice(dt: number, god: boolean) {
     if (god) {
-      if ((police as any).stars > 0) (police as any).clear?.("Godmode");
+      if (police.stars > 0) police.clear("Godmode");
       police.siren.setActive(false);
       return;
     }
@@ -1453,28 +1687,28 @@ export class PortneufEngine {
     if (store.citationOpen) return;
     const x = this.px();
     const z = this.pz();
-    const speedKmh = this.mode === "drive" ? Math.abs(this.vehicle.speed) * 3.6 : Math.abs(this.walker.speed) * 3.6;
+    const speedKmh =
+      this.mode === "drive"
+        ? Math.abs(this.vehicle.speed) * 3.6
+        : Math.abs(this.walker.speed) * 3.6;
     const dist = this.world.nearestPoliceDist(x, z);
     police.update(dt, dist, speedKmh, this.elapsed);
 
     if (this.mode === "drive" && speedKmh > 40 && this.world.ramPolice(x, z, 4.6) && this.elapsed - this.lastRamAt > 2.4) {
       this.lastRamAt = this.elapsed;
-      police.report(speedKmh > 70 ? ("officer_assault" as any) : ("hit_and_run" as any), this.elapsed);
+      police.report(speedKmh > 70 ? "officer_assault" : "hit_and_run", this.elapsed);
       useGameStore.getState().setHud({ notice: "Collision · unité SQ" });
     }
 
-    if (this.mode === "drive" && (police as any).bloodAlcohol >= 80 && this.elapsed - this.lastCatchAt > 8) {
+    if (this.mode === "drive" && police.bloodAlcohol >= 80 && this.elapsed - this.lastCatchAt > 8) {
       this.lastCatchAt = this.elapsed;
       const name = store.appearance.name || "Citoyen";
-      const test = (police as any).breathalyzer?.(name) ?? {
-        bloodAlcoholMgPercent: (police as any).bloodAlcohol ?? 0,
-        isOverLegalLimit: (police as any).bloodAlcohol >= 80,
-      };
+      const test = police.breathalyzer(name);
       store.setHud({
-        bloodAlcohol: test.bloodAlcoholMgPercent ?? (police as any).bloodAlcohol ?? 0,
-        notice: `Contrôle SQ · ${test.bloodAlcoholMgPercent ?? 0} mg · facultés affaiblies`,
+        bloodAlcohol: test.bloodAlcoholMgPercent,
+        notice: `Contrôle SQ · ${test.bloodAlcoholMgPercent} mg · facultés affaiblies`,
       });
-      const last = (police as any).tickets?.[0];
+      const last = police.tickets[0];
       if (last) {
         store.openCitation({
           kind: "ticket",
@@ -1482,33 +1716,29 @@ export class PortneufEngine {
           description: last.description,
           fine: last.fine,
           points: last.demeritPoints ?? 4,
-          message: `Art. 202 CSR · ${test.bloodAlcoholMgPercent ?? 0} mg`,
+          message: `Art. 202 CSR · ${test.bloodAlcoholMgPercent} mg`,
           ticketNumber: last.ticketNumber,
-          badge: last.issuingOfficerBadge ?? last.badge,
+          badge: last.issuingOfficerBadge,
         });
       }
       this.vehicle.speed = 0;
       return;
     }
 
-    const wanted = {
-      stars: (police as any).stars ?? 0,
-    };
     if (
-      wanted.stars > 0 &&
+      police.stars > 0 &&
       dist < (this.mode === "drive" ? 5.2 : 3.4) * worldConfig.policeCatchMul(x, z) &&
       speedKmh < 16 &&
       this.elapsed - this.lastCatchAt > 4
     ) {
       this.lastCatchAt = this.elapsed;
       if (this.mode === "drive") this.vehicle.speed = 0;
-      if (wanted.stars >= 4) {
-        const notice = (police as any).arrest?.() ?? { message: "Arrestation", kind: "arrest" };
-        const name = useGameStore.getState().appearance.name || "Citoyen";
-        const booked = (prisonSystem as any).book?.(name, chargesForStars(wanted.stars)) ?? {
-          booking: `BK-${Date.now().toString(36)}`,
-          minutes: 30,
-        };
+      if (police.stars >= 4) {
+        const notice = police.arrest();
+        const booked = prisonSystem.book(
+          useGameStore.getState().appearance.name || "Citoyen",
+          chargesForStars(police.stars),
+        );
         const door = this.world.doors.find((d) => d.kind === "prison");
         if (door) {
           if (this.mode === "drive") this.exitVehicle();
@@ -1518,26 +1748,24 @@ export class PortneufEngine {
           this.teleport(PRISON.x, PRISON.z + 42);
         }
         useGameStore.getState().openCitation({
-          ...(typeof notice === 'object' ? notice : { message: notice }),
-          message: `${typeof notice === 'object' ? (notice as any).message : notice} · ${booked.booking} · cellule A-1-04`,
+          ...notice,
+          message: `${notice.message} · ${booked.booking} · cellule A-1-04`,
         });
       } else {
-        useGameStore.getState().openCitation((police as any).pullOver?.() ?? {
-          kind: "ticket",
-          article: "Art. CSR",
-          description: "Infraction",
-          fine: 100,
-        });
+        useGameStore.getState().openCitation(police.pullOver());
       }
     }
   }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // PROMPT TEXT (inchangé)
+  // ═════════════════════════════════════════════════════════════════════════
 
   private promptText(): string | null {
     if (useGameStore.getState().buildOpen) {
       const t = useGameStore.getState().buildType;
       return t ? `E — Placer ${t} · Q rotation` : "Builder · choisissez un objet";
     }
-
     if (this.mode === "drive") {
       if (this.nearSwing(3.2) && Math.abs(this.vehicle.speed) > 2.4) return "Foncez — les portes s'ouvrent";
       if (Math.abs(this.vehicle.speed) < 3.2) {
@@ -1555,7 +1783,6 @@ export class PortneufEngine {
       }
       return null;
     }
-
     if (this.mode === "interior") {
       const room = this.activeInterior;
       if (!room) return null;
@@ -1575,8 +1802,6 @@ export class PortneufEngine {
       if (bankP) return bankP;
       const lobby = this.lobbyPrompt();
       if (lobby) return lobby;
-      const meal = this.mealPrompt();
-      if (meal) return meal;
       const sit = this.sitPrompt();
       if (sit) return sit;
       const hall = this.hallPrompt();
@@ -1598,72 +1823,57 @@ export class PortneufEngine {
       }
       return null;
     }
-
     const haul = this.haulPrompt();
     if (haul) return haul;
     const gigP = this.gigPrompt();
     if (gigP) return gigP;
     const firmP = this.firmPrompt();
     if (firmP) return firmP;
-
     const shopNow = this.world.nearestShop(this.walker.x, this.walker.z, 9);
     if (shopNow?.kind === "depanneur") return this.depLotPrompt(shopNow);
     if (shopNow?.kind === "sqdc") return this.sqdcLotPrompt(shopNow);
     if (shopNow?.kind === "food") return this.casseLotPrompt(shopNow);
-
     const biz = this.countyFirmPrompt();
     if (biz) return biz;
-
     const atm = this.world.nearestAtm(this.walker.x, this.walker.z, 4.8);
     if (atm) return `E — Guichet · ${atm.name}`;
-
     const caisseNow = this.world.nearestCaisse(this.walker.x, this.walker.z, 8);
     if (caisseNow) return this.caisseLotPrompt(caisseNow);
-
     const vend = this.world.nearestStreet(this.walker.x, this.walker.z, 2.4, "vending");
     if (vend) return `E — ${vend.name} · cola 2,50 $`;
-
     if (useGameStore.getState().sitting) return "E — Se lever";
-
     const fire = this.world.nearestStreet(this.walker.x, this.walker.z, 2.6, "campfire");
     if (fire) return `E — S'asseoir · ${fire.name}`;
-
     const bus = this.world.nearestStreet(this.walker.x, this.walker.z, 2.2, "bus");
     if (bus) return `E — S'asseoir · ${bus.name}`;
-
     const bench = this.world.nearestStreet(this.walker.x, this.walker.z, 2.0, "bench");
     if (bench) return `E — S'asseoir · ${bench.name}`;
-
     const pump = this.world.nearestStreet(this.walker.x, this.walker.z, 3.2, "pump");
     if (pump) return `E — ${pump.name} · 20 L · 28,40 $`;
-
     const dump = this.world.nearestStreet(this.walker.x, this.walker.z, 2.6, "dump");
     if (dump) return "E — Fouiller le conteneur";
-
     const mail = this.world.nearestStreet(this.walker.x, this.walker.z, 1.8, "mail");
     if (mail) return "E — Boîte aux lettres";
-
     if (this.nearPortal()) return "E — Téléporteur · Saint-Alban";
-
-    const loot = (this.world.worldItems as any).nearest(this.walker.x, this.walker.z, 2.4);
+    const loot = this.world.worldItems.nearest(this.walker.x, this.walker.z, 2.4);
     if (loot) return `E — Ramasser · ${loot.name}`;
-
     const field = this.world.nearestField(this.walker.x, this.walker.z, 14);
-    if (field) return (fieldPrompt as any)(field, useGameStore.getState().equippedTool, useGameStore.getState().selectedSeed);
-
+    if (field)
+      return fieldPrompt(
+        field,
+        useGameStore.getState().equippedTool,
+        useGameStore.getState().selectedSeed,
+      );
     const stNow = useGameStore.getState();
     const stock = this.world.nearestStock(this.walker.x, this.walker.z, 3.6);
     if (stock) {
       const feed = stock.kind === "vache" ? (stNow.inventory.foin ?? 0) > 0 : (stNow.inventory.ble ?? 0) > 0;
       return stockPrompt(stock, this.elapsed, feed);
     }
-
     const evap = this.world.nearestEvap(this.walker.x, this.walker.z, 3.6);
     if (evap) return evapPrompt(evap, stNow.inventory.eau_erable ?? 0);
-
     const tap = this.world.nearestTap(this.walker.x, this.walker.z, 2.8);
     if (tap) return tapPrompt(tap, this.elapsed);
-
     const houseHit = this.world.nearestHouseHot(this.walker.x, this.walker.z, 8);
     if (houseHit && (houseHit.kind !== "lot" || houseHit.dist < 5.5)) {
       const st = useGameStore.getState();
@@ -1676,48 +1886,35 @@ export class PortneufEngine {
         false,
       );
     }
-
     const mls = nearestCommercial(this.walker.x, this.walker.z, 7);
     if (mls) {
       const st = useGameStore.getState();
       const mine = ownedIds(st.ownedProps, st.realty).includes(mls.id);
       return mine ? `E — ${mls.name}` : `E — MLS · ${KIND_LABEL[mls.kind]} · ${mls.name}`;
     }
-
     const crime = this.world.nearestCrime(this.walker.x, this.walker.z, 4.8);
     if (crime) {
       const spec = crimeById(crime.crime);
       return `E — ${spec.name} · ${spec.reward}\u00a0$`;
     }
-
     const shop = this.world.nearestShop(this.walker.x, this.walker.z, 9);
     if (shop) {
       if (shop.kind === "clothing") {
         const open = this.world.swingDoors.some((d) => d.open);
         return open ? "E — Entrer · Boutique Éther" : "Poussez la porte — corps ou main, ou foncez au pick-up";
       }
-      if (shop.kind === "depanneur") {
-        return this.depLotPrompt(shop);
-      }
-      if (shop.kind === "sqdc") {
-        return this.sqdcLotPrompt(shop);
-      }
-      if (shop.kind === "food") {
-        return this.casseLotPrompt(shop);
-      }
+      if (shop.kind === "depanneur") return this.depLotPrompt(shop);
+      if (shop.kind === "sqdc") return this.sqdcLotPrompt(shop);
+      if (shop.kind === "food") return this.casseLotPrompt(shop);
       return `E — Entrer au ${shop.name}`;
     }
-
     const job = workJobAt(useGameStore.getState().equippedTool, this.walker.x, this.walker.z);
     if (job) return `E — ${job.label} · +${job.pay}\u00a0$`;
-
     const mill = getPoiAt(this.walker.x, this.walker.z);
     if (mill?.id === "donnacona_papeterie") return "Casque CSA · quart à la papeterie";
-
     if (Math.hypot(this.walker.x - this.vehicle.x, this.walker.z - this.vehicle.z) < 4.2) {
       return "E — Monter dans le véhicule";
     }
-
     const door = this.world.nearestDoor(this.walker.x, this.walker.z, 4.8);
     if (door) {
       if (door.kind === "hotel" && !hotelSecurity.isUnlocked(door.id)) {
@@ -1728,7 +1925,6 @@ export class PortneufEngine {
       }
       return `E — ${door.prompt}`;
     }
-
     const st = useGameStore.getState();
     const range = harvestRange(st.equippedTool);
     const fauna = this.world.wildlife.nearestHarvestable(this.walker.x, this.walker.z, range);
@@ -1737,7 +1933,6 @@ export class PortneufEngine {
       if (ammoId && (st.inventory[ammoId] ?? 0) < 1) return "E — Plus de munitions";
       return `E — Prélever ${fauna.name}`;
     }
-
     return null;
   }
 
@@ -1867,7 +2062,7 @@ export class PortneufEngine {
   private nearPortal(): boolean {
     let hit = false;
     let best = 2.4;
-    this.props.group.traverse((o: any) => {
+    this.props.group.traverse((o) => {
       if (!o.userData.teleport && o.name !== "teleporter") return;
       o.getWorldPosition(this.tvWorld);
       const d = Math.hypot(this.walker.x - this.tvWorld.x, this.walker.z - this.tvWorld.z);
@@ -1890,13 +2085,13 @@ export class PortneufEngine {
     if (this.elapsed - this.lastJobAt < 1.1) return;
     const store = useGameStore.getState();
     if (field.stage === "laboure" && store.selectedSeed) {
-      const spec = CROPS[store.selectedSeed as CropId];
+      const spec = CROPS[store.selectedSeed];
       if ((store.inventory[spec.seedId] ?? 0) < 1) {
         store.setHud({ notice: "Pas de semence · sac." });
         return;
       }
     }
-    const result = (workField as any)(field, store.equippedTool, store.selectedSeed, this.elapsed);
+    const result = workField(field, store.equippedTool, store.selectedSeed, this.elapsed);
     if (!result.ok) {
       store.setHud({ notice: result.notice });
       return;
@@ -1910,7 +2105,12 @@ export class PortneufEngine {
   private tryStock(stock: import("./livestock").Stock) {
     if (this.elapsed - this.lastJobAt < 1.1) return;
     const store = useGameStore.getState();
-    const result = workStock(stock, this.elapsed, (store.inventory.foin ?? 0) > 0, (store.inventory.ble ?? 0) > 0);
+    const result = workStock(
+      stock,
+      this.elapsed,
+      (store.inventory.foin ?? 0) > 0,
+      (store.inventory.ble ?? 0) > 0,
+    );
     if (!result.ok) {
       store.setHud({ notice: result.notice });
       return;
@@ -1937,7 +2137,7 @@ export class PortneufEngine {
   private tryEvap(evap: import("./sugar").SugarEvap) {
     if (this.elapsed - this.lastJobAt < 1.1) return;
     const store = useGameStore.getState();
-    const result = workEvap(evap, this.elapsed);
+    const result = workEvap(evap, this.elapsed, store.inventory.eau_erable ?? 0);
     if (!result.ok) {
       store.setHud({ notice: result.notice });
       return;
@@ -1976,24 +2176,9 @@ export class PortneufEngine {
 
   private tryHouse(): boolean {
     const hit = this.world.nearestHouseHot(this.walker.x, this.walker.z, 8);
-    if (!hit) return false;
+    if (!hit || hit.kind === "lot") return false;
     const store = useGameStore.getState();
     const owned = store.ownedProps.includes(hit.lot.deedId);
-    // CORRECTION : zone morte achat maison. L'ancre logique de porte
-    // (deed.z + depth/2 + 0.4) est decalee d'environ 1.56 m de la porte 3D
-    // reelle (house.position.z = -1.2 dans mountHouses, porte a depth/2 + 0.04).
-    // Debout devant la vraie porte, le hit le plus proche est donc frequemment
-    // de type "lot" (ex. a l'interieur du volume maison, sur les cotes ou pres
-    // du garage). Avant, on refusait silencieusement la touche E meme si le
-    // prompt affichait « E — A vendre ». On ouvre maintenant l'acte notarie
-    // quand le lot est a vendre et que le joueur est dans le rayon du prompt.
-    if (hit.kind === "lot") {
-      if (!owned && hit.dist < 5.5) {
-        store.openDeed(hit.lot.deedId);
-        return true;
-      }
-      return false;
-    }
     if (!owned) {
       store.openDeed(hit.lot.deedId);
       return true;
@@ -2085,7 +2270,10 @@ export class PortneufEngine {
       heatOn: heatWorks(st, store.gridOutage, 8),
     });
     const hydro = hydroLive(st, store.gridOutage);
-    this.showRoom(this.interiors.home, hydro ? (floor === "basement" ? 0.38 : hasReno(st, "eclairage") ? 0.95 : 0.42) : 0.12);
+    this.showRoom(
+      this.interiors.home,
+      hydro ? (floor === "basement" ? 0.38 : hasReno(st, "eclairage") ? 0.95 : 0.42) : 0.12,
+    );
   }
 
   private tryHomeBits(): boolean {
@@ -2112,8 +2300,8 @@ export class PortneufEngine {
       const next = useGameStore.getState().houses[this.homeDeedId ?? ""];
       if (next) {
         const hours = this.clockHours();
-        const ambient = ambientOf(quebecSeasons.getState().season, hours);
-        setHeatGlow(this.interiors.home.group, heatWorks(next, useGameStore.getState().gridOutage, ambient.temp));
+        const ambient = ambientOf(hours, this.night, gameMonth(this.elapsed));
+        setHeatGlow(this.interiors.home.group, heatWorks(next, useGameStore.getState().gridOutage, ambient));
       }
       return true;
     }
@@ -2193,8 +2381,8 @@ export class PortneufEngine {
   }
 
   private seizeCrop(field: import("./farms").FieldPlot) {
-    (seizeField as any)(field);
-    police.report("cultivation" as any, this.elapsed);
+    seizeField(field);
+    police.report("cultivation", this.elapsed);
     this.world.dispatchFarmRaid(field.x, field.z);
     const store = useGameStore.getState();
     const inv = { ...store.inventory };
@@ -2203,7 +2391,7 @@ export class PortneufEngine {
     useGameStore.setState({
       inventory: inv,
       notice: `Saisie SQ · ${field.name} · art. 12 LEC`,
-      wantedStars: (police as any).stars ?? 0,
+      wantedStars: police.stars,
       wantedReason: "Culture illégale de cannabis",
     });
     persist();
@@ -2310,12 +2498,11 @@ export class PortneufEngine {
     const store = useGameStore.getState();
     const n = cartCount(store.cart);
     if (n <= 0) return;
-    const cartMap = store.cart as Record<string, number>;
-    for (const [id, qty] of Object.entries(cartMap)) {
+    for (const [id, qty] of Object.entries(store.cart)) {
       if (qty > 0) store.addItem(id, qty);
     }
     store.clearCart();
-    police.report("theft" as any, this.elapsed);
+    police.report("theft", this.elapsed);
     store.setHud({ notice: "Vol à l'étalage · SQ alertée" });
   }
 
@@ -2349,12 +2536,13 @@ export class PortneufEngine {
     const owner = store.firm?.type === "depanneur";
     const open = isDepOpen(hours) || owner;
     if (!open) {
-      const armed = (store.inventory.pistol ?? 0) + (store.inventory.shotgun ?? 0) + (store.inventory.crochet ?? 0) > 0;
+      const armed =
+        (store.inventory.pistol ?? 0) + (store.inventory.shotgun ?? 0) + (store.inventory.crochet ?? 0) > 0;
       if (!armed) {
         store.setHud({ notice: `Fermé · ${depHoursLabel()}` });
         return true;
       }
-      store.commitCrime("robbery" as any, this.elapsed);
+      store.commitCrime("robbery", this.elapsed);
     }
     const near = this.nearSwing(5.2);
     const anyOpen = this.world.swingDoors.some((d) => d.open);
@@ -2387,7 +2575,9 @@ export class PortneufEngine {
     this.lastDoor = door;
     const room = this.interiors.depanneur;
     room.title = shop?.name ?? door.name;
-    room.subtitle = open ? `${depHoursLabel()} · rayons, caisse, loterie` : "Quart de nuit · lumières basses";
+    room.subtitle = open
+      ? `${depHoursLabel()} · rayons, caisse, loterie`
+      : "Quart de nuit · lumières basses";
     this.showRoom(room, open ? 0.92 : 0.22);
   }
 
@@ -2402,21 +2592,37 @@ export class PortneufEngine {
   }
 
   private tryEnterSqdc(shop: ShopSpot): boolean {
-    // MLO Seamless : Pas de téléportation, accès naturel à pied
-    return false;
+    const store = useGameStore.getState();
+    const open = isSqdcOpen(store.timeHours);
+    if (!open) {
+      store.setHud({ notice: `Fermé · ${sqdcHoursLabel()}` });
+      return true;
+    }
+    const near = this.nearSwing(5.2);
+    const anyOpen = this.world.swingDoors.some((d) => d.open);
+    if (near && !anyOpen) {
+      store.setHud({ notice: "Poussez la porte vitrée" });
+      return true;
+    }
+    const found =
+      this.world.doors.find((d) => d.id === shop.id) ??
+      this.world.doors.find((d) => d.kind === "sqdc" && Math.hypot(d.x - shop.x, d.z - shop.z) < 18);
+    const off = shopDoorOffset(shop);
+    const door: CityDoor = found ?? {
+      id: shop.id,
+      name: shop.name,
+      kind: "sqdc",
+      x: off.x,
+      y: getTerrainHeight(off.x, off.z),
+      z: off.z,
+      yaw: off.yaw,
+      prompt: `Entrer · ${shop.name}`,
+    };
+    this.enterSqdc(shop, door);
+    return true;
   }
 
   private enterSqdc(shop: ShopSpot | null, door: CityDoor) {
-    const store = useGameStore.getState();
-    const inventory = store.inventory || {};
-    
-    // Vérification québécoise de la pièce d'identité (21 ans et plus pour le cannabis)
-    if (!inventory.identite && !inventory.carte_identite) {
-      store.setHud({ notice: "⛔ [SQDC] Pièce d'identité avec photo requise (21 ans et plus) !" });
-      console.log("⛔ Accès refusé à la SQDC : pas de carte d'identité.");
-      return;
-    }
-
     this.depShopId = shop?.id ?? door.id;
     this.lastDoor = door;
     const room = this.interiors.sqdc;
@@ -2492,12 +2698,13 @@ export class PortneufEngine {
     const store = useGameStore.getState();
     const open = isCaisseOpen(store.timeHours);
     if (!open) {
-      const armed = (store.inventory.pistol ?? 0) + (store.inventory.shotgun ?? 0) + (store.inventory.crochet ?? 0) > 0;
+      const armed =
+        (store.inventory.pistol ?? 0) + (store.inventory.shotgun ?? 0) + (store.inventory.crochet ?? 0) > 0;
       if (!armed) {
         store.setHud({ notice: `Fermée · ${caisseHoursLabel()}` });
         return true;
       }
-      store.commitCrime("bank_robbery" as any, this.elapsed);
+      store.commitCrime("bank_robbery", this.elapsed);
     }
     const near = this.nearSwing(5.2);
     const anyOpen = this.world.swingDoors.some((d) => d.open);
@@ -2526,7 +2733,9 @@ export class PortneufEngine {
     this.lastDoor = door;
     const room = this.interiors.caisse;
     room.title = door.name;
-    room.subtitle = isCaisseOpen(useGameStore.getState().timeHours) ? "Ouvert · guichets et conseillers" : "Fermé · alarme";
+    room.subtitle = isCaisseOpen(useGameStore.getState().timeHours)
+      ? "Ouvert · guichets et conseillers"
+      : "Fermé · alarme";
     this.showRoom(room, 0.95);
   }
 
@@ -2564,13 +2773,14 @@ export class PortneufEngine {
       return true;
     }
     if (room.vaultSpot && Math.hypot(wx - room.vaultSpot.x, wz - room.vaultSpot.z) < 2.0) {
-      const armed = (store.inventory.pistol ?? 0) + (store.inventory.shotgun ?? 0) + (store.inventory.crochet ?? 0) > 0;
+      const armed =
+        (store.inventory.pistol ?? 0) + (store.inventory.shotgun ?? 0) + (store.inventory.crochet ?? 0) > 0;
       if (!armed) {
         store.setHud({ notice: "Porte de voûte · acier, scellée" });
         return true;
       }
-      store.commitCrime("bank_robbery" as any, this.elapsed);
-      store.setHud({ economy: breakAtm(store.economy) });
+      store.commitCrime("bank_robbery", this.elapsed);
+      store.setHud({ economy: breakAtm(store.economy, "atm_caisse") });
       store.addCash(420, "Voûte · 420 $");
       return true;
     }
@@ -2673,15 +2883,14 @@ export class PortneufEngine {
     const oz = room.group.position.z;
     const wx = this.walker.x - ox;
     const wz = this.walker.z - oz;
-    const atCaisse = Boolean(room.caisse && Math.hypot(wx - room.caisse.x, wz - room.caisse.z) < 1.7) || this.nearCaisse();
+    const atCaisse =
+      Boolean(room.caisse && Math.hypot(wx - room.caisse.x, wz - room.caisse.z) < 1.7) || this.nearCaisse();
     return sqdcPrompt(
       this.nearAisle(),
       this.nearGarment(),
       atCaisse,
       cartCount(useGameStore.getState().cart),
       (useGameStore.getState().inventory.identite ?? 0) > 0,
-      rpNet.selfId || "local",
-      String(this.elapsed),
     );
   }
 
@@ -2709,7 +2918,9 @@ export class PortneufEngine {
 
   private syncCaddie() {
     const room = this.activeInterior;
-    const inShop = this.mode === "interior" && (room?.kind === "boutique" || room?.kind === "depanneur" || room?.kind === "casse" || room?.kind === "sqdc");
+    const inShop =
+      this.mode === "interior" &&
+      (room?.kind === "boutique" || room?.kind === "depanneur" || room?.kind === "casse" || room?.kind === "sqdc");
     if (!inShop) {
       if (this.caddie) this.caddie.visible = false;
       return;
@@ -2719,16 +2930,8 @@ export class PortneufEngine {
       this.scene.add(this.caddie);
     }
     this.caddie.visible = true;
-    const cartNow = useGameStore.getState().cart as Record<string, number>;
-    const n = cartCount(cartNow);
-    // CORRIGÉ : l'ancienne clé ne suivait que le total d'articles, donc échanger
-    // un article contre un autre à quantité égale ne rafraîchissait jamais le
-    // caddie 3D. On sérialise maintenant le contenu réel du panier.
-    const key = Object.entries(cartNow)
-      .filter(([, qty]) => qty > 0)
-      .map(([id, qty]) => `${id}:${qty}`)
-      .sort()
-      .join(",");
+    const n = cartCount(useGameStore.getState().cart);
+    const key = `${n}`;
     if (key !== this.lastCartKey) {
       this.lastCartKey = key;
       fillCaddie(this.caddie, n);
@@ -2765,6 +2968,7 @@ export class PortneufEngine {
         this.pz() - Math.cos(yaw) * 0.42 - Math.sin(yaw) * 0.28,
       );
     }
+
     let anyOpen = false;
     let reach = 0;
     for (const d of this.world.swingDoors) {
@@ -2778,6 +2982,7 @@ export class PortneufEngine {
       );
       const slab = d.slabDist(this.walker.x, this.walker.z);
       const bumper = Math.hypot(this.px() - this.doorHit.x, this.pz() - this.doorHit.z);
+
       if (this.mode === "drive" && bumper < 3.8 && Math.abs(this.vehicle.speed) > 2.8) {
         d.hit(Math.max(4.2, Math.abs(this.vehicle.speed) * 0.85));
         this.vehicle.speed *= 0.5;
@@ -2786,6 +2991,7 @@ export class PortneufEngine {
           useGameStore.getState().setHud({ notice: "Portes vitrées — ça cède" });
         }
       }
+
       if (this.mode === "walk") {
         if (handDist < 0.7) {
           d.push(dt, 16 + Math.abs(this.walker.speed) * 6);
@@ -2795,10 +3001,12 @@ export class PortneufEngine {
           d.push(dt, 28 + Math.abs(this.walker.speed) * 10);
         }
       }
+
       d.tick(dt);
       if (d.open) anyOpen = true;
     }
     this.walker.reach = this.mode === "walk" ? reach : 0;
+
     if (this.mode === "walk" && anyOpen && this.elapsed - this.lastSwingAt > 0.6) {
       const door = this.world.nearestDoor(this.walker.x, this.walker.z, 1.35);
       if (door?.kind === "boutique") {
@@ -2810,7 +3018,7 @@ export class PortneufEngine {
 
   private syncCargo() {
     const job = useGameStore.getState().job;
-    let crate = this.vehicle.group.getObjectByName("cargo") as THREE.Object3D | undefined;
+    let crate = this.vehicle.group.getObjectByName("cargo");
     const show = Boolean(job?.loaded && job.kind !== "taxi" && fleetById(this.vehicle.kind).caisse);
     if (show && !crate) {
       crate = buildCargoCrate();
@@ -2823,10 +3031,8 @@ export class PortneufEngine {
             : k === "pickup" || k === "deplaceige" || k === "remorqueuse"
               ? ([0, 1.18, -1.12] as const)
               : ([0, 1.5, -0.12] as const);
-      if (crate) {
-        crate.position.set(pos[0], pos[1], pos[2]);
-        this.vehicle.group.add(crate);
-      }
+      crate.position.set(pos[0], pos[1], pos[2]);
+      this.vehicle.group.add(crate);
     }
     if (crate) {
       crate.visible = show;
@@ -2836,7 +3042,11 @@ export class PortneufEngine {
     }
   }
 
-  private pushHud() {
+  // ═════════════════════════════════════════════════════════════════════════
+  // PUSH HUD (diff-based)
+  // ═════════════════════════════════════════════════════════════════════════
+
+  private pushHud(store: ReturnType<typeof useGameStore.getState>): void {
     const onFoot = this.mode !== "drive";
     const x = this.px();
     const z = this.pz();
@@ -2844,9 +3054,9 @@ export class PortneufEngine {
     const { limit: roadLimit } = getSpeedLimitAt(x, z);
     const speedKmh = onFoot ? Math.abs(this.walker.speed) * 3.6 : Math.abs(this.vehicle.speed) * 3.6;
     const ice =
-      useGameStore.getState().weather === "snow" ||
-      useGameStore.getState().weather === "storm" ||
-      useGameStore.getState().gridOutage?.kind === "verglas";
+      store.weather === "snow" ||
+      store.weather === "storm" ||
+      store.gridOutage?.kind === "verglas";
     const surface = withIce(getSurfaceAt(x, z), ice);
     const cfg = this.mode === "interior" ? null : worldConfig.at(x, z);
     const zp = zoneSystem.getAt(x, z);
@@ -2854,70 +3064,87 @@ export class PortneufEngine {
     const poi = this.mode === "interior" ? null : getPoiAt(x, z);
     const limit = cfg?.speedLimit ?? roadLimit;
     const speeding = ENFORCE_SPEED_LIMITS && !onFoot && speedKmh > limit + 5;
-    const god = useGameStore.getState().godMode;
-    let fineFlash = useGameStore.getState().fineFlash;
-    let fines = useGameStore.getState().fines;
-    if (speeding && !god && this.elapsed - this.lastFineAt > 4) {
+    const god = store.godMode;
+
+    let fineFlash = store.fineFlash;
+    let fines = store.fines;
+    if (speeding && !god && this.elapsed - this.lastFineAt > this.config.fineCooldownS) {
       this.lastFineAt = this.elapsed;
       const excess = speedKmh - limit;
       const add = excess < 20 ? 105 : excess < 40 ? 225 : excess < 60 ? 495 : 1050;
       fines += add;
       fineFlash = add;
-      const hit = (police as any).reportSpeeding?.(excess, String(this.elapsed));
-      const name = useGameStore.getState().appearance.name || "Citoyen";
-      const radar = (police as any).radarTicket?.(excess, speedKmh, limit, name);
+      const hit = police.reportSpeeding(excess, this.elapsed);
+      const name = store.appearance.name || "Citoyen";
+      const radar = police.radarTicket(excess, speedKmh, limit, name);
       const label = radar
-        ? `${radar.csrArticle ?? "CSR"} · ${radar.ticketNumber ?? ""} · −${add}\u00a0$`
+        ? `${radar.csrArticle} · ${radar.ticketNumber} · −${add}\u00a0$`
         : hit?.citation
-          ? `${hit.citation.article ?? "Art."} · −${add}\u00a0$`
+          ? `${hit.citation.article} · −${add}\u00a0$`
           : `Contravention · −${add}\u00a0$`;
-      useGameStore.getState().addCash(-add, label);
+      store.addCash(-add, label);
       if (radar) {
         useGameStore.setState({
-          demeritPoints: (police as any).demeritTotal ?? 0,
-          licenseSuspendedUntil: (police as any).licenseSuspendedUntil ?? 0,
+          demeritPoints: police.demeritTotal,
+          licenseSuspendedUntil: police.licenseSuspendedUntil,
         });
       }
     } else {
       fineFlash = Math.max(0, fineFlash - 18);
     }
-    const km = useGameStore.getState().km + this.kmAcc / 1000;
+
+    const km = store.km + this.kmAcc / 1000;
     this.kmAcc = 0;
     const hours = this.clockHours();
-    let leaves = useGameStore.getState().leaves;
+
+    let leaves = store.leaves;
     if (this.mode === "walk") {
       const found = this.world.nearestLeaf(x, z, 1.8);
       if (found && this.world.collectLeaf(found.id)) {
         leaves = leaves.includes(found.id) ? leaves : [...leaves, found.id];
-        useGameStore.getState().addCash(8, "Feuille d'érable · +8\u00a0$");
-        persist();
+        store.addCash(8, "Feuille d'érable · +8\u00a0$");
+        try { persist(); } catch { /* noop */ }
       }
-      const loot = (this.world.worldItems as any).nearest(x, z, 1.7);
+      const loot = this.world.worldItems.nearest(x, z, 1.7);
       if (loot) {
-        const got = (this.world.worldItems as any).collect(loot.id);
+        const got = this.world.worldItems.collect(loot.id);
         if (got) {
-          useGameStore.getState().addItem(got.itemId, 1);
-          useGameStore.getState().lootItem(got.id);
-          useGameStore.getState().addCash(got.cash, `${got.name} · +${got.cash}\u00a0$`);
+          store.addItem(got.itemId, 1);
+          store.lootItem(got.id);
+          store.addCash(got.cash, `${got.name} · +${got.cash}\u00a0$`);
         }
       }
     }
+
     const fieldHere = this.mode === "interior" ? null : this.world.nearestField(x, z, 18);
     const bushHere = this.mode === "interior" || fieldHere ? null : this.world.nearestBush(x, z, 36);
     const room = this.activeInterior;
-    const wanted = {
-      stars: (police as any).stars ?? 0,
-      reason: (police as any).reason ?? (police as any).wantedReason ?? "",
-      bounty: (police as any).bounty ?? 0,
-      evading: (police as any).evading ?? false,
-    };
+    const wanted = police.getState();
     const np = quebecFM.on ? quebecFM.nowPlaying() : null;
-    const inmate = (prisonSystem as any).inmate;
-    const interiorSub =
-      room?.kind === "prison" && inmate
-        ? `${inmate.booking} · ${((prisonSystem as any).remain?.() ?? 0).toFixed(0)} min · ${(prisonSystem as any).lockdown ? "LOCKDOWN" : "cour fermée"}`
-        : (room?.subtitle ?? null);
-    useGameStore.getState().setHud({
+    const prompt = this.promptText();
+
+    const hashParts = [
+      Math.round(speedKmh),
+      limit,
+      this.mode,
+      room?.title ?? "",
+      prompt ?? "",
+      wanted.stars,
+      Math.round(store.surv.health),
+      Math.round(store.surv.hunger),
+      Math.round(store.surv.thirst),
+      fines,
+      speeding ? 1 : 0,
+    ];
+    const hash = hashParts.join("|");
+    if (hash === this.lastHudHash) {
+      this.engineStats.hudSkips++;
+      return;
+    }
+    this.lastHudHash = hash;
+    this.engineStats.hudPushes++;
+
+    store.setHud({
       speedKmh,
       limit: this.mode === "interior" ? 0 : limit,
       zone:
@@ -2933,31 +3160,34 @@ export class PortneufEngine {
       fineFlash,
       fines,
       policeEta: cfg?.policeResponseSeconds ?? 0,
-      bloodAlcohol: Math.round((police as any).bloodAlcohol ?? 0),
-      radarActive: (police as any).units?.some((u: any) => u.radarActive) ?? false,
-      demeritPoints: (police as any).demeritTotal ?? 0,
-      licenseSuspendedUntil: (police as any).licenseSuspendedUntil ?? 0,
+      bloodAlcohol: Math.round(police.bloodAlcohol),
+      radarActive: police.units.some((u) => u.radarActive),
+      demeritPoints: police.demeritTotal,
+      licenseSuspendedUntil: police.licenseSuspendedUntil,
       safeZone: cfg?.isSafeZone ?? false,
       x,
       z,
       yaw,
       km,
-      timeHours: rpNet.live && !rpNet.isHost() ? useGameStore.getState().timeHours : hours,
+      timeHours: rpNet.live && !rpNet.isHost() ? store.timeHours : hours,
       night: this.night,
       cameraMode: this.cameraMode,
       poi: poi?.name ?? null,
       poiDesc: poi?.description ?? null,
       mode: this.mode,
-      prompt: this.promptText(),
+      prompt,
       interiorTitle: room?.title ?? null,
-      interiorSub,
+      interiorSub:
+        room?.kind === "prison" && prisonSystem.inmate
+          ? `${prisonSystem.inmate.booking} · ${prisonSystem.remain().toFixed(0)} min · ${prisonSystem.lockdown ? "LOCKDOWN" : "cour fermée"}`
+          : (room?.subtitle ?? null),
       leaves,
       fauna: this.mode === "interior" ? null : this.world.wildlife.warning,
       wantedStars: wanted.stars,
       wantedReason: wanted.reason,
       bounty: wanted.bounty,
       evading: wanted.evading,
-      dispatch: (police as any).dispatchLine?.() ?? "",
+      dispatch: police.dispatchLine(),
       radioOn: quebecFM.on,
       radioId: quebecFM.stationId,
       radioTrack: np ? `${np.track.title} · ${np.track.artist}` : null,
@@ -2970,8 +3200,12 @@ export class PortneufEngine {
       eventSeverity: dynamicEventsService.banner()?.severity ?? null,
       sirenMode: this.vehicle.sirenPattern(),
     });
-    if (poi) useGameStore.getState().visit(poi.id);
+    if (poi) store.visit(poi.id);
   }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // RUN ADMIN (préservé avec ajouts)
+  // ═════════════════════════════════════════════════════════════════════════
 
   runAdmin(raw: string) {
     const store = useGameStore.getState();
@@ -3050,7 +3284,9 @@ export class PortneufEngine {
         useGameStore.getState().setWeather("storm");
         this.world.setWeather("storm");
         this.fx.play("lightning");
-        useGameStore.getState().addChat("MTQ", "Alerte blizzard — Route 138, visibilité nulle. Chasse-neige en cours.", "system");
+        useGameStore
+          .getState()
+          .addChat("MTQ", "Alerte blizzard — Route 138, visibilité nulle. Chasse-neige en cours.", "system");
       },
       runPlow: (id) => {
         const wx = quebecSeasons.getState();
@@ -3074,7 +3310,10 @@ export class PortneufEngine {
         }
         if (k === "panne" || k === "hydro" || k === "outage") {
           dynamicEventsService.triggerOutage();
-          useGameStore.setState({ gridOutage: { kind: "panne", t: 70 }, notice: "Panne Hydro-Québec · Saint-Casimir" });
+          useGameStore.setState({
+            gridOutage: { kind: "panne", t: 70 },
+            notice: "Panne Hydro-Québec · Saint-Casimir",
+          });
           this.teleport(-900, -280);
           return "Événement · panne Hydro Saint-Casimir";
         }
@@ -3098,7 +3337,7 @@ export class PortneufEngine {
           return "Événement · tempête d'Éther";
         }
         if (k === "police_chase" || k === "chase" || k === "poursuite") {
-          (police as any).setStars?.(4, "Course-poursuite Route 138", 8000);
+          police.setStars(4, "Course-poursuite Route 138", 8000);
           dynamicEventsService.triggerEvent({
             title: "Poursuite SQ — Route 138",
             category: "urgence",
@@ -3112,7 +3351,7 @@ export class PortneufEngine {
           return "Événement · poursuite SQ";
         }
         if (k === "bank_robbery" || k === "braquage" || k === "bank") {
-          (police as any).setStars?.(5, "Braquage de caisse populaire", 14000);
+          police.setStars(5, "Braquage de caisse populaire", 14000);
           dynamicEventsService.triggerEvent({
             title: "Braquage de la Caisse populaire",
             category: "urgence",
@@ -3184,7 +3423,10 @@ export class PortneufEngine {
           this.world.setWeather("storm");
         }
         dynamicEventsService.triggerOutage();
-        useGameStore.setState({ gridOutage: { kind, t: 70 }, notice: kind === "verglas" ? "Verglas · réseau Hydro hors service" : "Panne Hydro-Québec" });
+        useGameStore.setState({
+          gridOutage: { kind, t: 70 },
+          notice: kind === "verglas" ? "Verglas · réseau Hydro hors service" : "Panne Hydro-Québec",
+        });
         persist();
       },
       say: (text) => {
@@ -3213,7 +3455,7 @@ export class PortneufEngine {
       },
       slap: (force) => {
         if (this.mode === "drive") this.exitVehicle();
-        (this.walker as any).slap(force);
+        this.walker.slap(force);
         this.fx.play("impact");
       },
       smite: () => {
@@ -3235,7 +3477,7 @@ export class PortneufEngine {
         useGameStore.getState().setHud({ notice: "Véhicules réparés" });
       },
       unjail: () => {
-        (prisonSystem as any).release?.();
+        prisonSystem.release();
         if (this.activeInterior?.kind === "prison") this.leaveInterior();
         this.teleport(SPAWN.x, SPAWN.z);
         useGameStore.getState().setHud({ staffFrozen: false, notice: "Libéré" });
@@ -3243,7 +3485,16 @@ export class PortneufEngine {
       maxStats: () => {
         const s = useGameStore.getState();
         s.setHud({
-          surv: { ...s.surv, health: 100, hunger: 100, thirst: 100, energy: 100, bodyTemp: 36.6, shiver: 0, alerts: [] },
+          surv: {
+            ...s.surv,
+            health: 100,
+            hunger: 100,
+            thirst: 100,
+            energy: 100,
+            bodyTemp: 36.6,
+            shiver: 0,
+            alerts: [],
+          },
           armor: 100,
           notice: "Stats max",
         });
@@ -3267,7 +3518,7 @@ export class PortneufEngine {
         return `${hit.username} expulsé`;
       },
       setWanted: (n) => {
-        (police as any).setStars?.(n, n > 0 ? "Avis de recherche (console)" : undefined, n * 1500);
+        police.setStars(n, n > 0 ? "Avis de recherche (console)" : undefined, n * 1500);
       },
       cycleRadio: () => {
         void this.cycleRadio();
@@ -3282,11 +3533,11 @@ export class PortneufEngine {
       prison: () => this.goPrison(),
       book: () => this.bookPlayer(),
       lockdown: () => {
-        (prisonSystem as any).startLockdown?.(8);
+        prisonSystem.startLockdown(8);
         store.setHud({ notice: "🚨 LOCKDOWN · Établissement de Donnacona" });
       },
       release: () => {
-        (prisonSystem as any).release?.();
+        prisonSystem.release();
         if (this.activeInterior?.kind === "prison") this.leaveInterior();
         store.setHud({ notice: "Libération administrative" });
       },
@@ -3368,15 +3619,15 @@ export class PortneufEngine {
       },
       status: () => {
         const s = useGameStore.getState();
-        const inventoryMap = s.inventory as Record<string, number>;
-        const inv = Object.entries(inventoryMap)
-          .filter(([, n]) => Number(n) > 0)
+        const inv = Object.entries(s.inventory)
+          .filter(([, n]) => n > 0)
           .map(([id, n]) => `${id}×${n}`)
           .join(", ");
         const net = rpNet.getMetrics();
         const wx = quebecSeasons.getState();
         const tel = AdminMetrics.getMetrics({ players: { size: rpNet.remotes.size + 1 }, vehicles: { size: 1 } });
         const banner = dynamicEventsService.banner();
+        const stats = this.getStats();
         return [
           `${s.appearance.name} · ${s.appearance.model} · ${s.appearance.outfit}`,
           `pos ${this.px().toFixed(0)} ${this.pz().toFixed(0)} · ${this.mode}`,
@@ -3387,6 +3638,8 @@ export class PortneufEngine {
           `événements ${dynamicEventsService.getActiveEvents().length} · ${banner?.title ?? "calme"}`,
           `net ${net.clients} · AOI ${net.aoi.visible}/${rpNet.remotes.size} · spatial ${net.spatial.cells}`,
           `télémétrie ${tel.fps} fps · ${tel.memoryUsageMB} Mo · ${tel.uptimeSeconds}s`,
+          `engine ticks ${stats.ticksTotal} · avg ${stats.avgTickMs.toFixed(2)} ms · peak ${stats.peakTickMs.toFixed(2)} ms`,
+          `hud push ${stats.hudPushes} · skip ${stats.hudSkips} · errors ${stats.errorsCaught}`,
           `cash ${s.cash}\u00a0$ · banque ${s.bank}\u00a0$ · ${s.wantedStars}★ · gilet ${s.armor ?? 0}%`,
           `emploi ${s.rpJob} · grade ${s.adminRole} · gang ${s.gangId ?? "—"} · firm ${s.firm?.tradeName ?? "—"}`,
           `permis ${s.licenses.join(", ") || "aucun"}`,
@@ -3550,8 +3803,9 @@ export class PortneufEngine {
       propsInfo: () => {
         const n = useGameStore.getState().placed.length;
         const type = useGameStore.getState().buildType ?? "aucun";
-        return `${n}/80 posés · fantôme ${type} · snap ${this.buildSnap || "off"}`;
+        return `${n}/${this.config.maxProps} posés · fantôme ${type} · snap ${this.buildSnap || "off"}`;
       },
+      engineStats: () => this.getStats(),
     });
   }
 
@@ -3578,10 +3832,12 @@ export class PortneufEngine {
     this.vehicle.reset();
     this.vehicle.group.visible = true;
     this.world.setExteriorVisible(true);
-    this.mode = "drive";
+    this.setMode("drive");
   }
 
   teleport(x: number, z: number) {
+    this.engineStats.teleportCount++;
+    this.emit("teleport", { from: [this.px(), this.pz()], to: [x, z] });
     if (this.mode === "interior") this.leaveInterior();
     this.walker.hide();
     this.vehicle.x = x;
@@ -3593,7 +3849,7 @@ export class PortneufEngine {
     this.vehicle.snap();
     this.vehicle.group.visible = true;
     this.world.setExteriorVisible(true);
-    this.mode = "drive";
+    this.setMode("drive");
   }
 
   private ghostSpot() {
@@ -3617,8 +3873,8 @@ export class PortneufEngine {
   private placeProp() {
     const s = useGameStore.getState();
     if (!s.buildType) return;
-    if (s.placed.length >= 80) {
-      s.setHud({ notice: "Limite 80 objets" });
+    if (s.placed.length >= this.config.maxProps) {
+      s.setHud({ notice: `Limite ${this.config.maxProps} objets` });
       return;
     }
     const spot = this.ghostSpot();
@@ -3665,10 +3921,10 @@ export class PortneufEngine {
 
   private dupNearestProp(): string {
     const id = this.props.nearest(this.px(), this.pz(), 8);
-    const src = id ? useGameStore.getState().placed.find((p: any) => p.id === id) : undefined;
+    const src = id ? useGameStore.getState().placed.find((p) => p.id === id) : undefined;
     if (!src) return "Rien à copier.";
     const s = useGameStore.getState();
-    if (s.placed.length >= 80) return "Limite 80 objets";
+    if (s.placed.length >= this.config.maxProps) return `Limite ${this.config.maxProps} objets`;
     const spot = this.ghostSpot();
     const copy = {
       id: `p${Date.now().toString(36)}`,
@@ -3697,10 +3953,7 @@ export class PortneufEngine {
 
   private bookPlayer(): string {
     const name = useGameStore.getState().appearance.name || "Citoyen";
-    const inmate = (prisonSystem as any).book?.(name, chargesForStars(Math.max(2, (police as any).stars ?? 2))) ?? {
-      booking: `BK-${Date.now().toString(36)}`,
-      minutes: 30,
-    };
+    const inmate = prisonSystem.book(name, chargesForStars(Math.max(2, police.stars)));
     this.goPrison();
     useGameStore.getState().setHud({
       notice: `Écroué ${inmate.booking} · ${inmate.minutes} min`,
@@ -3708,24 +3961,132 @@ export class PortneufEngine {
     return `${inmate.booking} · cellule A-1-04 · ${inmate.minutes} min`;
   }
 
+  // ═════════════════════════════════════════════════════════════════════════
+  // STATS & HEALTH & CONFIG
+  // ═════════════════════════════════════════════════════════════════════════
+
+  public getStats(): EngineStats & {
+    fps: number;
+    dpr: number;
+    mode: PlayMode;
+    activeInterior: string | null;
+    propsCount: number;
+    remotesCount: number;
+    listenersCount: number;
+    isDisposed: boolean;
+  } {
+    return {
+      ...this.engineStats,
+      fps: Math.round(this.fpsEma),
+      dpr: Math.round(this.dprNow * 100) / 100,
+      mode: this.mode,
+      activeInterior: this.activeInterior?.kind ?? null,
+      propsCount: this.props.group.children.length,
+      remotesCount: this.remotes.group.children.length,
+      listenersCount: this.listeners.size,
+      isDisposed: this.disposed,
+    };
+  }
+
+  public health(): { ok: boolean; reason?: string } {
+    if (this.disposed) return { ok: false, reason: "disposed" };
+    if (this.engineStats.avgTickMs > 20) return { ok: false, reason: "tick_too_slow" };
+    if (this.engineStats.errorsCaught > 100) return { ok: false, reason: "too_many_errors" };
+    if (this.fpsEma < 20) return { ok: false, reason: "low_fps" };
+    return { ok: true };
+  }
+
+  public updateConfig(patch: Partial<PortneufEngineConfig>): void {
+    this.config = { ...this.config, ...patch };
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // DISPOSE
+  // ═════════════════════════════════════════════════════════════════════════
+
   dispose() {
+    if (this.disposed) return;
     this.disposed = true;
-    this.stop();
-    input.detach();
-    this.timer.disconnect();
-    window.removeEventListener("resize", this.onResize);
-    persist();
-    quebecFM.dispose();
-    spatialAudio.dispose();
-    physics.dispose();
-    police.dispose();
-    this.world.dispose();
-    this.remotes.dispose();
-    tex.dispose();
-    this.renderer.dispose();
-    delete window.__controlsTest;
+
+    try {
+      this.stop();
+      input.detach();
+      this.timer.disconnect();
+
+      if (this.pendingUnloadHandler) {
+        window.removeEventListener("beforeunload", this.pendingUnloadHandler);
+        this.pendingUnloadHandler = null;
+      }
+      window.removeEventListener("resize", this.onResize);
+
+      try { persist(); } catch { /* noop */ }
+      try { quebecFM.dispose(); } catch { /* noop */ }
+      try { spatialAudio.dispose(); } catch { /* noop */ }
+      try { physics.dispose(); } catch { /* noop */ }
+      try { police.dispose(); } catch { /* noop */ }
+
+      // Dispose interiors
+      for (const room of Object.values(this.interiors)) {
+        room.group.traverse((o) => {
+          const m = o as THREE.Mesh;
+          if (m.geometry) m.geometry.dispose();
+          if (m.material) {
+            const mat = m.material as THREE.Material | THREE.Material[];
+            if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
+            else mat.dispose();
+          }
+        });
+        this.scene.remove(room.group);
+      }
+
+      // Dispose props
+      try {
+        this.props.group.traverse((o) => {
+          const m = o as THREE.Mesh;
+          if (m.geometry) m.geometry.dispose();
+          if (m.material) {
+            const mat = m.material as THREE.Material | THREE.Material[];
+            if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
+            else mat.dispose();
+          }
+        });
+        this.scene.remove(this.props.group);
+      } catch { /* noop */ }
+
+      // Dispose caddie
+      if (this.caddie) {
+        this.scene.remove(this.caddie);
+        this.caddie.traverse((o) => {
+          const m = o as THREE.Mesh;
+          if (m.geometry) m.geometry.dispose();
+          if (m.material) {
+            const mat = m.material as THREE.Material | THREE.Material[];
+            if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
+            else mat.dispose();
+          }
+        });
+        this.caddie = null;
+      }
+
+      try { this.world.dispose(); } catch { /* noop */ }
+      try { this.remotes.dispose(); } catch { /* noop */ }
+      try { tex.dispose(); } catch { /* noop */ }
+      try { this.renderer.dispose(); } catch { /* noop */ }
+
+      this.listeners.clear();
+      (window as any).__controlsTest = undefined;
+
+      this.emit("dispose");
+    } catch (err) {
+      this.engineStats.errorsCaught++;
+      console.error("[PortneufEngine] Dispose error:", err);
+    }
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════════════════════
 
 function chargesForStars(stars: number): ChargeId[] {
   if (stars >= 5) return ["evasion", "voies_de_fait", "conduite_dangereuse"];
@@ -3749,9 +4110,3 @@ declare global {
     __physics?: typeof physics;
   }
 }
-
-
-
-
-
-

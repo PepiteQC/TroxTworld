@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 💼 PANNEAU CARRIÈRES, CONTRATS & DISPATCH TRANSPORT — TROXTWORLD
  * Fichier: src/game/JobsOverlay.tsx
  */
@@ -232,7 +232,7 @@ export function JobsOverlay() {
                         </div>
                         <div className="flex justify-between text-sm pt-2">
                           <span className="text-neutral-400">Durée du quart :</span>
-                          <span className="font-mono font-bold text-white">{liveShiftHours.toFixed(3)} heures</span>
+                          <span className="font-mono font-bold text-white">{(liveShiftHours ?? 0).toFixed(3)} heures</span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-neutral-400">Salaire brut accumulé :</span>
@@ -251,7 +251,7 @@ export function JobsOverlay() {
                         <div className="flex items-center gap-2 text-[10px] uppercase font-bold text-neutral-400">
                           <TrendingUp className="size-3.5 text-cyan-400" /> Expérience Cumulée
                         </div>
-                        <p className="mt-1 text-lg font-bold text-white">{contract.hoursWorkedTotal.toFixed(1)}h</p>
+                        <p className="mt-1 text-lg font-bold text-white">{(contract.hoursWorkedTotal ?? 0).toFixed(1)}h</p>
                         <p className="text-[10px] text-neutral-500 mt-0.5">Heures de service totales</p>
                       </div>
                       <div className="rounded-lg bg-black/25 p-3 border border-white/5">
