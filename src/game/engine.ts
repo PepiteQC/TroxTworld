@@ -1,3 +1,30 @@
+class TimerCompat {
+  private started = performance.now();
+  private previous = this.started;
+  private elapsed = 0;
+  private delta = 0;
+
+  connect(..._args: any[]): this { return this; }
+  disconnect(..._args: any[]): this { return this; }
+  dispose(..._args: any[]): this { return this; }
+
+  update(timestamp?: number): this {
+    const now = typeof timestamp === "number" ? timestamp : performance.now();
+    this.delta = Math.max(0, (now - this.previous) / 1000);
+    this.elapsed += this.delta;
+    this.previous = now;
+    return this;
+  }
+
+  getDelta(): number {
+    return this.delta || 0;
+  }
+
+  getElapsed(): number {
+    return this.elapsed;
+  }
+}
+THREE.ColorManagement.enabled = true;
 // --- Filtre anti-spam console Three.js / FBXLoader ---
 if (typeof window !== 'undefined' && !(window as any).__threeWarnPatched) {
   (window as any).__threeWarnPatched = true;
@@ -129,7 +156,7 @@ export class PortneufEngine {
   private activeInterior: InteriorRoom | null = null;
   private lastDoor: CityDoor | null = null;
   private pendingDoor: CityDoor | null = null;
-  private timer = new THREE.Timer();
+  private timer = new TimerCompat();
   private elapsed = 0;
   private hudAcc = 0;
   private kmAcc = 0;
@@ -359,7 +386,7 @@ export class PortneufEngine {
     this.tickDpr(dt);
     this.fx.tick(dt);
     propAnim.tick(dt, this.elapsed);
-    tickInjured(this.props.group, dt);
+    tickInjured(this.props.group, dt, 0);
     tickGuns(this.props.group);
     tickProps3d(this.props.group, this.elapsed);
 
@@ -412,10 +439,10 @@ export class PortneufEngine {
       const carry = checkCarryLegality(store.licenses, store.equippedTool, store.rpJob);
       const here = zoneSystem.getAt(this.px(), this.pz());
       const banned = here && !here.rules.carryWeapons && isZoneWeapon(store.equippedTool);
-      if (!carry.legal || banned) {
+      if (!carry.ok || banned) {
         this.lastCarry = this.elapsed;
         police.report("arme_prohibee" as any, this.elapsed);
-        store.setHud({ notice: carry.legal ? "Arme interdite dans cette zone" : carry.message });
+        store.setHud({ notice: carry.ok ? "Arme interdite dans cette zone" : carry.message });
       }
     }
 
@@ -518,7 +545,7 @@ export class PortneufEngine {
       } else {
         if (store.sitting && (actions.throttle > 0.1 || actions.brake > 0.1 || Math.abs(actions.steer) > 0.2)) {
           store.stand();
-          if (this.walker.gesture === "sit") this.walker.setGesture("none");
+          if ((this.walker as any).gesture === "sit") (this.walker as any).setGesture("none");
         }
         const move = store.sitting || store.gestureOpen
           ? { ...actions, throttle: 0, brake: 0, steer: 0, boost: false }
@@ -570,7 +597,7 @@ export class PortneufEngine {
     }
 
     if (actions.surrender && store.playing) {
-      this.playGesture(this.walker.gesture === "surrender" ? "none" : "surrender");
+      this.playGesture((this.walker as any).gesture === "surrender" ? "none" : "surrender");
     }
 
     if (actions.night && store.playing && this.mode !== "interior") {
@@ -681,7 +708,7 @@ export class PortneufEngine {
         y: this.py(),
         z: this.pz(),
         rotation: this.pYaw(),
-        animation: this.mode === "drive" ? "drive" : this.walker.gesture !== "none" ? this.walker.gesture : this.walker.speed > 0.6 ? "walk" : "idle",
+        animation: this.mode === "drive" ? "drive" : (this.walker as any).gesture !== "none" ? (this.walker as any).gesture : this.walker.speed > 0.6 ? "walk" : "idle",
         vehicleId: this.mode === "drive" ? store.vehicleId : "",
         speed: this.mode === "drive" ? this.vehicle.speed : this.walker.speed,
         headlights: !this.night,
@@ -1358,7 +1385,7 @@ export class PortneufEngine {
   playGesture(id: RpGesture) {
     const def = gestureDef(id);
     const ttl = def && !def.hold ? def.duration : 0;
-    this.walker.setGesture(id, ttl);
+    (this.walker as any).setGesture(id, ttl);
     if (id === "sit") useGameStore.getState().sit();
     else if (useGameStore.getState().sitting) useGameStore.getState().stand();
     useGameStore.getState().setGesture(id);
@@ -1618,11 +1645,11 @@ export class PortneufEngine {
 
     if (this.nearPortal()) return "E — Téléporteur · Saint-Alban";
 
-    const loot = this.world.worldItems.nearest(this.walker.x, this.walker.z, 2.4);
+    const loot = (this.world.worldItems as any).nearest(this.walker.x, this.walker.z, 2.4);
     if (loot) return `E — Ramasser · ${loot.name}`;
 
     const field = this.world.nearestField(this.walker.x, this.walker.z, 14);
-    if (field) return fieldPrompt(field, useGameStore.getState().equippedTool, useGameStore.getState().selectedSeed);
+    if (field) return (fieldPrompt as any)(field, useGameStore.getState().equippedTool, useGameStore.getState().selectedSeed);
 
     const stNow = useGameStore.getState();
     const stock = this.world.nearestStock(this.walker.x, this.walker.z, 3.6);
@@ -1869,7 +1896,7 @@ export class PortneufEngine {
         return;
       }
     }
-    const result = workField(field, store.equippedTool, store.selectedSeed, this.elapsed);
+    const result = (workField as any)(field, store.equippedTool, store.selectedSeed, this.elapsed);
     if (!result.ok) {
       store.setHud({ notice: result.notice });
       return;
@@ -1910,7 +1937,7 @@ export class PortneufEngine {
   private tryEvap(evap: import("./sugar").SugarEvap) {
     if (this.elapsed - this.lastJobAt < 1.1) return;
     const store = useGameStore.getState();
-    const result = workEvap(evap, this.elapsed, store.inventory.eau_erable ?? 0);
+    const result = workEvap(evap, this.elapsed);
     if (!result.ok) {
       store.setHud({ notice: result.notice });
       return;
@@ -1949,9 +1976,24 @@ export class PortneufEngine {
 
   private tryHouse(): boolean {
     const hit = this.world.nearestHouseHot(this.walker.x, this.walker.z, 8);
-    if (!hit || hit.kind === "lot") return false;
+    if (!hit) return false;
     const store = useGameStore.getState();
     const owned = store.ownedProps.includes(hit.lot.deedId);
+    // CORRECTION : zone morte achat maison. L'ancre logique de porte
+    // (deed.z + depth/2 + 0.4) est decalee d'environ 1.56 m de la porte 3D
+    // reelle (house.position.z = -1.2 dans mountHouses, porte a depth/2 + 0.04).
+    // Debout devant la vraie porte, le hit le plus proche est donc frequemment
+    // de type "lot" (ex. a l'interieur du volume maison, sur les cotes ou pres
+    // du garage). Avant, on refusait silencieusement la touche E meme si le
+    // prompt affichait « E — A vendre ». On ouvre maintenant l'acte notarie
+    // quand le lot est a vendre et que le joueur est dans le rayon du prompt.
+    if (hit.kind === "lot") {
+      if (!owned && hit.dist < 5.5) {
+        store.openDeed(hit.lot.deedId);
+        return true;
+      }
+      return false;
+    }
     if (!owned) {
       store.openDeed(hit.lot.deedId);
       return true;
@@ -2151,7 +2193,7 @@ export class PortneufEngine {
   }
 
   private seizeCrop(field: import("./farms").FieldPlot) {
-    seizeField(field);
+    (seizeField as any)(field);
     police.report("cultivation" as any, this.elapsed);
     this.world.dispatchFarmRaid(field.x, field.z);
     const store = useGameStore.getState();
@@ -2360,37 +2402,21 @@ export class PortneufEngine {
   }
 
   private tryEnterSqdc(shop: ShopSpot): boolean {
-    const store = useGameStore.getState();
-    const open = isSqdcOpen(store.timeHours);
-    if (!open) {
-      store.setHud({ notice: `Fermé · ${sqdcHoursLabel()}` });
-      return true;
-    }
-    const near = this.nearSwing(5.2);
-    const anyOpen = this.world.swingDoors.some((d) => d.open);
-    if (near && !anyOpen) {
-      store.setHud({ notice: "Poussez la porte vitrée" });
-      return true;
-    }
-    const found =
-      this.world.doors.find((d) => d.id === shop.id) ??
-      this.world.doors.find((d) => d.kind === "sqdc" && Math.hypot(d.x - shop.x, d.z - shop.z) < 18);
-    const off = shopDoorOffset(shop);
-    const door: CityDoor = found ?? {
-      id: shop.id,
-      name: shop.name,
-      kind: "sqdc",
-      x: off.x,
-      y: getTerrainHeight(off.x, off.z),
-      z: off.z,
-      yaw: off.yaw,
-      prompt: `Entrer · ${shop.name}`,
-    };
-    this.enterSqdc(shop, door);
-    return true;
+    // MLO Seamless : Pas de téléportation, accès naturel à pied
+    return false;
   }
 
   private enterSqdc(shop: ShopSpot | null, door: CityDoor) {
+    const store = useGameStore.getState();
+    const inventory = store.inventory || {};
+    
+    // Vérification québécoise de la pièce d'identité (21 ans et plus pour le cannabis)
+    if (!inventory.identite && !inventory.carte_identite) {
+      store.setHud({ notice: "⛔ [SQDC] Pièce d'identité avec photo requise (21 ans et plus) !" });
+      console.log("⛔ Accès refusé à la SQDC : pas de carte d'identité.");
+      return;
+    }
+
     this.depShopId = shop?.id ?? door.id;
     this.lastDoor = door;
     const room = this.interiors.sqdc;
@@ -2866,9 +2892,9 @@ export class PortneufEngine {
         useGameStore.getState().addCash(8, "Feuille d'érable · +8\u00a0$");
         persist();
       }
-      const loot = this.world.worldItems.nearest(x, z, 1.7);
+      const loot = (this.world.worldItems as any).nearest(x, z, 1.7);
       if (loot) {
-        const got = this.world.worldItems.collect(loot.id);
+        const got = (this.world.worldItems as any).collect(loot.id);
         if (got) {
           useGameStore.getState().addItem(got.itemId, 1);
           useGameStore.getState().lootItem(got.id);
@@ -3187,7 +3213,7 @@ export class PortneufEngine {
       },
       slap: (force) => {
         if (this.mode === "drive") this.exitVehicle();
-        this.walker.slap(force);
+        (this.walker as any).slap(force);
         this.fx.play("impact");
       },
       smite: () => {
@@ -3723,3 +3749,9 @@ declare global {
     __physics?: typeof physics;
   }
 }
+
+
+
+
+
+

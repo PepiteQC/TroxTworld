@@ -1,18 +1,6 @@
-export const SQ_LEGAL_BAC = 80;
-
-export interface RecruitApplicationResult {
-  ok: boolean;
-  message: string;
-  officer: PoliceOfficer | null;
-}
-
-export function getWantedLevel(playerId: string): number {
-  return WANTED.get(playerId)?.wantedLevel ?? 0;
-}
-
 /**
  * ═══════════════════════════════════════════════════════════════════
- * 🚔 POLICE QUÉBEC (SGC) — SPVM / SQ / GRC MULTIJOUEUR & CAD SYSTEM (v2.0)
+ * 🚔 POLICE QUÉBEC (SGC) — SPVM / SQ / GRC MULTIJOUEUR & CAD SYSTEM (v3.0)
  * ═══════════════════════════════════════════════════════════════════
  * Fusion complète du netcode multijoueur d'origine et des fonctionnalités 
  * avancées FiveM RP : Sirènes 3D, MDT SAAQ, Taser Mini-game et Enquêtes.
@@ -26,7 +14,13 @@ import { triggerNotification } from "./phone";
 import { useGameStore } from "./store";
 
 // ═══════════════════════════════════════════════════════════
-// 1. STRUCTURES DE DONNÉES & ENUMS (CONFORMITÉ QUÉBÉCOISE)
+// 1. CONSTANTES LÉGALES QUÉBÉCOISES
+// ═══════════════════════════════════════════════════════════
+
+export const SQ_LEGAL_BAC = 80; // 80 mg d'alcool par 100 ml de sang (0.08)
+
+// ═══════════════════════════════════════════════════════════
+// 2. STRUCTURES DE DONNÉES & ENUMS (CONFORMITÉ QUÉBÉCOISE)
 // ═══════════════════════════════════════════════════════════
 
 export type PoliceForce =
@@ -56,7 +50,6 @@ export const POLICE_FORCE_LABEL: Record<PoliceForce, string> = {
   port_authority: "Sûreté du Port de Montréal",
 };
 
-// Grades officiels au Québec
 export type SQRank =
   | "cadet"
   | "agent_patrouilleur"
@@ -156,10 +149,6 @@ export interface CsrCitation {
   wantedStars: number;
 }
 
-// ═══════════════════════════════════════════════════════════
-// CATALOGUE OFFICIEL DES CONTRAVENTIONS (CSR / CODE CRIMINEL)
-// ═══════════════════════════════════════════════════════════
-
 export const CITATIONS: CsrCitation[] = [
   { code: "CSR-328-1", article: "Art. 328 CSR", law: "CSR", description: "Excès de vitesse (+15 à +25 km/h)", fineAmount: 175, demeritPoints: 2, jailMonths: 0, isFelony: false, bailAmount: 0, wantedStars: 0 },
   { code: "CSR-328-2", article: "Art. 328 CSR", law: "CSR", description: "Excès de vitesse (+26 à +40 km/h)", fineAmount: 260, demeritPoints: 3, jailMonths: 0, isFelony: false, bailAmount: 0, wantedStars: 0 },
@@ -182,7 +171,6 @@ export function citationByCode(code: string): CsrCitation | undefined {
   return CITATIONS.find(c => c.code.toLowerCase() === q || c.code.toLowerCase().includes(q) || c.article.toLowerCase().includes(q));
 }
 
-// Codes 10 de patrouille
 export const CODES_10: Record<string, string> = {
   "10-4": "Bien compris (Roger)",
   "10-6": "Occupé",
@@ -199,7 +187,7 @@ export const CODES_10: Record<string, string> = {
 };
 
 // ═══════════════════════════════════════════════════════════
-// INTERFACES ET ENTITÉS POLICIÈRES
+// 3. INTERFACES ET ENTITÉS
 // ═══════════════════════════════════════════════════════════
 
 export interface PoliceOfficer {
@@ -276,7 +264,6 @@ export interface Call911 {
   type: CallType;
   priority: 1 | 2 | 3 | 4 | 5;
   description: string;
-  audioTranscript?: string;
   status: "pending" | "dispatched" | "on_scene" | "resolved" | "false_alarm" | "cancelled";
   assignedUnits: string[];
   responseTime: number | null;
@@ -306,7 +293,7 @@ export const CALL_PRIORITY: Record<CallType, 1 | 2 | 3 | 4 | 5> = {
 export interface WantedPerson {
   playerId: string;
   playerName: string;
-  wantedLevel: number; // 0-5 stars
+  wantedLevel: number;
   wantedPoints: number;
   activeWarrants: Warrant[];
   reason: string;
@@ -462,8 +449,14 @@ export interface Interrogation {
   usedTactics: string[];
 }
 
+export interface RecruitApplicationResult {
+  ok: boolean;
+  message: string;
+  officer: PoliceOfficer | null;
+}
+
 // ═══════════════════════════════════════════════════════════
-// CLASSE INTERNE DE SYNTHÈSE SONORE (Sirènes audio 3D)
+// 4. AUDIO 3D & SIRÈNES
 // ═══════════════════════════════════════════════════════════
 
 class PoliceSiren {
@@ -528,7 +521,7 @@ class PoliceSiren {
 }
 
 // ═══════════════════════════════════════════════════════════
-// TAMPONS DE DONNÉES EN MÉMOIRE (Multijoueur)
+// 5. ETATS EN MÉMOIRE
 // ═══════════════════════════════════════════════════════════
 
 const OFFICERS = new Map<string, PoliceOfficer>();
@@ -549,7 +542,6 @@ let warrantSeq = 500;
 let ticketSeq = 1040;
 let caseSeq = 2024_00001;
 
-// ─── UTILS DE PRÉFIXAGE ───
 function uid(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -570,11 +562,6 @@ function generateCallsign(force: PoliceForce, sector: string): string {
   return `${prefix}-${num}`;
 }
 
-function nextCaseNumber(): string {
-  caseSeq++;
-  return `CASE-${caseSeq}`;
-}
-
 function nextTicketNumber(force: PoliceForce): string {
   ticketSeq++;
   const prefix = force === "spvm" ? "SPVM" : force === "sq" ? "SQ" : "GRC";
@@ -593,8 +580,12 @@ function pushRadioLog(force: PoliceForce, code: string, text: string) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// FONCTIONNALITÉS SYSTÈMES & NETCODE (SQ / SPVM)
+// 6. FONCTIONS DE GESTION POLICIÈRE
 // ═══════════════════════════════════════════════════════════
+
+export function getWantedLevel(playerId: string): number {
+  return WANTED.get(playerId)?.wantedLevel ?? 0;
+}
 
 export function applyToBecomeOfficer(
   playerId: string,
@@ -680,7 +671,7 @@ const RANK_PROGRESSION: SQRank[] = [
   "inspecteur_chef", "directeur_adjoint", "directeur_general",
 ];
 
-export function clockInOfficer(playerId: string, vehicleId?: string, partnerId?: string): { ok: boolean; message: string } {
+export function clockInOfficer(playerId: string, vehicleId?: string): { ok: boolean; message: string } {
   const officer = OFFICERS.get(playerId);
   if (!officer) return { ok: false, message: "Vous n'êtes pas officier." };
   if (officer.isOnDuty) return { ok: false, message: "Déjà en service." };
@@ -721,7 +712,6 @@ export function clockOutOfficer(playerId: string): { ok: boolean; message: strin
   return { ok: true, message: `10-42 · Fin de service. Salaire versé : ${earnings}$`, earnings };
 }
 
-// ─── APPELS D'URGENCE ───
 export function call911(
   callerId: string,
   callerName: string,
@@ -783,7 +773,6 @@ export function resolveCall(officerId: string, callId: string, outcome: "resolve
   return { ok: true, message: "Code 4, appel clôturé." };
 }
 
-// ─── RECHERCHES & MANDATS ───
 export function addWantedPoints(playerId: string, points: number, reason?: string): { newLevel: number; totalPoints: number } {
   let wanted = WANTED.get(playerId);
   if (!wanted) wanted = createWantedProfile(playerId);
@@ -830,7 +819,7 @@ export function issueWarrant(playerId: string, _playerName: string, officerId: s
   return warrant;
 }
 
-export function arrestSuspect(officerId: string, suspectId: string, charges: CrimeKind[]): { ok: boolean; message: string; totalFine: number; jailTime: number } {
+export function arrestSuspect(officerId: string, suspectId: string, _charges: CrimeKind[]): { ok: boolean; message: string; totalFine: number; jailTime: number } {
   const officer = OFFICERS.get(officerId);
   if (!officer) return { ok: false, message: "Non autorisé.", totalFine: 0, jailTime: 0 };
 
@@ -929,7 +918,7 @@ export function issueTicket(officerId: string, offenderId: string, offenderName:
   return { ok: true, message: `Constat d'infraction émis de ${ticket.fine}$`, ticket };
 }
 
-export function payTicket(ticketNumber: string, payerId: string): { ok: boolean; message: string; amount: number } {
+export function payTicket(ticketNumber: string, _payerId: string): { ok: boolean; message: string; amount: number } {
   const t = ACTIVE_TICKETS.get(ticketNumber);
   if (!t) return { ok: false, message: "Introuvable.", amount: 0 };
   t.paid = true;
@@ -943,8 +932,7 @@ export function administerBreathalyzer(officerId: string, suspectId: string, blo
   return { ok: true, result: res, violation: over };
 }
 
-export function radarCatch(officerId: string, _vehiclePlate: string, driverId: string, measuredSpeedKmh: number, speedLimitKmh: number): { ok: boolean; ticket: any } {
-  const excess = measuredSpeedKmh - speedLimitKmh;
+export function radarCatch(officerId: string, _vehiclePlate: string, driverId: string, _measuredSpeedKmh: number, _speedLimitKmh: number): { ok: boolean; ticket: any } {
   const res = issueTicket(officerId, driverId, "Contrevenant", "CSR-328-1", { x: 0, z: 0 });
   return { ok: res.ok, ticket: res.ticket };
 }
@@ -960,7 +948,7 @@ export function endPursuit(suspectId: string, outcome: string): { ok: boolean; m
 }
 
 // ═══════════════════════════════════════════════════════════
-// CLASSE LEGACY & SINGLETON DE COMPATIBILITÉ (police)
+// 7. COMPATIBILITÉ LEGACY (PoliceDeskLegacy)
 // ═══════════════════════════════════════════════════════════
 
 export type TicketRecord = {
@@ -1088,7 +1076,7 @@ class PoliceDeskLegacy {
 export const police = new PoliceDeskLegacy();
 
 // ═══════════════════════════════════════════════════════════
-// ACCESS HELPERS
+// 8. HELPERS D'ACCÈS ET ENREGISTREMENT RPC
 // ═══════════════════════════════════════════════════════════
 
 export function getOfficer(playerId: string): PoliceOfficer | null { return OFFICERS.get(playerId) ?? null; }
@@ -1116,10 +1104,6 @@ export function createPoliceStation(force: PoliceForce, name: string, address: s
   return station;
 }
 
-// ═══════════════════════════════════════════════════════════
-// REMOTES REGISTRATIONS (RPC MULTIJOUEUR)
-// ═══════════════════════════════════════════════════════════
-
 registerRemote("police:apply", applyToBecomeOfficer);
 registerRemote("police:promote", promoteOfficer);
 registerRemote("police:clock_in", clockInOfficer);
@@ -1140,5 +1124,3 @@ registerRemote("police:start_pursuit", startPursuit);
 registerRemote("police:end_pursuit", endPursuit);
 
 export type CitationNotice = TicketRecord;
-
-

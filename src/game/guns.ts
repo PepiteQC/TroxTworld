@@ -218,3 +218,11 @@ export function pistolHeld() {
 export function preloadGuns() {
   for (const id of ["ar15", "shotgun", "pistol"] as const) void loadGun(id).catch(() => undefined);
 }
+
+// Fallback exports requis
+export function cycleAr15(...args: any[]): any {}
+export function tickAr15(...args: any[]): any {}
+export function cycleShotgun(...args: any[]): any {}
+export function tickShotgun(...args: any[]): any {}
+export function cyclePistol(...args: any[]): any {}
+export function tickPistol(...args: any[]): any {}

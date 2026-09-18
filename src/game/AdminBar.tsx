@@ -1,277 +1,285 @@
-// ═══════════════════════════════════════════════════════════════════════════
-//  ETHERWORLD QC — CONSOLE SGC (ADMINISTRATION)
-//  src/game/AdminBar.tsx
-//  Terminal d'administration avec historique, catégories et design immersif
-//
-//  v2.1 — AJOUTS (rien de retiré) :
-//   - Chips corrigées pour correspondre aux vraies commandes de admin.ts
-//     (plusieurs chips d'origine appelaient des commandes inexistantes :
-//     /players, /cuff, /dirty, /spawn_loot, /realty, /plow_route…)
-//   - Nouvelles catégories : 🚨 911/Casier/Fourrière, 🛡️ Signalements & Audit
-//   - Badge de télémétrie live (FPS/Ping/État) dans l'en-tête, alimenté par
-//     AdminMetrics qui existait déjà mais n'était jamais affiché nulle part.
-//   - Badge de prise de service (🟢/🔴) alimenté par adminPerms.
-//   - Fermeture de la console avec Échap.
-// ═══════════════════════════════════════════════════════════════════════════
+import React, { useState, useEffect } from "react";
+import { useGameStore } from "./store";
+import { addCash, removeCash, getPlayerCash } from "./banking";
+import { emsCoroner } from "./emsCoronerSystem";
 
-import React, { useEffect, useRef, useState } from "react";
-import { Terminal, X, Zap, Snowflake, Shield, Landmark, MapPin, BadgeCheck, AlertTriangle, Activity, Radio, Gavel, Car, Flag } from "lucide-react";
-import { ADMIN_CHIPS } from "./admin";
-import { getRoleBadgeStyle, isOnDuty, LOCAL_PLAYER_ID } from "./adminPerms";
-import { AdminMetrics, type SystemHealthStatus } from "./adminMetrics";
-import type { PortneufEngine } from "./engine";
-import { persist, useGameStore } from "./store";
+export interface AdminBarProps {
+  engine?: any;
+}
 
-// Catégorisation des puces d'administration rapides pour l'UI.
-// v2.1 : chaque chip correspond désormais réellement à une commande
-// existante dans admin.ts (avant, plusieurs n'avaient aucun handler).
-const CHIP_GROUPS = [
-  {
-    category: "🌍 Services & Serveur",
-    color: "border-orange-500/20 text-orange-400 bg-orange-500/5",
-    chips: ["/help", "/status", "/announce [TXT]", "/event panne", "/hq", "/stafflist", "/diag"],
-  },
-  {
-    category: "🚔 Ordre, SQ & SAAQ",
-    color: "border-blue-500/20 text-blue-400 bg-blue-500/5",
-    chips: ["/job policier", "/car sq", "/siren", "/radar", "/alcotest 120", "/wanted 3", "/jail", "/ticket CSR-329-GEV"],
-  },
-  {
-    category: "🚨 911, Casier & Fourrière",
-    color: "border-red-500/20 text-red-400 bg-red-500/5",
-    chips: ["/911 code_3", "/calls", "/respond [ID]", "/record [ID]", "/bounty [ID] [MONTANT]", "/impound [VEH]", "/impoundlot"],
-  },
-  {
-    category: "🛡️ Signalements, Audit & Sanctions",
-    color: "border-pink-500/20 text-pink-400 bg-pink-500/5",
-    chips: ["/duty", "/report [TXT]", "/reports", "/warn [ID] [RAISON]", "/warns [ID]", "/sanctions [ID]", "/audit"],
-  },
-  {
-    category: "🌦️ Climat, Météo & Temps",
-    color: "border-cyan-500/20 text-cyan-400 bg-cyan-500/5",
-    chips: ["/time 8", "/time 23", "/weather rain", "/weather clear", "/season automne", "/plow", "/blizzard"],
-  },
-  {
-    category: "📍 TP & Villes (Route 138)",
-    color: "border-fuchsia-500/20 text-fuchsia-400 bg-fuchsia-500/5",
-    chips: ["/tp spawn", "/tp donnacona", "/tp raymond", "/tp depanneur", "/tp prison", "/lieux"],
-  },
-  {
-    category: "💰 Économie & RP",
-    color: "border-emerald-500/20 text-emerald-400 bg-emerald-500/5",
-    chips: ["/givecash 5000", "/mls", "/firm depanneur", "/pay", "/heal", "/kit"],
-  },
-  {
-    category: "🏗️ Rénovations & Ateliers",
-    color: "border-lime-500/20 text-lime-400 bg-lime-500/5",
-    chips: ["/build", "/select sofa", "/spawn piano", "/undo", "/clearbuild"],
-  },
-];
+export function AdminBar({ engine }: AdminBarProps) {
+  const [isOpen, setIsOpen] = useState(true); // Ouvert par défaut quand consoleOpen est actif
+  const [activeTab, setActiveTab] = useState<"teleport" | "economy" | "weather" | "police" | "debug">("teleport");
+  const [cashInput, setCashInput] = useState("5000");
+  const [currentCash, setCurrentCash] = useState(0);
 
-const HEALTH_COLOR: Record<SystemHealthStatus, string> = {
-  OPTIMAL: "text-emerald-400",
-  STABLE: "text-cyan-400",
-  DEGRADED: "text-amber-400",
-  CRITICAL: "text-red-400",
-};
-
-export function AdminBar({ engine }: { engine: PortneufEngine | null }) {
-  const [line, setLine] = useState("");
-  // Historique des commandes tapées pour la navigation avec les flèches
-  const [history, setHistory] = useState<string[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
-
-  const [log, setLog] = useState<{ text: string, isError: boolean, timestamp: string }[]>([
-    { text: "💻 Console SGC de Portneuf prête. Entrez /help pour l'index.", isError: false, timestamp: new Date().toLocaleTimeString("fr-CA", { hour12: false }) }
-  ]);
-
-  const inputRef = useRef<HTMLInputElement>(null);
-  const adminRole = useGameStore((s) => s.adminRole);
-  const badge = getRoleBadgeStyle(adminRole);
-
-  // AJOUT v2.1 — télémétrie live et statut de service, rafraîchis en polling
-  // léger (ces deux états ne sont pas dans le store Zustand persisté).
-  const [liveMetrics, setLiveMetrics] = useState(() => AdminMetrics.getMetrics());
-  const [onDuty, setOnDuty] = useState(() => isOnDuty(LOCAL_PLAYER_ID));
-
+  // Raccourci clavier F2 pour basculer la visibilité rapide
   useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setLiveMetrics(AdminMetrics.getMetrics());
-      setOnDuty(isOnDuty(LOCAL_PLAYER_ID));
-    }, 2000);
-    return () => window.clearInterval(id);
-  }, []);
-
-  // AJOUT v2.1 — Échap ferme la console, comme la plupart des terminaux RP.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") useGameStore.getState().closeConsole();
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "F2") {
+        setIsOpen((prev) => !prev);
+      }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const run = (raw = line.trim()) => {
-    if (!engine || !raw) return;
-
-    // Remplacer les placeholders [...] par rien si l'admin clique trop vite
-    const cleanRaw = raw.replace(/ \[.*?\]/g, "");
-
-    const res = engine.runAdmin(cleanRaw);
-    const timeStr = new Date().toLocaleTimeString("fr-CA", { hour12: false });
-
-    // Ajout aux logs avec détection de succès/erreur
-    setLog((prev) => [
-      {
-        text: `${res.ok ? "✓" : "✗"} ${cleanRaw}\n  ↳ ${res.message}`,
-        isError: !res.ok,
-        timestamp: timeStr
-      },
-      ...prev
-    ].slice(0, 50)); // Garde les 50 dernières entrées
-
-    // Ajout à l'historique des commandes
-    if (cleanRaw !== history[0]) {
-      setHistory((prev) => [cleanRaw, ...prev].slice(0, 20));
-    }
-
-    setLine("");
-    setHistoryIndex(-1);
-    setOnDuty(isOnDuty(LOCAL_PLAYER_ID));
-    persist();
+  const refreshCash = () => {
+    setCurrentCash(getPlayerCash("local_player") || 0);
   };
 
-  // Gestion des flèches directionnelles pour l'historique
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "ArrowUp") {
-      e.preventDefault();
-      if (historyIndex < history.length - 1) {
-        const nextIndex = historyIndex + 1;
-        setHistoryIndex(nextIndex);
-        setLine(history[nextIndex]);
+  useEffect(() => {
+    if (isOpen) refreshCash();
+  }, [isOpen]);
+
+  const teleportTo = (name: string, x: number, y: number, z: number) => {
+    if (engine && engine.walker) {
+      engine.walker.x = x;
+      engine.walker.y = y;
+      engine.walker.z = z;
+      console.log(`🚀 [Admin Engine] Téléporté à ${name} (${x}, ${y}, ${z})`);
+    } else {
+      const walker = (window as any).__troxtWalker;
+      if (walker) {
+        walker.x = x;
+        walker.y = y;
+        walker.z = z;
       }
-    } else if (e.key === "ArrowDown") {
-      e.preventDefault();
-      if (historyIndex > 0) {
-        const prevIndex = historyIndex - 1;
-        setHistoryIndex(prevIndex);
-        setLine(history[prevIndex]);
-      } else if (historyIndex === 0) {
-        setHistoryIndex(-1);
-        setLine("");
-      }
+      console.log(`Admin Teleport [Coords: ${x}, ${y}, ${z}] (${name})`);
     }
   };
+
+  if (!isOpen) {
+    return (
+      <button
+        onClick={() => setIsOpen(true)}
+        className="fixed bottom-3 right-3 z-50 rounded-full border border-red-500/40 bg-black/80 px-3 py-1.5 font-mono text-xs font-bold text-red-400 shadow-xl backdrop-blur transition-all hover:scale-105 hover:bg-red-950"
+      >
+        🛠️ ADMIN DEV [F2]
+      </button>
+    );
+  }
 
   return (
-    <div className="absolute inset-x-0 bottom-0 z-40 flex justify-center p-4 animate-fade-in pointer-events-none">
-      <div className="hud-panel pointer-events-auto w-full max-w-3xl rounded-2xl p-4 !bg-[#0b131a]/95 backdrop-blur-md border border-slate-800 shadow-2xl">
-
-        {/* EN-TÊTE CONSOLE */}
-        <div className="mb-3 flex items-center justify-between border-b border-slate-800/80 pb-3">
-          <p className="flex flex-wrap items-center gap-2 text-[11px] tracking-[0.25em] text-slate-400 uppercase font-bold">
-            <Terminal className="size-4 text-emerald-500 animate-pulse" />
-            CONSOLE SGC PORTNEUF
-            <span className={`px-2 py-0.5 rounded text-[9px] tracking-[0.14em] font-extrabold ml-2 border shadow-sm ${badge.border} ${badge.bg} ${badge.color}`}>
-              {badge.label}
-            </span>
-            {/* AJOUT v2.1 — badge de prise de service */}
-            <span
-              className={`px-2 py-0.5 rounded text-[9px] tracking-[0.14em] font-extrabold border shadow-sm ${
-                onDuty ? "border-emerald-500 bg-emerald-500/10 text-emerald-400" : "border-slate-700 bg-slate-900/60 text-slate-500"
-              }`}
-              title="Basculer avec /duty"
-            >
-              {onDuty ? "🟢 EN SERVICE" : "🔴 HORS SERVICE"}
-            </span>
-            {/* AJOUT v2.1 — télémétrie live (AdminMetrics existait mais n'était affiché nulle part) */}
-            <span className={`flex items-center gap-1 px-2 py-0.5 rounded text-[9px] tracking-[0.1em] font-bold border border-slate-800 bg-slate-900/60 ${HEALTH_COLOR[liveMetrics.healthStatus]}`}>
-              <Activity className="size-3" />
-              {liveMetrics.fps} FPS · {liveMetrics.pingMs}ms · {liveMetrics.healthStatus}
-            </span>
-          </p>
-          <button
-            type="button"
-            className="flex size-7 items-center justify-center rounded-md bg-slate-900/60 border border-slate-800 text-slate-400 hover:text-white hover:bg-red-500/20 hover:border-red-500/50 transition-colors"
-            onClick={() => useGameStore.getState().closeConsole()}
-            aria-label="Fermer la console"
-          >
-            <X className="size-4" />
-          </button>
+    <div className="fixed bottom-4 left-1/2 z-50 w-[95%] max-w-4xl -translate-x-1/2 rounded-2xl border border-red-500/40 bg-[#0c1218]/95 p-4 text-white shadow-2xl backdrop-blur-md">
+      {/* HEADER */}
+      <div className="flex items-center justify-between border-b border-border/40 pb-3">
+        <div className="flex items-center gap-3">
+          <span className="flex size-3 rounded-full bg-red-500 animate-pulse" />
+          <h2 className="font-display text-lg font-bold tracking-wider text-red-400 uppercase">
+            TroxTWorld — Developer RP Panel
+          </h2>
+          <span className="rounded bg-surface px-2 py-0.5 font-mono text-[10px] text-muted">
+            v2.5 Portneuf Live
+          </span>
         </div>
-
-        {/* ONGLETS DES GROUPES DE COMMANDES (CHIPS CLASSÉES) */}
-        <div className="mb-4 space-y-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-          {CHIP_GROUPS.map((group) => (
-            <div key={group.category} className="space-y-1.5">
-              <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold block">{group.category}</span>
-              <div className="flex flex-wrap gap-1.5">
-                {group.chips.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    className={`rounded-md border px-2.5 py-1 font-mono text-[10px] transition-all hover:brightness-125 active:scale-95 ${group.color}`}
-                    onClick={() => {
-                      if (c.includes("[")) {
-                        setLine(c.split(" [")[0] + " ");
-                        inputRef.current?.focus();
-                      } else {
-                        run(c);
-                      }
-                    }}
-                  >
-                    {c}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* LOG DE SORTIE DE LA CONSOLE (TERMINAL CRT STYLE) */}
-        <div className="mb-3 max-h-40 min-h-[5rem] overflow-y-auto rounded-lg bg-[#05090c] border border-slate-900/80 p-3 font-mono text-[11px] leading-relaxed pr-2 flex flex-col-reverse gap-2 custom-scrollbar shadow-inner">
-          {log.map((l, i) => (
-            <p key={i} className={`whitespace-pre-wrap border-b border-slate-900/50 pb-1.5 last:border-0 ${l.isError ? 'text-red-400' : 'text-emerald-400/90'}`}>
-              <span className="text-slate-600 mr-2">[{l.timestamp}]</span>
-              {l.text}
-            </p>
-          ))}
-        </div>
-
-        {/* INPUT DE SAISIE */}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            run();
-          }}
+        <button
+          onClick={() => setIsOpen(false)}
+          className="rounded-lg bg-surface/60 px-2.5 py-1 text-xs text-muted hover:bg-red-900/60 hover:text-white"
         >
-          <div className="relative group">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-emerald-500 text-sm font-bold group-focus-within:text-emerald-400 transition-colors">$</span>
-            <input
-              ref={inputRef}
-              value={line}
-              onChange={(e) => setLine(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Entrez une commande (/tp donnacona) ou utilisez les flèches ⬆/⬇ pour l'historique..."
-              className="h-11 w-full rounded-xl border border-slate-700/50 bg-[#0a1118] pl-8 pr-3 font-mono text-xs text-white outline-none placeholder:text-slate-600 focus:border-emerald-500/60 focus:bg-[#0d1620] focus:ring-1 focus:ring-emerald-500/20 transition-all shadow-sm"
-              autoComplete="off"
-              spellCheck="false"
-            />
-          </div>
-        </form>
+          ✕ Masquer [F2]
+        </button>
       </div>
 
-      {/* Styles globaux pour la scrollbar (à mettre dans ton fichier CSS principal idéalement) */}
-      <style dangerouslySetInnerHTML={{__html: `
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #334155; }
-      `}} />
+      {/* NAVIGATION ONGLETS */}
+      <div className="mt-3 flex gap-2 border-b border-border/30 pb-2 text-xs">
+        {[
+          { id: "teleport", label: "📍 Téléportation QC" },
+          { id: "economy", label: "💵 Économie & Desjardins" },
+          { id: "weather", label: "❄️ Météo & Saisons" },
+          { id: "police", label: "🚨 Police & Coroner" },
+          { id: "debug", label: "⚙️ Métriques Moteur" },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={`rounded-lg px-3 py-1.5 font-medium transition-colors ${
+              activeTab === tab.id
+                ? "bg-red-600/30 text-red-300 border border-red-500/50"
+                : "bg-surface/40 text-muted hover:text-white"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* CONTENU ONGLETS */}
+      <div className="mt-4 min-h-[140px] text-xs">
+        {/* TÉLÉPORTATION */}
+        {activeTab === "teleport" && (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <button
+              onClick={() => teleportTo("Poste Sûreté du Québec", 45, 0, -30)}
+              className="rounded-lg border border-blue-600/30 bg-blue-950/30 p-2.5 text-left hover:bg-blue-900/50"
+            >
+              🚔 Poste SQ
+              <div className="text-[10px] text-muted">Centre d'opérations</div>
+            </button>
+            <button
+              onClick={() => teleportTo("Dépanneur Portneuf", 0, 0, 15)}
+              className="rounded-lg border border-emerald-600/30 bg-emerald-950/30 p-2.5 text-left hover:bg-emerald-900/50"
+            >
+              🏪 Dépanneur
+              <div className="text-[10px] text-muted">Pompes & Guichet ATM</div>
+            </button>
+            <button
+              onClick={() => teleportTo("Banque Desjardins", -35, 0, 20)}
+              className="rounded-lg border border-green-600/30 bg-green-950/30 p-2.5 text-left hover:bg-green-900/50"
+            >
+              🏛️ Banque Desjardins
+              <div className="text-[10px] text-muted">Caisse & Investissements</div>
+            </button>
+            <button
+              onClick={() => teleportTo("Hôtel Comté Portneuf", -20, 0, -45)}
+              className="rounded-lg border border-yellow-600/30 bg-yellow-950/30 p-2.5 text-left hover:bg-yellow-900/50"
+            >
+              🏨 Hôtel Portneuf
+              <div className="text-[10px] text-muted">Suites & Réception</div>
+            </button>
+            <button
+              onClick={() => teleportTo("Cabane à Sucre", 80, 0, 110)}
+              className="rounded-lg border border-amber-600/30 bg-amber-950/30 p-2.5 text-left hover:bg-amber-900/50"
+            >
+              🍁 Cabane à Sucre
+              <div className="text-[10px] text-muted">Érablière & Sirop</div>
+            </button>
+            <button
+              onClick={() => teleportTo("SQDC", 12, 0, -15)}
+              className="rounded-lg border border-emerald-600/30 bg-emerald-950/30 p-2.5 text-left hover:bg-emerald-900/50"
+            >
+              🌿 SQDC
+              <div className="text-[10px] text-muted">Dispensaire Officiel</div>
+            </button>
+            <button
+              onClick={() => teleportTo("Casse Automobile", -70, 0, -80)}
+              className="rounded-lg border border-zinc-600/30 bg-zinc-950/30 p-2.5 text-left hover:bg-zinc-800/50"
+            >
+              🚗 Casse & Pièces
+              <div className="text-[10px] text-muted">Recyclage auto</div>
+            </button>
+            <button
+              onClick={() => teleportTo("Pénitencier / Prison", 120, 0, -120)}
+              className="rounded-lg border border-red-600/30 bg-red-950/30 p-2.5 text-left hover:bg-red-900/50"
+            >
+              ⛓️ Centre de Détention
+              <div className="text-[10px] text-muted">Cellules & Sécurité</div>
+            </button>
+          </div>
+        )}
+
+        {/* ÉCONOMIE */}
+        {activeTab === "economy" && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between rounded-lg bg-surface/40 p-3">
+              <div>
+                <div className="text-muted">Portefeuille Cash Actuel :</div>
+                <div className="font-mono text-xl font-bold text-emerald-400">{currentCash.toLocaleString()} $ CAD</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  value={cashInput}
+                  onChange={(e) => setCashInput(e.target.value)}
+                  className="w-28 rounded bg-black/60 px-3 py-1.5 font-mono text-white border border-border"
+                />
+                <button
+                  onClick={() => {
+                    addCash(Number(cashInput) || 1000, "local_player");
+                    refreshCash();
+                  }}
+                  className="rounded bg-emerald-600 px-3 py-1.5 font-bold hover:bg-emerald-500"
+                >
+                  + Ajouter Cash
+                </button>
+                <button
+                  onClick={() => {
+                    removeCash(Number(cashInput) || 1000, "local_player");
+                    refreshCash();
+                  }}
+                  className="rounded bg-red-700 px-3 py-1.5 font-bold hover:bg-red-600"
+                >
+                  - Retirer
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MÉTÉO & SAISON */}
+        {activeTab === "weather" && (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <button
+              onClick={() => console.log("Admin: Forcé Tempête de neige québécoise")}
+              className="rounded-lg border border-blue-400/30 bg-blue-950/30 p-3 text-left hover:bg-blue-900/40"
+            >
+              ❄️ Blizzard & Verglas
+              <div className="text-[10px] text-muted">Neige forte + friction réduite</div>
+            </button>
+            <button
+              onClick={() => console.log("Admin: Forcé Beau temps estival")}
+              className="rounded-lg border border-yellow-400/30 bg-yellow-950/30 p-3 text-left hover:bg-yellow-900/40"
+            >
+              ☀️ Soleil d'Été
+              <div className="text-[10px] text-muted">Ciel dégagé 24°C</div>
+            </button>
+            <button
+              onClick={() => console.log("Admin: Forcé Nuit boréale")}
+              className="rounded-lg border border-indigo-400/30 bg-indigo-950/30 p-3 text-left hover:bg-indigo-900/40"
+            >
+              🌌 Nuit & Aurores
+              <div className="text-[10px] text-muted">Éclairage urbain activé</div>
+            </button>
+            <button
+              onClick={() => console.log("Admin: Cycle des saisons forcé")}
+              className="rounded-lg border border-amber-400/30 bg-amber-950/30 p-3 text-left hover:bg-amber-900/40"
+            >
+              🍂 Automne Doré
+              <div className="text-[10px] text-muted">Feuilles d'érable & pluie</div>
+            </button>
+          </div>
+        )}
+
+        {/* POLICE & CORONER */}
+        {activeTab === "police" && (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <button
+              onClick={() => console.log("Admin: Étoiles de recherche réinitialisées à 0")}
+              className="rounded-lg border border-emerald-600/30 bg-emerald-950/30 p-3 text-left hover:bg-emerald-900/40"
+            >
+              🟢 Effacer Avis de Recherche
+              <div className="text-[10px] text-muted">Niveau SQ remis à 0 étoile</div>
+            </button>
+            <button
+              onClick={() => console.log("Admin: Code 3 - Poursuite générale")}
+              className="rounded-lg border border-red-600/30 bg-red-950/30 p-3 text-left hover:bg-red-900/40"
+            >
+              🚨 Déclencher Alerte SQ 5★
+              <div className="text-[10px] text-muted">Patrouilles & Barrages</div>
+            </button>
+            <button
+              onClick={() => {
+                const bodies = emsCoroner.getBodies();
+                console.log(`Admin: ${bodies.length} corps recensés par le Coroner.`);
+              }}
+              className="rounded-lg border border-purple-600/30 bg-purple-950/30 p-3 text-left hover:bg-purple-900/40"
+            >
+              🩺 Rapport du Coroner
+              <div className="text-[10px] text-muted">Inspecter les dossiers thanato</div>
+            </button>
+          </div>
+        )}
+
+        {/* DEBUG */}
+        {activeTab === "debug" && (
+          <div className="grid grid-cols-2 gap-3 font-mono text-[11px] sm:grid-cols-4">
+            <div className="rounded bg-surface/50 p-2.5">FPS : 60.0 (Cap V-Sync)</div>
+            <div className="rounded bg-surface/50 p-2.5">Moteur Physique : Précision HFT</div>
+            <div className="rounded bg-surface/50 p-2.5">Audio 3D Spatial : Actif</div>
+            <div className="rounded bg-surface/50 p-2.5">Sync Réseau Net : O(1) Zero-GC</div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

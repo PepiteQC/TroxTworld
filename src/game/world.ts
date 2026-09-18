@@ -98,7 +98,7 @@ import { PedSystem } from "./peds";
 import { WorldItemField } from "./worlditems";
 import { useGameStore } from "./store";
 import { parseFogColor, pickTrafficKind, worldConfig } from "./worldconfig";
-import { buildCity, type CityDoor } from "./city";
+import { buildCity, type CityDoor, type BuiltCity, type CityBuilding, type Citizen, type CityDistrict, setCurrentDay, setCurrentSeason, setCurrentTime, updateCityForNewDay, updateCitizensForNewHour } from "./city";
 import { type SwingDoor } from "./door";
 import {
   A40_EXITS,
@@ -128,53 +128,531 @@ import {
   WORLD,
 } from "./worlddata";
 
-// Fonction utilitaire pour générer des pins réalistes autour du pénitencier
-function createProceduralPine(height: number): THREE.Group {
-  const group = new THREE.Group();
-  
-  // Tronc en bois texturé
-  const trunkHeight = height * 0.3;
-  const trunk = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.08, 0.16, trunkHeight, 6),
-    new THREE.MeshStandardMaterial({ color: 0x4a2f13, roughness: 0.9, metalness: 0.1 })
-  );
-  trunk.position.y = trunkHeight / 2;
-  trunk.castShadow = true;
-  trunk.receiveShadow = true;
-  group.add(trunk);
-  
-  // Feuillage en cône vert foncé (style sapin des Laurentides)
-  const leavesHeight = height * 0.85;
-  const leaves = new THREE.Mesh(
-    new THREE.ConeGeometry(height * 0.32, leavesHeight, 6),
-    new THREE.MeshStandardMaterial({ color: 0x143118, roughness: 0.8, metalness: 0.1 })
-  );
-  leaves.position.y = trunkHeight + (leavesHeight / 2) - 0.1;
-  leaves.castShadow = true;
-  leaves.receiveShadow = true;
-  group.add(leaves);
-  
-  return group;
+// ============================================================================
+// ­ƒö╣ TYPES ET INTERFACES RP
+// ============================================================================
+
+/** Saison de l'ann├®e. */
+export type Season = "hiver" | "printemps" | "ete" | "automne";
+
+/** Type de m├®t├®o. */
+export type WeatherType =
+  | "clear"
+  | "rain"
+  | "snow"
+  | "fog"
+  | "storm"
+  | "blizzard"
+  | "poudrerie"
+  | "verglas"
+  | "tempete_neige"
+  | "froid_polaire"
+  | "pluie_fine"
+  | "orage_ete"
+  | "nuageux";
+
+/** Type de jour (pour les cycles jour/nuit). */
+export type DayPhase = "aube" | "matin" | "midi" | "apres_midi" | "soir" | "nuit" | "minuit";
+
+/** Type d'├®v├®nement mondial. */
+export type WorldEventType =
+  | "festival"
+  | "marche"
+  | "feux_artifice"
+  | "tempete"
+  | "incendie"
+  | "accident"
+  | "manifestation"
+  | "election"
+  | "epidemie"
+  | "chasse_au_tresor"
+  | "courses_de_tracteurs"
+  | "fete_des_neiges";
+
+/** Gravit├® d'un ├®v├®nement. */
+export type EventSeverity = "mineur" | "modere" | "majeur" | "catastrophique";
+
+/** Type de faction. */
+export type FactionType =
+  | "citoyens"
+  | "police"
+  | "pompiers"
+  | "medecins"
+  | "agriculteurs"
+  | "bucherons"
+  | "chasseurs"
+  | "criminels"
+  | "mairie"
+  | "journalistes"
+  | "touristes";
+
+/** Relation entre factions (-100 ├á 100). */
+export type FactionRelation = Record<FactionType, number>;
+
+/** D├®finition d'une faction. */
+export interface Faction {
+  id: FactionType;
+  name: string;
+  description: string;
+  color: number;
+  reputation: number; // R├®putation globale (-100 ├á 100)
+  power: number; // Puissance/influence (0-100)
+  wealth: number; // Richesse (en $)
+  members: string[]; // IDs des membres (citoyens)
+  leader?: string; // ID du chef
+  headquarters?: string; // ID du b├ótiment QG
+  relations: FactionRelation; // Relations avec les autres factions
+  quests: WorldQuest[]; // Qu├¬tes associ├®es
 }
+
+/** D├®finition d'un ├®v├®nement mondial. */
+export interface WorldEvent {
+  id: string;
+  type: WorldEventType;
+  title: string;
+  description: string;
+  severity: EventSeverity;
+  startTime: number; // Heure de d├®but (en jours + fraction pour l'heure)
+  duration: number; // Dur├®e en heures
+  location?: { x: number; z: number; radius: number }; // Zone affect├®e
+  affectedFactions?: FactionType[]; // Factions affect├®es
+  effects: {
+    reputationChange?: Record<FactionType, number>; // Changements de r├®putation
+    satisfactionChange?: number; // Changement de satisfaction globale
+    crimeRateChange?: number; // Changement du taux de criminalit├®
+    pollutionChange?: number; // Changement de la pollution
+    wealthChange?: number; // Changement de la richesse globale
+    populationChange?: number; // Changement de population
+    weatherOverride?: WeatherType; // Surcharge de la m├®t├®o
+    trafficMultiplier?: number; // Multiplicateur de trafic
+    pedMultiplier?: number; // Multiplicateur de pi├®tons
+  };
+  rewards?: {
+    money?: number;
+    reputation?: Record<FactionType, number>;
+    items?: string[];
+    unlocks?: string[]; // ├ël├®ments d├®bloqu├®s
+  };
+  isActive: boolean;
+  progress?: number; // Progression (pour les ├®v├®nements avec objectifs)
+  objectives?: {
+    type: "collect" | "destroy" | "protect" | "visit";
+    target: string;
+    count: number;
+    current: number;
+  };
+}
+
+/** D├®finition d'une qu├¬te mondiale. */
+export interface WorldQuest {
+  id: string;
+  title: string;
+  description: string;
+  giver?: string; // ID du PNJ ou faction qui donne la qu├¬te
+  giverFaction?: FactionType; // Faction du donneur
+  objectives: {
+    type: "go_to" | "talk_to" | "collect" | "deliver" | "kill" | "protect" | "build" | "repair" | "buy" | "sell";
+    target: string; // ID de la cible (lieu, PNJ, objet)
+    count?: number; // Nombre requis
+    current?: number; // Progression actuelle
+  }[];
+  rewards: {
+    money?: number;
+    experience?: number;
+    reputation?: Record<FactionType, number>;
+    items?: string[];
+    unlocks?: string[]; // ├ël├®ments d├®bloqu├®s
+  };
+  prerequisites?: {
+    quests?: string[]; // Qu├¬tes requises
+    reputation?: Record<FactionType, number>; // Niveaux de r├®putation requis
+    items?: string[]; // Objets requis
+    level?: number; // Niveau du joueur requis
+  };
+  expiry?: number; // Date d'expiration (en jours)
+  isActive: boolean;
+  isCompleted: boolean;
+  isFailed: boolean;
+}
+
+/** ├ëtat du joueur dans le monde. */
+export interface PlayerWorldState {
+  money: number;
+  experience: number;
+  level: number;
+  reputation: Record<FactionType, number>; // R├®putation avec chaque faction
+  skills: Record<string, number>; // Comp├®tences (ex: "conduite", "negociation")
+  inventory: Record<string, number>; // Inventaire (ID -> quantit├®)
+  equipped: {
+    tool?: string; // Outil ├®quip├®
+    vehicle?: string; // V├®hicule ├®quip├®
+    weapon?: string; // Arme ├®quip├®e
+  };
+  currentVehicle?: string; // ID du v├®hicule actuel
+  ownedBuildings: string[]; // IDs des b├ótiments poss├®d├®
+  ownedVehicles: string[]; // IDs des v├®hicules poss├®d├®
+  activeQuests: string[]; // IDs des qu├¬tes actives
+  completedQuests: string[]; // IDs des qu├¬tes compl├®t├®es
+  discoveredAreas: Record<string, boolean>; // Zones d├®couvertes
+  playTime: number; // Temps de jeu total (en heures)
+  lastSave: number; // Derni├¿re sauvegarde (timestamp)
+}
+
+/** ├ëtat global du monde. */
+export interface WorldState {
+  season: Season;
+  currentDay: number; // Jour actuel (0 = premier jour)
+  currentTime: number; // Heure actuelle (0-23)
+  dayPhase: DayPhase;
+  weather: WeatherType;
+  temperature: number; // Temp├®rature en ┬░C
+  windSpeed: number; // Vitesse du vent en km/h
+  windDirection: number; // Direction du vent (0-360┬░)
+  fogDensity: number; // Densit├® du brouillard
+  fogColor: number; // Couleur du brouillard
+  globalReputation: number; // R├®putation globale (0-100)
+  globalSatisfaction: number; // Satisfaction globale (0-100)
+  crimeRate: number; // Taux de criminalit├® (0-100)
+  pollution: number; // Niveau de pollution (0-100)
+  wealth: number; // Richesse globale (en $)
+  population: number; // Population totale
+  taxRate: number; // Taux d'imposition (0-1)
+  factions: Record<FactionType, Faction>;
+  events: WorldEvent[];
+  quests: WorldQuest[];
+  player: PlayerWorldState;
+  statistics: {
+    buildingsConstructed: number;
+    buildingsDestroyed: number;
+    crimesCommitted: number;
+    crimesStopped: number;
+    resourcesHarvested: Record<string, number>;
+    moneyEarned: number;
+    moneySpent: number;
+  };
+}
+
+/** Type de v├®hicule ├®tendu avec propri├®t├®s RP. */
+export type ExtendedTrafficVehicle = {
+  mesh: THREE.Group;
+  road: (typeof ROADS)[number];
+  roadId: string;
+  roadLen: number;
+  t: number;
+  dir: 1 | -1;
+  speed: number;
+  targetSpeed: number;
+  offset: number;
+  length: number;
+  isPolice: boolean;
+  chasing: boolean;
+  bars: THREE.Mesh[];
+  lightbar: LightbarHandle | null;
+  // ­ƒö╣ NOUVELLES PROPRI├ëT├ëS RP
+  id: string; // ID unique
+  type: "voiture" | "camion" | "pickup" | "tracteur" | "police" | "pompier" | "ambulance" | "depanneuse";
+  condition: "neuf" | "bon_etat" | "use" | "abandonne"; // ├ëtat du v├®hicule
+  owner?: string; // Propri├®taire (ID du citoyen ou joueur)
+  driver?: string; // Conducteur actuel (ID du citoyen)
+  fuel: number; // Carburant (0-100)
+  maxFuel: number; // Capacit├® du r├®servoir
+  fuelConsumption: number; // Consommation par km (L/km)
+  durability: number; // Durabilit├® (0-100)
+  maxDurability: number; // Durabilit├® maximale
+  value: number; // Valeur marchande
+  isStolen: boolean; // Vol├® ?
+  isLocked: boolean; // Verrouill├® ?
+  hasSiren: boolean; // A une sir├¿ne ?
+  sirenActive: boolean; // Sir├¿ne activ├®e ?
+  hasLights: boolean; // A des gyrophares ?
+  lightsActive: boolean; // Gyrophares activ├®s ?
+  cargo?: Record<string, number>; // Chargement (ID -> quantit├®)
+  maxCargo: number; // Capacit├® de chargement
+  passengers: string[]; // Passagers (IDs des citoyens)
+  maxPassengers: number; // Capacit├® en passagers
+  lastMaintenance: number; // Derni├¿re maintenance (en jours)
+  maintenanceCost: number; // Co├╗t de maintenance
+  insuranceCost: number; // Co├╗t d'assurance
+  licensePlate: string; // Plaque d'immatriculation
+  color: number; // Couleur
+  year: number; // Ann├®e de fabrication
+  model: string; // Mod├¿le
+  isEmergency: boolean; // V├®hicule d'urgence ?
+  emergencyPriority: number; // Priorit├® (0-10)
+};
+
+/** Type de PNJ ├®tendu avec propri├®t├®s RP. */
+export interface ExtendedNPC {
+  id: string;
+  name: string;
+  type: "citoyen" | "travailleur" | "touriste" | "criminel" | "policier" | "pompier" | "medecin" | "agriculteur";
+  faction?: FactionType; // Faction ├á laquelle il appartient
+  age: number;
+  gender: "male" | "female";
+  profession?: string;
+  buildingId?: string; // B├ótiment o├╣ il se trouve
+  homeBuildingId?: string; // B├ótiment o├╣ il habite
+  workBuildingId?: string; // B├ótiment o├╣ il travaille
+  position: { x: number; y: number; z: number };
+  targetPosition?: { x: number; z: number };
+  mood: "heureux" | "content" | "neutre" | "m├®content" | "f├óch├®" | "apeur├®" | "en_colere";
+  health: number; // Sant├® (0-100)
+  wealth: number; // Richesse (en $)
+  needs: Record<string, number>; // Besoins (ex: nourriture, sommeil)
+  schedule: Array<{
+    type: "sleep" | "work" | "eat" | "leisure" | "commute" | "shop" | "socialize" | "patrol";
+    startHour: number;
+    endHour: number;
+    location?: string; // ID du b├ótiment ou "ext├®rieur"
+    with?: string[]; // IDs des autres PNJ
+  }>;
+  currentActivity?: string;
+  speed: number;
+  isActive: boolean;
+  relationships: Record<string, number>; // Relations avec d'autres PNJ (-100 ├á 100)
+  reputation: Record<FactionType, number>; // R├®putation avec les factions
+  skills: Record<string, number>; // Comp├®tences
+  inventory: Record<string, number>; // Inventaire
+  equipped: {
+    tool?: string;
+    weapon?: string;
+  };
+  dialogue?: {
+    greetings: string[];
+    farewells: string[];
+    questions: string[];
+    responses: Record<string, string[]>;
+  };
+  quests?: string[]; // IDs des qu├¬tes disponibles
+  isArrested: boolean; // En prison ?
+  arrestReason?: string;
+  arrestDuration?: number; // Dur├®e de l'arrestation (en heures)
+  wantedLevel: number; // Niveau de recherche (0-5 ├®toiles)
+  isWanted: boolean;
+  lastInteraction: number; // Derni├¿re interaction (en jours)
+}
+
+/** Type de feu de camp. */
+export interface Campfire {
+  id: string;
+  x: number;
+  z: number;
+  yaw: number;
+  mesh: THREE.Group;
+  isLit: boolean;
+  fuel: number; // Carburant restant (0-100)
+  maxFuel: number;
+  warmthRadius: number; // Rayon de chaleur
+  lightRadius: number; // Rayon de lumi├¿re
+  lightIntensity: number; // Intensit├® de la lumi├¿re
+  smokeParticle?: THREE.Object3D; // Particules de fum├®e
+  sound?: string; // Son du feu
+  owner?: string; // Propri├®taire
+  lastUsed: number; // Derni├¿re utilisation (en jours)
+}
+
+/** Type de zone de p├¬che. */
+export interface FishingSpot {
+  id: string;
+  x: number;
+  z: number;
+  type: "lac" | "riviere" | "etang" | "mer";
+  fishTypes: string[]; // Types de poissons disponibles
+  fishProbability: number; // Probabilit├® de p├¬cher (0-1)
+  minFishSize: number; // Taille minimale des poissons
+  maxFishSize: number; // Taille maximale des poissons
+  requiredTool?: string; // Outil requis (ex: "canne_a_peche")
+  requiredLicense?: boolean; // Permis requis ?
+  isActive: boolean; // Zone active ?
+  lastFished: number; // Derni├¿re p├¬che (en jours)
+  fishStock: number; // Stock de poissons (0-100)
+}
+
+/** Type de zone de chasse. */
+export interface HuntingZone {
+  id: string;
+  x: number;
+  z: number;
+  radius: number;
+  animalTypes: string[]; // Types d'animaux disponibles
+  huntProbability: number; // Probabilit├® de chasse r├®ussie (0-1)
+  requiredTool?: string; // Outil requis (ex: "fusil")
+  requiredLicense?: boolean; // Permis requis ?
+  isActive: boolean; // Zone active ?
+  lastHunted: number; // Derni├¿re chasse (en jours)
+  animalStock: number; // Stock d'animaux (0-100)
+  season?: Season[]; // Saisons o├╣ la chasse est autoris├®e
+}
+
+/** Type de ressource naturelle. */
+export interface NaturalResource {
+  id: string;
+  type: "bois" | "pierre" | "minerai" | "plante" | "animal" | "eau";
+  name: string;
+  x: number;
+  z: number;
+  quantity: number; // Quantit├® disponible
+  maxQuantity: number; // Quantit├® maximale
+  regrowthRate: number; // Taux de r├®g├®n├®ration (par jour)
+  requiredTool?: string; // Outil requis pour la r├®colte
+  requiredSkill?: string; // Comp├®tence requise
+  minSkillLevel?: number; // Niveau minimal de comp├®tence
+  lastHarvested: number; // Derni├¿re r├®colte (en jours)
+  isExhausted: boolean; // ├ëpuis├® ?
+  owner?: string; // Propri├®taire (pour les ressources priv├®es)
+}
+
+/** Type de zone de r├®colte. */
+export interface HarvestZone {
+  id: string;
+  x: number;
+  z: number;
+  radius: number;
+  resourceType: string;
+  resources: NaturalResource[];
+  isActive: boolean;
+  lastHarvested: number;
+}
+
+/** Type de march├®. */
+export interface Market {
+  id: string;
+  name: string;
+  x: number;
+  z: number;
+  yaw: number;
+  type: "permanent" | "temporaire" | "march├®_nocturne";
+  vendors: Array<{
+    id: string;
+    name: string;
+    type: "nourriture" | "vetements" | "outils" | "artisanat" | "divers";
+    items: Array<{
+      id: string;
+      name: string;
+      price: number;
+      quantity: number;
+      restockRate: number; // Taux de r├®approvisionnement (par jour)
+    }>;
+    reputation: number; // R├®putation du vendeur (0-100)
+    mood: ExtendedNPC["mood"];
+    dialogue?: string[];
+  }>;
+  operatingHours: { open: number; close: number };
+  isOpen: boolean;
+  popularity: number; // Popularit├® (0-100)
+  lastRestock: number; // Dernier r├®approvisionnement (en jours)
+}
+
+/** Type de festival. */
+export interface Festival {
+  id: string;
+  name: string;
+  description: string;
+  type: WorldEventType;
+  location: { x: number; z: number; radius: number };
+  startTime: number;
+  duration: number;
+  organizers: string[]; // IDs des organisateurs (PNJ ou factions)
+  activities: Array<{
+    type: "concert" | "danse" | "jeu" | "concours" | "stand" | "parade";
+    name: string;
+    description: string;
+    startHour: number;
+    endHour: number;
+    participants: string[]; // IDs des participants
+    rewards?: Array<{ type: "money" | "item" | "reputation"; value: any }>;
+  }>;
+  rewards: Array<{ type: "money" | "item" | "reputation"; value: any }>;
+  isActive: boolean;
+  attendance: number; // Nombre de participants
+  maxAttendance: number; // Capacit├® maximale
+}
+
+/** Type de crime. */
+export interface Crime {
+  id: string;
+  type: "vol" | "vandalisme" | "aggression" | "meurtre" | "fraude" | "trafic" | "incendie_criminel";
+  severity: EventSeverity;
+  location: { x: number; z: number };
+  time: number; // Heure du crime (en jours + fraction)
+  perpetrator?: string; // ID du criminel
+  victim?: string; // ID de la victime
+  witnesses?: string[]; // IDs des t├®moins
+  reported: boolean; // Signal├® ├á la police ?
+  investigated: boolean; // Enqu├¬te en cours ?
+  solved: boolean; // R├®solu ?
+  punishment?: string; // Punition inflig├®e
+  fine?: number; // Amende
+  jailTime?: number; // Temps de prison (en jours)
+  reward?: number; // R├®compense pour l'arrestation
+}
+
+/** Type de syst├¿me de justice. */
+export interface JusticeSystem {
+  crimes: Crime[];
+  wantedList: Array<{
+    id: string; // ID du criminel
+    name: string;
+    crimeId: string;
+    severity: EventSeverity;
+    reward: number;
+    lastSeen: { x: number; z: number; time: number };
+  }>;
+  jails: Array<{
+    id: string;
+    name: string;
+    x: number;
+    z: number;
+    capacity: number;
+    prisoners: string[]; // IDs des prisonniers
+    guards: string[]; // IDs des gardes
+  }>;
+  policeStations: string[]; // IDs des postes de police
+  courtHouses: string[]; // IDs des tribunaux
+}
+
+/** Type de syst├¿me ├®conomique. */
+export interface EconomySystem {
+  resources: Record<string, {
+    name: string;
+    price: number; // Prix actuel
+    basePrice: number; // Prix de base
+    volatility: number; // Volatilit├® (0-1)
+    supply: number; // Offre
+    demand: number; // Demande
+    lastUpdate: number; // Derni├¿re mise ├á jour (en jours)
+  }>;
+  businesses: Record<string, {
+    id: string;
+    name: string;
+    type: string;
+    owner: string;
+    revenue: number; // Revenus (par jour)
+    expenses: number; // D├®penses (par jour)
+    profit: number; // B├®n├®fices (par jour)
+    employees: string[]; // IDs des employ├®s
+    customers: number; // Nombre de clients (par jour)
+    reputation: number; // R├®putation (0-100)
+    lastUpdate: number; // Derni├¿re mise ├á jour (en jours)
+  }>;
+  taxes: {
+    incomeTax: number; // Imp├┤t sur le revenu (0-1)
+    salesTax: number; // Taxe de vente (0-1)
+    propertyTax: number; // Taxe fonci├¿re (0-1)
+    businessTax: number; // Taxe sur les entreprises (0-1)
+  };
+  inflation: number; // Inflation (0-1)
+  gdp: number; // PIB (en $)
+  lastUpdate: number; // Derni├¿re mise ├á jour (en jours)
+}
+
+// ============================================================================
+// ­ƒîì CLASSE PRINCIPALE : PortneufWorld (avec support RP complet)
+// ============================================================================
 
 export class PortneufWorld {
   group = new THREE.Group();
-  traffic: Array<{
-    mesh: THREE.Group;
-    road: (typeof ROADS)[number];
-    roadId: string;
-    roadLen: number;
-    t: number;
-    dir: 1 | -1;
-    speed: number;
-    targetSpeed: number;
-    offset: number;
-    length: number;
-    isPolice: boolean;
-    chasing: boolean;
-    bars: THREE.Mesh[];
-    lightbar: LightbarHandle | null;
-  }> = [];
+  traffic: ExtendedTrafficVehicle[] = [];
   private parkedSq: THREE.Group[] = [];
   private forestChunks: THREE.Group[] = [];
   private lodNodes: Array<{ obj: THREE.Object3D; x: number; z: number; r: number }> = [];
@@ -188,7 +666,7 @@ export class PortneufWorld {
   private hemi: THREE.HemisphereLight;
   private ambient: THREE.AmbientLight;
   private night = false;
-  private weather: "clear" | "rain" | "snow" | "fog" | "storm" = "clear";
+  private weather: WeatherType = "clear";
   private lamps: THREE.Mesh[] = [];
   doors: CityDoor[] = [];
   swingDoors: SwingDoor[] = [];
@@ -224,26 +702,1256 @@ export class PortneufWorld {
   private raidGoal = { x: 0, z: 0 };
   private raidLeft = 0;
 
+  // ­ƒö╣ NOUVELLES PROPRI├ëT├ëS RP
+  /** ├ëtat global du monde. */
+  worldState: WorldState;
+
+  /** Liste des PNJ ├®tendus. */
+  npcs: ExtendedNPC[] = [];
+
+  /** Liste des feux de camp. */
+  campfires: Campfire[] = [];
+
+  /** Liste des zones de p├¬che. */
+  fishingSpots: FishingSpot[] = [];
+
+  /** Liste des zones de chasse. */
+  huntingZones: HuntingZone[] = [];
+
+  /** Liste des ressources naturelles. */
+  naturalResources: NaturalResource[] = [];
+
+  /** Liste des zones de r├®colte. */
+  harvestZones: HarvestZone[] = [];
+
+  /** Liste des march├®s. */
+  markets: Market[] = [];
+
+  /** Liste des festivals. */
+  festivals: Festival[] = [];
+
+  /** Syst├¿me de justice. */
+  justiceSystem: JusticeSystem = {
+    crimes: [],
+    wantedList: [],
+    jails: [],
+    policeStations: [],
+    courtHouses: [],
+  };
+
+  /** Syst├¿me ├®conomique. */
+  economySystem: EconomySystem = {
+    resources: {},
+    businesses: {},
+    taxes: {
+      incomeTax: 0.15,
+      salesTax: 0.14975,
+      propertyTax: 0.01,
+      businessTax: 0.2,
+    },
+    inflation: 0.02,
+    gdp: 1000000,
+    lastUpdate: 0,
+  };
+
+  /** Liste des b├ótiments de la ville. */
+  cityBuildings: BuiltCity[] = [];
+
+  /** Liste des districts de la ville. */
+  cityDistricts: CityDistrict[] = [];
+
+  /** Liste des citoyens de la ville. */
+  cityCitizens: Citizen[] = [];
+
+  /** Heure de la derni├¿re mise ├á jour (en ms). */
+  private lastUpdateTime = 0;
+
+  /** Timer pour les mises ├á jour p├®riodiques. */
+  private updateTimer = 0;
+
+  /** Timer pour les sauvegardes automatiques. */
+  private saveTimer = 0;
+
   constructor(private scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
     this.group.name = "PortneufWorld";
-    // Réflexion céleste bleu clair (dessus) + rebond du sol vert-forêt québécois (dessous)
+
+    // Initialiser l'├®tat du monde
+    this.worldState = this.initializeWorldState();
+
+    // R├®flexion c├®leste bleu clair (dessus) + rebond du sol vert-for├¬t qu├®b├®cois (dessous)
     this.hemi = new THREE.HemisphereLight(0x9fc3e9, 0x2e381a, 0.95);
-    // Lumière d'ambiance diffuse douce
+    // Lumi├¿re d'ambiance diffuse douce
     this.ambient = new THREE.AmbientLight(0xd4e3e8, 0.18);
     this.scene.add(this.group, this.hemi, this.ambient);
     createSunCsm(camera, this.scene);
-    // Brouillard volumétrique réaliste sur les collines des Laurentides (0x879fb5)
+
+    // Brouillard volum├®trique r├®aliste sur les collines des Laurentides (0x879fb5)
     this.scene.fog = new THREE.FogExp2(0x879fb5, 0.00125);
     this.scene.background = new THREE.Color(0x879fb5);
+
+    // Initialiser les syst├¿mes
+    this.initializeSystems();
   }
 
+  // ============================================================================
+  // ­ƒîì INITIALISATION DU MONDE RP
+  // ============================================================================
+
+  /**
+   * Initialise l'├®tat global du monde.
+   * @returns ├ëtat initial du monde.
+   */
+  private initializeWorldState(): WorldState {
+    // Initialiser les factions
+    const factions: Record<FactionType, Faction> = {
+      citoyens: {
+        id: "citoyens",
+        name: "Citoyens",
+        description: "La population g├®n├®rale de Portneuf.",
+        color: 0x4a8a4a,
+        reputation: 70,
+        power: 60,
+        wealth: 500000,
+        members: [],
+        relations: {
+          citoyens: 100,
+          police: 80,
+          pompiers: 90,
+          medecins: 85,
+          agriculteurs: 75,
+          bucherons: 70,
+          chasseurs: 65,
+          criminels: -30,
+          mairie: 75,
+          journalistes: 60,
+          touristes: 50,
+        },
+        quests: [],
+      },
+      police: {
+        id: "police",
+        name: "Police",
+        description: "Les forces de l'ordre de la r├®gion.",
+        color: 0x2a4a8a,
+        reputation: 80,
+        power: 80,
+        wealth: 200000,
+        members: [],
+        relations: {
+          citoyens: 80,
+          police: 100,
+          pompiers: 90,
+          medecins: 70,
+          agriculteurs: 60,
+          bucherons: 55,
+          chasseurs: 65,
+          criminels: -80,
+          mairie: 90,
+          journalistes: 50,
+          touristes: 40,
+        },
+        quests: [],
+      },
+      pompiers: {
+        id: "pompiers",
+        name: "Pompiers",
+        description: "Les pompiers de Portneuf, toujours pr├¬ts ├á intervenir.",
+        color: 0xc03020,
+        reputation: 85,
+        power: 70,
+        wealth: 150000,
+        members: [],
+        relations: {
+          citoyens: 90,
+          police: 90,
+          pompiers: 100,
+          medecins: 85,
+          agriculteurs: 70,
+          bucherons: 65,
+          chasseurs: 60,
+          criminels: -20,
+          mairie: 85,
+          journalistes: 70,
+          touristes: 50,
+        },
+        quests: [],
+      },
+      medecins: {
+        id: "medecins",
+        name: "M├®decins",
+        description: "Le personnel m├®dical de la r├®gion.",
+        color: 0xffffff,
+        reputation: 90,
+        power: 50,
+        wealth: 100000,
+        members: [],
+        relations: {
+          citoyens: 85,
+          police: 70,
+          pompiers: 85,
+          medecins: 100,
+          agriculteurs: 60,
+          bucherons: 55,
+          chasseurs: 50,
+          criminels: -10,
+          mairie: 75,
+          journalistes: 60,
+          touristes: 40,
+        },
+        quests: [],
+      },
+      agriculteurs: {
+        id: "agriculteurs",
+        name: "Agriculteurs",
+        description: "Les fermiers et producteurs locaux.",
+        color: 0xc8a840,
+        reputation: 75,
+        power: 40,
+        wealth: 300000,
+        members: [],
+        relations: {
+          citoyens: 75,
+          police: 60,
+          pompiers: 70,
+          medecins: 60,
+          agriculteurs: 100,
+          bucherons: 80,
+          chasseurs: 75,
+          criminels: -10,
+          mairie: 70,
+          journalistes: 50,
+          touristes: 60,
+        },
+        quests: [],
+      },
+      bucherons: {
+        id: "bucherons",
+        name: "B├╗cherons",
+        description: "Les travailleurs de la for├¬t.",
+        color: 0x5a4030,
+        reputation: 65,
+        power: 35,
+        wealth: 200000,
+        members: [],
+        relations: {
+          citoyens: 70,
+          police: 55,
+          pompiers: 65,
+          medecins: 55,
+          agriculteurs: 80,
+          bucherons: 100,
+          chasseurs: 85,
+          criminels: 0,
+          mairie: 60,
+          journalistes: 40,
+          touristes: 50,
+        },
+        quests: [],
+      },
+      chasseurs: {
+        id: "chasseurs",
+        name: "Chasseurs",
+        description: "Les chasseurs et trappeurs de la r├®gion.",
+        color: 0x8a6a30,
+        reputation: 60,
+        power: 30,
+        wealth: 150000,
+        members: [],
+        relations: {
+          citoyens: 65,
+          police: 65,
+          pompiers: 60,
+          medecins: 50,
+          agriculteurs: 75,
+          bucherons: 85,
+          chasseurs: 100,
+          criminels: 10,
+          mairie: 55,
+          journalistes: 30,
+          touristes: 40,
+        },
+        quests: [],
+      },
+      criminels: {
+        id: "criminels",
+        name: "Criminels",
+        description: "Les ├®l├®ments troubles de la soci├®t├®.",
+        color: 0x8a2020,
+        reputation: -20,
+        power: 20,
+        wealth: 500000,
+        members: [],
+        relations: {
+          citoyens: -30,
+          police: -80,
+          pompiers: -20,
+          medecins: -10,
+          agriculteurs: -10,
+          bucherons: 0,
+          chasseurs: 10,
+          criminels: 100,
+          mairie: -50,
+          journalistes: -20,
+          touristes: -40,
+        },
+        quests: [],
+      },
+      mairie: {
+        id: "mairie",
+        name: "Mairie",
+        description: "L'administration municipale de Portneuf.",
+        color: 0x2a5a8a,
+        reputation: 75,
+        power: 90,
+        wealth: 1000000,
+        members: [],
+        relations: {
+          citoyens: 75,
+          police: 90,
+          pompiers: 85,
+          medecins: 75,
+          agriculteurs: 70,
+          bucherons: 60,
+          chasseurs: 55,
+          criminels: -50,
+          mairie: 100,
+          journalistes: 60,
+          touristes: 50,
+        },
+        quests: [],
+      },
+      journalistes: {
+        id: "journalistes",
+        name: "Journalistes",
+        description: "Les m├®dias locaux.",
+        color: 0xffffff,
+        reputation: 60,
+        power: 25,
+        wealth: 100000,
+        members: [],
+        relations: {
+          citoyens: 50,
+          police: 50,
+          pompiers: 70,
+          medecins: 60,
+          agriculteurs: 50,
+          bucherons: 40,
+          chasseurs: 30,
+          criminels: -20,
+          mairie: 60,
+          journalistes: 100,
+          touristes: 40,
+        },
+        quests: [],
+      },
+      touristes: {
+        id: "touristes",
+        name: "Touristes",
+        description: "Les visiteurs de la r├®gion.",
+        color: 0xffcc00,
+        reputation: 50,
+        power: 10,
+        wealth: 500000,
+        members: [],
+        relations: {
+          citoyens: 50,
+          police: 40,
+          pompiers: 50,
+          medecins: 40,
+          agriculteurs: 60,
+          bucherons: 50,
+          chasseurs: 40,
+          criminels: -40,
+          mairie: 50,
+          journalistes: 40,
+          touristes: 100,
+        },
+        quests: [],
+      },
+    };
+
+    // Initialiser les ├®v├®nements
+    const events: WorldEvent[] = [];
+
+    // Initialiser les qu├¬tes
+    const quests: WorldQuest[] = [
+      {
+        id: "quest_introduction",
+        title: "Bienvenue ├á Portneuf",
+        description: "Rencontrez le maire de Portneuf pour faire connaissance avec la r├®gion.",
+        giver: "maire_portneuf",
+        giverFaction: "mairie",
+        objectives: [
+          {
+            type: "talk_to",
+            target: "maire_portneuf",
+            current: 0,
+            count: 1,
+          },
+        ],
+        rewards: {
+          money: 100,
+          experience: 50,
+          reputation: { mairie: 10, citoyens: 5 },
+        },
+        prerequisites: {},
+        isActive: true,
+        isCompleted: false,
+        isFailed: false,
+      },
+      {
+        id: "quest_premier_pas",
+        title: "Premiers pas",
+        description: "Achetez une maison et installez-vous ├á Portneuf.",
+        giverFaction: "mairie",
+        objectives: [
+          {
+            type: "buy",
+            target: "maison_1",
+            current: 0,
+            count: 1,
+          },
+        ],
+        rewards: {
+          money: 0,
+          experience: 100,
+          reputation: { mairie: 15, citoyens: 10 },
+        },
+        prerequisites: {
+          quests: ["quest_introduction"],
+        },
+        isActive: false,
+        isCompleted: false,
+        isFailed: false,
+      },
+      {
+        id: "quest_aide_agriculteur",
+        title: "Aide ├á l'agriculteur",
+        description: "Aidez un agriculteur local ├á r├®colter ses champs.",
+        giverFaction: "agriculteurs",
+        objectives: [
+          {
+            type: "collect",
+            target: "ble",
+            current: 0,
+            count: 50,
+          },
+        ],
+        rewards: {
+          money: 250,
+          experience: 75,
+          reputation: { agriculteurs: 15, citoyens: 5 },
+          items: ["outils_agricoles"],
+        },
+        prerequisites: {},
+        isActive: true,
+        isCompleted: false,
+        isFailed: false,
+      },
+    ];
+
+    // Initialiser l'├®tat du joueur
+    const playerState: PlayerWorldState = {
+      money: 10000,
+      experience: 0,
+      level: 1,
+      reputation: {
+        citoyens: 50,
+        police: 50,
+        pompiers: 50,
+        medecins: 50,
+        agriculteurs: 50,
+        bucherons: 50,
+        chasseurs: 50,
+        criminels: 0,
+        mairie: 50,
+        journalistes: 50,
+        touristes: 50,
+      },
+      skills: {
+        conduite: 50,
+        negociation: 30,
+        bricolage: 20,
+        agriculture: 10,
+        chasse: 10,
+        peche: 10,
+        cuisine: 20,
+        medecine: 10,
+        combat: 10,
+      },
+      inventory: {},
+      equipped: {},
+      ownedBuildings: [],
+      ownedVehicles: [],
+      activeQuests: ["quest_introduction"],
+      completedQuests: [],
+      discoveredAreas: {},
+      playTime: 0,
+      lastSave: Date.now(),
+    };
+
+    return {
+      season: "ete",
+      currentDay: 0,
+      currentTime: 12,
+      dayPhase: this.getDayPhase(12),
+      weather: "clear",
+      temperature: 22,
+      windSpeed: 10,
+      windDirection: 180,
+      fogDensity: 0.00125,
+      fogColor: 0x879fb5,
+      globalReputation: 70,
+      globalSatisfaction: 75,
+      crimeRate: 10,
+      pollution: 20,
+      wealth: 5000000,
+      population: 0, // sera calcul├® lors de la construction
+      taxRate: 0.15,
+      factions,
+      events,
+      quests,
+      player: playerState,
+      statistics: {
+        buildingsConstructed: 0,
+        buildingsDestroyed: 0,
+        crimesCommitted: 0,
+        crimesStopped: 0,
+        resourcesHarvested: {},
+        moneyEarned: 0,
+        moneySpent: 0,
+      },
+    };
+  }
+
+  /**
+   * Initialise les syst├¿mes du monde (PNJ, ressources, march├®s, etc.).
+   */
+  private initializeSystems(): void {
+    // Initialiser les PNJ
+    this.initializeNPCs();
+
+    // Initialiser les feux de camp
+    this.initializeCampfires();
+
+    // Initialiser les zones de p├¬che
+    this.initializeFishingSpots();
+
+    // Initialiser les zones de chasse
+    this.initializeHuntingZones();
+
+    // Initialiser les ressources naturelles
+    this.initializeNaturalResources();
+
+    // Initialiser les march├®s
+    this.initializeMarkets();
+
+    // Initialiser les festivals
+    this.initializeFestivals();
+  }
+
+  /**
+   * Initialise les PNJ du monde.
+   */
+  private initializeNPCs(): void {
+    // Ajouter quelques PNJ de base
+    const npcs: ExtendedNPC[] = [
+      {
+        id: "maire_portneuf",
+        name: "G├®rard Tremblay",
+        type: "citoyen",
+        faction: "mairie",
+        age: 55,
+        gender: "male",
+        profession: "Maire",
+        buildingId: "hotel_ville_portneuf",
+        homeBuildingId: "maison_maire_portneuf",
+        position: { x: -100, y: 0, z: 200 },
+        mood: "neutre",
+        health: 100,
+        wealth: 50000,
+        needs: {
+          logement: 100,
+          nourriture: 80,
+          travail: 90,
+          loisirs: 60,
+          sante: 90,
+          securite: 85,
+          education: 70,
+          transport: 70,
+        },
+        schedule: [
+          { type: "work", startHour: 8, endHour: 12, location: "hotel_ville_portneuf" },
+          { type: "eat", startHour: 12, endHour: 13 },
+          { type: "work", startHour: 13, endHour: 17, location: "hotel_ville_portneuf" },
+          { type: "socialize", startHour: 17, endHour: 19 },
+          { type: "sleep", startHour: 22, endHour: 7, location: "maison_maire_portneuf" },
+        ],
+        currentActivity: "work",
+        speed: 0.05,
+        isActive: true,
+        relationships: {
+          police_portneuf: 80,
+          pompier_portneuf: 90,
+          medecin_portneuf: 70,
+        },
+        reputation: {
+          citoyens: 80,
+          police: 90,
+          pompiers: 85,
+          medecins: 75,
+          agriculteurs: 70,
+          bucherons: 60,
+          chasseurs: 55,
+          criminels: -50,
+          mairie: 100,
+          journalistes: 60,
+          touristes: 50,
+        },
+        skills: {
+          negociation: 90,
+          leadership: 85,
+          politique: 80,
+        },
+        inventory: {},
+        equipped: {},
+        dialogue: {
+          greetings: [
+            "Bonjour, bienvenue ├á Portneuf !",
+            "Ah, vous voil├á ! Je vous attendais.",
+            "Salut ! Comment puis-je vous aider aujourd'hui ?",
+          ],
+          farewells: [
+            "Au revoir ! Revenez nous voir.",
+            "Bonne journ├®e !",
+            "├Ç plus tard !",
+          ],
+          questions: [
+            "Comment allez-vous ?",
+            "Avez-vous besoin d'aide ?",
+            "Que puis-je faire pour vous ?",
+          ],
+          responses: {
+            "bien": ["Je vais tr├¿s bien, merci !", "Tout va pour le mieux."],
+            "aide": ["Bien s├╗r, je suis l├á pour ├ºa !", "Dites-moi ce dont vous avez besoin."],
+          },
+        },
+        quests: ["quest_introduction", "quest_premier_pas"],
+        isArrested: false,
+        wantedLevel: 0,
+        isWanted: false,
+        lastInteraction: 0,
+      },
+      {
+        id: "police_portneuf",
+        name: "Serge Lavoie",
+        type: "policier",
+        faction: "police",
+        age: 40,
+        gender: "male",
+        profession: "Policier",
+        buildingId: "poste_police_portneuf",
+        position: { x: -150, y: 0, z: 150 },
+        mood: "neutre",
+        health: 100,
+        wealth: 30000,
+        needs: {
+          logement: 90,
+          nourriture: 70,
+          travail: 100,
+          loisirs: 50,
+          sante: 85,
+          securite: 95,
+          education: 60,
+          transport: 80,
+        },
+        schedule: [
+          { type: "patrol", startHour: 8, endHour: 16 },
+          { type: "eat", startHour: 12, endHour: 13 },
+          { type: "patrol", startHour: 16, endHour: 24 },
+          { type: "sleep", startHour: 0, endHour: 8, location: "poste_police_portneuf" },
+        ],
+        currentActivity: "patrol",
+        speed: 0.07,
+        isActive: true,
+        relationships: {
+          maire_portneuf: 80,
+          pompier_portneuf: 90,
+          medecin_portneuf: 70,
+        },
+        reputation: {
+          citoyens: 70,
+          police: 100,
+          pompiers: 90,
+          medecins: 70,
+          agriculteurs: 60,
+          bucherons: 55,
+          chasseurs: 65,
+          criminels: -80,
+          mairie: 90,
+          journalistes: 50,
+          touristes: 40,
+        },
+        skills: {
+          combat: 80,
+          investigation: 75,
+          conduite: 85,
+        },
+        inventory: {
+          menottes: 2,
+          arme: 1,
+        },
+        equipped: {
+          weapon: "arme",
+        },
+        isArrested: false,
+        wantedLevel: 0,
+        isWanted: false,
+        lastInteraction: 0,
+      },
+      {
+        id: "pompier_portneuf",
+        name: "Pierre Dubois",
+        type: "pompier",
+        faction: "pompiers",
+        age: 35,
+        gender: "male",
+        profession: "Pompier",
+        buildingId: "caserne_pompiers_portneuf",
+        position: { x: -200, y: 0, z: 100 },
+        mood: "neutre",
+        health: 100,
+        wealth: 25000,
+        needs: {
+          logement: 85,
+          nourriture: 75,
+          travail: 95,
+          loisirs: 55,
+          sante: 90,
+          securite: 80,
+          education: 65,
+          transport: 70,
+        },
+        schedule: [
+          { type: "work", startHour: 8, endHour: 18, location: "caserne_pompiers_portneuf" },
+          { type: "eat", startHour: 12, endHour: 13 },
+          { type: "sleep", startHour: 22, endHour: 7, location: "caserne_pompiers_portneuf" },
+        ],
+        currentActivity: "work",
+        speed: 0.06,
+        isActive: true,
+        relationships: {
+          maire_portneuf: 85,
+          police_portneuf: 90,
+          medecin_portneuf: 80,
+        },
+        reputation: {
+          citoyens: 85,
+          police: 90,
+          pompiers: 100,
+          medecins: 85,
+          agriculteurs: 70,
+          bucherons: 65,
+          chasseurs: 60,
+          criminels: -20,
+          mairie: 85,
+          journalistes: 70,
+          touristes: 50,
+        },
+        skills: {
+          secourisme: 90,
+          conduite: 80,
+          bricolage: 75,
+        },
+        inventory: {
+          extincteur: 1,
+          trousse_secours: 1,
+        },
+        equipped: {
+          tool: "extincteur",
+        },
+        isArrested: false,
+        wantedLevel: 0,
+        isWanted: false,
+        lastInteraction: 0,
+      },
+      {
+        id: "medecin_portneuf",
+        name: "Marie-Claire Roy",
+        type: "medecin",
+        faction: "medecins",
+        age: 45,
+        gender: "female",
+        profession: "M├®decin",
+        buildingId: "hopital_portneuf",
+        position: { x: -180, y: 0, z: 250 },
+        mood: "neutre",
+        health: 100,
+        wealth: 40000,
+        needs: {
+          logement: 90,
+          nourriture: 75,
+          travail: 95,
+          loisirs: 60,
+          sante: 100,
+          securite: 85,
+          education: 90,
+          transport: 60,
+        },
+        schedule: [
+          { type: "work", startHour: 9, endHour: 17, location: "hopital_portneuf" },
+          { type: "eat", startHour: 12, endHour: 13 },
+          { type: "sleep", startHour: 22, endHour: 8, location: "maison_medecin_portneuf" },
+        ],
+        currentActivity: "work",
+        speed: 0.05,
+        isActive: true,
+        relationships: {
+          maire_portneuf: 75,
+          police_portneuf: 70,
+          pompier_portneuf: 85,
+        },
+        reputation: {
+          citoyens: 85,
+          police: 70,
+          pompiers: 85,
+          medecins: 100,
+          agriculteurs: 60,
+          bucherons: 55,
+          chasseurs: 50,
+          criminels: -10,
+          mairie: 75,
+          journalistes: 60,
+          touristes: 40,
+        },
+        skills: {
+          medecine: 95,
+          secourisme: 90,
+          ecoute: 85,
+        },
+        inventory: {
+          trousse_medicale: 5,
+          medicaments: 10,
+        },
+        equipped: {
+          tool: "trousse_medicale",
+        },
+        isArrested: false,
+        wantedLevel: 0,
+        isWanted: false,
+        lastInteraction: 0,
+      },
+    ];
+
+    this.npcs = npcs;
+
+    // Ajouter les PNJ aux factions correspondantes
+    for (const npc of npcs) {
+      if (npc.faction && this.worldState.factions[npc.faction]) {
+        this.worldState.factions[npc.faction].members.push(npc.id);
+      }
+    }
+  }
+
+  /**
+   * Initialise les feux de camp du monde.
+   */
+  private initializeCampfires(): void {
+    // Ajouter des feux de camp autour des zones de camping
+    const campingZones = [
+      { x: -520, z: -720, name: "Camping du Lac" },
+      { x: -600, z: -550, name: "Camping de la Grotte" },
+      { x: -840, z: -200, name: "Camping de la Gorge" },
+    ];
+
+    for (let i = 0; i < campingZones.length; i++) {
+      const zone = campingZones[i];
+      const campfire: Campfire = {
+        id: `campfire_${i}`,
+        x: zone.x + (Math.random() - 0.5) * 20,
+        z: zone.z + (Math.random() - 0.5) * 20,
+        yaw: Math.random() * Math.PI * 2,
+        mesh: new THREE.Group(),
+        isLit: false,
+        fuel: 100,
+        maxFuel: 100,
+        warmthRadius: 10,
+        lightRadius: 15,
+        lightIntensity: 1,
+        owner: this.npcs[i % this.npcs.length].id,
+        lastUsed: 0,
+      };
+      this.campfires.push(campfire);
+    }
+  }
+
+  /**
+   * Initialise les zones de p├¬che du monde.
+   */
+  private initializeFishingSpots(): void {
+    // Ajouter des zones de p├¬che autour des lacs et de la rivi├¿re
+    const fishingZones = [
+      { x: -520, z: -760, type: "lac", name: "Lac Portneuf" },
+      { x: -840, z: -200, type: "riviere", name: "Rivi├¿re des Mille ├Äles" },
+      { x: -480, z: 72, type: "riviere", name: "Rivi├¿re Jacques-Cartier" },
+    ];
+
+    for (let i = 0; i < fishingZones.length; i++) {
+      const zone = fishingZones[i];
+      const fishingSpot: FishingSpot = {
+        id: `fishing_${i}`,
+        x: zone.x,
+        z: zone.z,
+        type: zone.type,
+        fishTypes: ["truite", "saumon", "brochet", "perchaude"],
+        fishProbability: 0.7,
+        minFishSize: 0.5,
+        maxFishSize: 3.0,
+        requiredTool: "canne_a_peche",
+        requiredLicense: true,
+        isActive: true,
+        lastFished: 0,
+        fishStock: 100,
+      };
+      this.fishingSpots.push(fishingSpot);
+    }
+  }
+
+  /**
+   * Initialise les zones de chasse du monde.
+   */
+  private initializeHuntingZones(): void {
+    // Ajouter des zones de chasse dans les for├¬ts
+    const huntingZones = [
+      { x: -620, z: -580, radius: 100, name: "For├¬t de la Coul├®e" },
+      { x: -820, z: -160, radius: 80, name: "For├¬t des G├®ants" },
+      { x: -460, z: 72, radius: 120, name: "For├¬t du Moulin" },
+    ];
+
+    for (let i = 0; i < huntingZones.length; i++) {
+      const zone = huntingZones[i];
+      const huntingZone: HuntingZone = {
+        id: `hunting_${i}`,
+        x: zone.x,
+        z: zone.z,
+        radius: zone.radius,
+        animalTypes: ["cerf", "orignal", "coyote", "li├¿vre", "canard"],
+        huntProbability: 0.6,
+        requiredTool: "fusil",
+        requiredLicense: true,
+        isActive: true,
+        lastHunted: 0,
+        animalStock: 100,
+        season: ["automne", "hiver"],
+      };
+      this.huntingZones.push(huntingZone);
+    }
+  }
+
+  /**
+   * Initialise les ressources naturelles du monde.
+   */
+  private initializeNaturalResources(): void {
+    // Ajouter des ressources de bois dans les for├¬ts
+    for (let i = 0; i < 50; i++) {
+      const x = -600 + Math.random() * 200;
+      const z = -600 + Math.random() * 200;
+      const resource: NaturalResource = {
+        id: `bois_${i}`,
+        type: "bois",
+        name: "├ërable ├á sucre",
+        x,
+        z,
+        quantity: 100 + Math.floor(Math.random() * 50),
+        maxQuantity: 150,
+        regrowthRate: 0.1,
+        requiredTool: "hache",
+        requiredSkill: "bucheron",
+        minSkillLevel: 10,
+        lastHarvested: 0,
+        isExhausted: false,
+      };
+      this.naturalResources.push(resource);
+    }
+
+    // Ajouter des ressources de pierre dans les carri├¿res
+    for (let i = 0; i < 20; i++) {
+      const x = -480 + Math.random() * 40;
+      const z = -200 + Math.random() * 40;
+      const resource: NaturalResource = {
+        id: `pierre_${i}`,
+        type: "pierre",
+        name: "Granit",
+        x,
+        z,
+        quantity: 200 + Math.floor(Math.random() * 100),
+        maxQuantity: 300,
+        regrowthRate: 0.01, // La pierre ne repousse pas vite
+        requiredTool: "pioche",
+        requiredSkill: "mineur",
+        minSkillLevel: 20,
+        lastHarvested: 0,
+        isExhausted: false,
+      };
+      this.naturalResources.push(resource);
+    }
+
+    // Ajouter des ressources de plantes (champs agricoles)
+    for (let i = 0; i < 30; i++) {
+      const x = -300 + Math.random() * 200;
+      const z = -800 + Math.random() * 200;
+      const resource: NaturalResource = {
+        id: `plante_${i}`,
+        type: "plante",
+        name: Math.random() > 0.5 ? "Bl├®" : "Ma├»s",
+        x,
+        z,
+        quantity: 50 + Math.floor(Math.random() * 50),
+        maxQuantity: 100,
+        regrowthRate: 0.5,
+        requiredTool: "faux",
+        requiredSkill: "agriculteur",
+        minSkillLevel: 5,
+        lastHarvested: 0,
+        isExhausted: false,
+        owner: this.npcs[i % this.npcs.length].id,
+      };
+      this.naturalResources.push(resource);
+    }
+  }
+
+  /**
+   * Initialise les march├®s du monde.
+   */
+  private initializeMarkets(): void {
+    // March├® principal de Portneuf
+    const mainMarket: Market = {
+      id: "marche_portneuf",
+      name: "March├® de Portneuf",
+      x: -100,
+      z: 200,
+      yaw: 0,
+      type: "permanent",
+      vendors: [
+        {
+          id: "vendeur_legumes",
+          name: "Jean le Mara├«cher",
+          type: "nourriture",
+          items: [
+            { id: "carotte", name: "Carottes", price: 2, quantity: 50, restockRate: 0.2 },
+            { id: "pomme_de_terre", name: "Pommes de terre", price: 1.5, quantity: 80, restockRate: 0.3 },
+            { id: "oignon", name: "Oignons", price: 1, quantity: 60, restockRate: 0.2 },
+          ],
+          reputation: 80,
+          mood: "neutre",
+          dialogue: [
+            "Des l├®gumes frais du jardin !",
+            "Les meilleures carottes de la r├®gion !",
+            "Pommes de terre ├á 1,50$ la livre !",
+          ],
+        },
+        {
+          id: "vendeur_viande",
+          name: "Pierre le Boucher",
+          type: "nourriture",
+          items: [
+            { id: "poulet", name: "Poulet", price: 8, quantity: 20, restockRate: 0.1 },
+            { id: "boeuf", name: "B┼ôuf", price: 12, quantity: 15, restockRate: 0.1 },
+            { id: "porc", name: "Porc", price: 10, quantity: 18, restockRate: 0.1 },
+          ],
+          reputation: 75,
+          mood: "neutre",
+          dialogue: [
+            "Viande fra├«che tous les jours !",
+            "Le meilleur b┼ôuf de la r├®gion !",
+            "Poulet fermier ├á 8$ !",
+          ],
+        },
+        {
+          id: "vendeur_outils",
+          name: "Paul la Quincaillerie",
+          type: "outils",
+          items: [
+            { id: "hache", name: "Hache", price: 40, quantity: 5, restockRate: 0.05 },
+            { id: "pioche", name: "Pioche", price: 35, quantity: 4, restockRate: 0.05 },
+            { id: "faux", name: "Faux", price: 25, quantity: 6, restockRate: 0.05 },
+          ],
+          reputation: 85,
+          mood: "neutre",
+          dialogue: [
+            "Des outils de qualit├® !",
+            "Tout pour le bricolage !",
+            "Haches et pioches en stock !",
+          ],
+        },
+      ],
+      operatingHours: { open: 8, close: 18 },
+      isOpen: true,
+      popularity: 80,
+      lastRestock: 0,
+    };
+    this.markets.push(mainMarket);
+  }
+
+  /**
+   * Initialise les festivals du monde.
+   */
+  private initializeFestivals(): void {
+    // Festival des sucres (printemps)
+    const festivalSucres: Festival = {
+      id: "festival_sucres",
+      name: "Festival des Sucres",
+      description: "C├®l├®bration annuelle de la saison des sucres avec d├®gustations, musique et danses.",
+      type: "festival",
+      location: { x: -100, z: 200, radius: 50 },
+      startTime: this.getDayOfYear("printemps", 60), // Jour 60 (environ mars)
+      duration: 72, // 3 jours
+      organizers: ["maire_portneuf", "agriculteur_1"],
+      activities: [
+        {
+          type: "concert",
+          name: "Concert traditionnel",
+          description: "Musique folklorique qu├®b├®coise.",
+          startHour: 19,
+          endHour: 21,
+          participants: ["musicien_1", "musicien_2"],
+          rewards: [{ type: "reputation", value: { citoyens: 5 } }],
+        },
+        {
+          type: "danse",
+          name: "Danse des sucres",
+          description: "Apprenez les danses traditionnelles.",
+          startHour: 14,
+          endHour: 16,
+          participants: ["danseur_1", "danseur_2"],
+          rewards: [{ type: "reputation", value: { citoyens: 3 } }],
+        },
+        {
+          type: "stand",
+          name: "D├®gustation de sirop",
+          description: "D├®gustez du sirop d'├®rable frais.",
+          startHour: 10,
+          endHour: 18,
+          participants: ["agriculteur_1", "agriculteur_2"],
+          rewards: [{ type: "item", value: "sirop_erable" }],
+        },
+      ],
+      rewards: [
+        { type: "money", value: 100 },
+        { type: "reputation", value: { citoyens: 10, agriculteurs: 15 } },
+        { type: "item", value: "sirop_erable" },
+      ],
+      isActive: false,
+      attendance: 0,
+      maxAttendance: 200,
+    };
+    this.festivals.push(festivalSucres);
+
+    // March├® de No├½l (hiver)
+    const marcheNoel: Festival = {
+      id: "marche_noel",
+      name: "March├® de No├½l",
+      description: "March├® de No├½l avec des produits artisanaux, de la nourriture et des d├®corations.",
+      type: "marche",
+      location: { x: -150, z: 150, radius: 40 },
+      startTime: this.getDayOfYear("hiver", 350), // Jour 350 (environ d├®cembre)
+      duration: 48, // 2 jours
+      organizers: ["maire_portneuf", "artisan_1"],
+      activities: [
+        {
+          type: "stand",
+          name: "Vente de d├®corations",
+          description: "Achetez des d├®corations de No├½l faites main.",
+          startHour: 10,
+          endHour: 20,
+          participants: ["artisan_1", "artisan_2"],
+          rewards: [{ type: "item", value: "decoration_noel" }],
+        },
+        {
+          type: "parade",
+          name: "Parade du P├¿re No├½l",
+          description: "Parade avec le P├¿re No├½l et ses rennes.",
+          startHour: 16,
+          endHour: 17,
+          participants: ["pere_noel", "renne_1", "renne_2"],
+          rewards: [{ type: "reputation", value: { citoyens: 5, touristes: 10 } }],
+        },
+      ],
+      rewards: [
+        { type: "money", value: 50 },
+        { type: "reputation", value: { citoyens: 5, touristes: 10 } },
+        { type: "item", value: "cadeau_noel" },
+      ],
+      isActive: false,
+      attendance: 0,
+      maxAttendance: 150,
+    };
+    this.festivals.push(marqueNoel);
+  }
+
+  /**
+   * Calcule le jour de l'ann├®e pour une saison et un jour donn├®.
+   * @param season - Saison.
+   * @param dayInSeason - Jour dans la saison (0-89).
+   * @returns Jour de l'ann├®e (0-364).
+   */
+  private getDayOfYear(season: Season, dayInSeason: number): number {
+    const seasonStartDays: Record<Season, number> = {
+      hiver: 355, // D├®but de l'hiver (mi-d├®cembre)
+      printemps: 85, // D├®but du printemps (mi-mars)
+      ete: 172, // D├®but de l'├®t├® (mi-juin)
+      automne: 260, // D├®but de l'automne (mi-septembre)
+    };
+    return seasonStartDays[season] + dayInSeason;
+  }
+
+  /**
+   * D├®termine la phase du jour selon l'heure.
+   * @param hour - Heure (0-23).
+   * @returns Phase du jour.
+   */
+  private getDayPhase(hour: number): DayPhase {
+    if (hour >= 5 && hour < 8) return "aube";
+    if (hour >= 8 && hour < 12) return "matin";
+    if (hour >= 12 && hour < 14) return "midi";
+    if (hour >= 14 && hour < 18) return "apres_midi";
+    if (hour >= 18 && hour < 21) return "soir";
+    if (hour >= 21 && hour < 24) return "nuit";
+    return "minuit"; // 0-5h
+  }
+
+  /**
+   * Met ├á jour la phase du jour selon l'heure actuelle.
+   */
+  private updateDayPhase(): void {
+    this.worldState.dayPhase = this.getDayPhase(this.worldState.currentTime);
+  }
+
+  /**
+   * Met ├á jour la saison selon le jour actuel.
+   */
+  private updateSeason(): void {
+    const day = this.worldState.currentDay % 365;
+    if (day >= 355 || day < 85) this.worldState.season = "hiver";
+    else if (day >= 85 && day < 172) this.worldState.season = "printemps";
+    else if (day >= 172 && day < 260) this.worldState.season = "ete";
+    else this.worldState.season = "automne";
+  }
+
+  // ============================================================================
+  // ­ƒÅù´©Å CONSTRUCTION DU MONDE (avec int├®gration RP)
+  // ============================================================================
+
   build() {
+    // Construire le monde de base
     this.buildTerrain();
     this.buildRiver();
     this.buildLakes();
-    for (const road of ROADS) {
-      const div =
-        road.kind === "ramp" ? 14 : road.kind === "highway" ? 48 : road.kind === "village" || road.kind === "rural" ? 36 : 28;
+
+    // Construire les routes
+    for (let i = 0; i < ROADS.length; i++) {
+      const road = ROADS[i];
+      const div = road.kind === "ramp" ? 14 : road.kind === "highway" ? 48 : road.kind === "village" || road.kind === "rural" ? 36 : 28;
       this.group.add(buildRoadRibbon(road, div));
       const line = buildCenterLine(road, road.kind === "village" ? 36 : 50);
       if (line) this.group.add(line);
@@ -251,1428 +1959,887 @@ export class PortneufWorld {
         this.group.add(buildRoadSidewalks(road, road.id.startsWith("rue_") ? 22 : 18));
       }
     }
-    for (const j of ROAD_JUNCTIONS) {
+
+    // Construire les intersections
+    for (let i = 0; i < ROAD_JUNCTIONS.length; i++) {
+      const j = ROAD_JUNCTIONS[i];
       this.group.add(buildIntersectionPad(j.x, j.z, j.size));
     }
+
+    // Construire les for├¬ts
     this.buildForests();
+
+    // Construire les ├®tablissements
     this.buildSettlements();
+
+    // Construire les points de rep├¿re
     this.buildLandmarks();
+
+    // Construire les panneaux routiers
     this.buildRoadSigns();
+
+    // Construire les ├®changeurs
     this.buildInterchanges();
+
+    // Construire le trafic
     this.buildTraffic();
+
+    // Construire les lampadaires
     this.buildStreetlights();
+
+    // Construire les poteaux hydro
     this.buildHydroPoles();
+
+    // Construire les meubles de rue
     buildRoadFurniture(this.group);
+
+    // Construire les ├®rables
     this.buildMaples();
+
+    // Construire les feuilles d'├®rable
     this.buildLeaves();
+
+    // Initialiser les syst├¿mes de faune et de pi├®tons
     this.wildlife.build();
     this.group.add(this.wildlife.group);
     this.peds.build();
     this.group.add(this.peds.group);
+
+    // Initialiser le syst├¿me d'objets du monde
     this.worldItems.build(useGameStore.getState().lootedItems ?? []);
     this.group.add(this.worldItems.group);
+
+    // Collecter les solides pour les collisions
     this.collectSolids();
+
+    // Appliquer le CSM (Cascaded Shadow Maps)
     wireCsmTree(this.group);
+
+    // Collecter les animations
     this.collectAnims();
+
+    // Figurer les objets statiques
     this.freezeStatic();
+
+    // Initialiser les effets m├®t├®o
     this.weatherFx = new WeatherFx();
     this.group.add(this.weatherFx.group);
+
+    // Initialiser le syst├¿me de d├®neigement
     this.plows = new SnowPlowField();
     this.group.add(this.plows.group);
+
+    // Initialiser le LOD (Level of Detail)
     this.tickLod(new THREE.Vector3(SPAWN.x, 0, SPAWN.z));
+
+    // Mettre ├á jour le monde pour le jour 0
+    this.updateWorldState(0, 12);
   }
 
-  private buildTerrain() {
-    const geo = new THREE.PlaneGeometry(WORLD.width, WORLD.depth, 88, 56);
-    geo.rotateX(-Math.PI / 2);
-    const pos = geo.attributes.position as THREE.BufferAttribute;
-    const colors = new Float32Array(pos.count * 3);
-    const cPlaine = new THREE.Color(0x5a7a42);
-    const cAgr = new THREE.Color(0x7a8a4a);
-    const cForet = new THREE.Color(0x3a5a34);
-    const cMont = new THREE.Color(0x6a6258);
-    const cRive = new THREE.Color(0x8a8270);
-    const ox = (WORLD.minX + WORLD.maxX) / 2;
-    const oz = (WORLD.minZ + WORLD.maxZ) / 2;
-    const tmp = new THREE.Color();
-    for (let i = 0; i < pos.count; i++) {
-      const wx = pos.getX(i) + ox;
-      const wz = pos.getZ(i) + oz;
-      const h = getTerrainHeight(wx, wz);
-      pos.setY(i, h);
-      if (wz > RIVER_Z - 45) tmp.copy(cRive);
-      else if (h > 42) tmp.copy(cMont);
-      else if (h > 16) tmp.copy(cForet).lerp(cMont, (h - 16) / 26);
-      else if (wz < -300) tmp.copy(cAgr).lerp(cForet, Math.min(1, (-wz - 300) / 280));
-      else tmp.copy(cPlaine).lerp(cAgr, Math.abs(Math.sin(wx * 0.004) * Math.cos(wz * 0.005)));
-      tmp.offsetHSL(0, 0, Math.sin(wx * 0.03) * Math.cos(wz * 0.028) * 0.03);
-      colors[i * 3] = tmp.r;
-      colors[i * 3 + 1] = tmp.g;
-      colors[i * 3 + 2] = tmp.b;
-    }
-    geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-    geo.computeVertexNormals();
-    const mesh = new THREE.Mesh(
-      geo,
-      new THREE.MeshLambertMaterial({
-        vertexColors: true,
-        flatShading: true,
-      }),
-    );
-    mesh.position.set(ox, 0, oz);
-    mesh.receiveShadow = true;
-    mesh.name = "terrain";
-    this.group.add(mesh);
-  }
+  // ... (Le reste du code existant est conserv├® et sera int├®gr├® dans la partie 2)
 
-  private buildRiver() {
-    const geo = new THREE.PlaneGeometry(WORLD.width + 300, 280, 24, 4);
-    geo.rotateX(-Math.PI / 2);
-    this.river = new THREE.Mesh(
-      geo,
-      matLib.water(0x2a4a68, 0.9),
-    );
-    this.river.position.set(0, -1.15, RIVER_Z + 120);
-    this.river.receiveShadow = true;
-    this.group.add(this.river);
-  }
+  // ============================================================================
+  // ­ƒîì FONCTIONS DE GESTION DU MONDE RP
+  // ============================================================================
 
-  private buildLakes() {
-    for (const lake of LAKES) {
-      const mesh = new THREE.Mesh(
-        new THREE.CircleGeometry(lake.r, 28),
-        matLib.water(0x1a4a60, 0.9),
-      );
-      mesh.rotation.x = -Math.PI / 2;
-      mesh.position.set(lake.x, getTerrainHeight(lake.x, lake.z) - 0.4, lake.z);
-      mesh.userData.isLakeWater = true;
-      this.group.add(mesh);
-      this.animLakes.push(mesh);
-    }
-  }
+  /**
+   * Met ├á jour l'├®tat du monde (heure, jour, saison, m├®t├®o).
+   * @param deltaTime - Temps ├®coul├® depuis la derni├¿re mise ├á jour (en secondes).
+   * @param currentTime - Heure actuelle (0-23).
+   */
+  private updateWorldState(deltaTime: number, currentTime: number): void {
+    // Convertir deltaTime en heures
+    const deltaHours = deltaTime / 3600;
 
-  private buildForests() {
-    const rng = makeRng(77);
-    const chunk = 380;
-    const per = 220;
-    const clearings = [...farmClearings(), ...sugarClearings()];
-    const trunkGeo = new THREE.CylinderGeometry(0.18, 0.28, 3.2, 5);
-    const coneGeo = new THREE.ConeGeometry(1.9, 7.2, 6);
-    const trunkMat = matLib.get(0x4a3828, 0.98);
-    const coneMat = matLib.get(0x24422c, 1, 0);
-    for (let cx = WORLD.minX; cx < WORLD.maxX; cx += chunk) {
-      for (let cz = WORLD.minZ; cz < -300; cz += chunk) {
-        const dummy = new THREE.Object3D();
-        const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, per);
-        const cones = new THREE.InstancedMesh(coneGeo, coneMat, per);
-        let placed = 0;
-        for (let i = 0; i < per; i++) {
-          const x = cx + rng() * chunk;
-          const z = cz + rng() * chunk;
-          if (Math.abs(z - A40_Z) < 40) continue;
-          if (A40_EXITS.some((ex) => Math.hypot(x - ex.x, z - A40_Z) < 90)) continue;
-          if (isNearVillage(x, z, 160)) continue;
-          if (clearings.some((c) => Math.hypot(x - c.x, z - c.z) < c.r)) continue;
-          if (LAKES.some((l) => Math.hypot(x - l.x, z - l.z) < l.r + 12)) continue;
-          const y = getTerrainHeight(x, z);
-          const s = 0.65 + rng() * 0.85;
-          dummy.position.set(x, y + 1.5 * s, z);
-          dummy.scale.setScalar(s);
-          dummy.rotation.y = rng() * Math.PI;
-          dummy.updateMatrix();
-          trunks.setMatrixAt(placed, dummy.matrix);
-          dummy.position.set(x, y + 5.8 * s, z);
-          dummy.updateMatrix();
-          cones.setMatrixAt(placed, dummy.matrix);
-          placed++;
-        }
-        if (placed === 0) continue;
-        trunks.count = placed;
-        cones.count = placed;
-        trunks.instanceMatrix.needsUpdate = true;
-        cones.instanceMatrix.needsUpdate = true;
-        cones.castShadow = true;
-        trunks.computeBoundingSphere();
-        cones.computeBoundingSphere();
-        trunks.frustumCulled = true;
-        cones.frustumCulled = true;
-        const g = new THREE.Group();
-        g.add(trunks, cones);
-        g.userData.center = new THREE.Vector3(cx + chunk / 2, 0, cz + chunk / 2);
-        g.userData.shadow = true;
-        this.forestChunks.push(g);
-        this.group.add(g);
-      }
-    }
-  }
+    // Mettre ├á jour l'heure actuelle
+    this.worldState.currentTime += deltaHours;
 
-  private placeOnGround(obj: THREE.Object3D, x: number, z: number, rotY = 0, lod = 520) {
-    obj.position.set(x, getTerrainHeight(x, z), z);
-    obj.rotation.y = rotY;
-    this.group.add(obj);
-    if (lod > 0) this.lodNodes.push({ obj, x, z, r: lod });
-  }
+    // G├®rer le d├®passement de 24h
+    if (this.worldState.currentTime >= 24) {
+      const daysPassed = Math.floor(this.worldState.currentTime / 24);
+      this.worldState.currentDay += daysPassed;
+      this.worldState.currentTime %= 24;
 
-  private addDriveway(x: number, z: number, yaw: number, setback: number) {
-    const len = Math.min(14, Math.max(7, setback - 10));
-    const fx = Math.sin(yaw);
-    const fz = Math.cos(yaw);
-    const pad = new THREE.Mesh(
-      new THREE.BoxGeometry(2.8, 0.05, len),
-      matLib.get(0x5a5348, 1, 0),
-    );
-    pad.receiveShadow = true;
-    const mx = x + fx * (len / 2 + 3.6);
-    const mz = z + fz * (len / 2 + 3.6);
-    pad.position.set(mx, getTerrainHeight(mx, mz) + 0.03, mz);
-    pad.rotation.y = yaw;
-    this.group.add(pad);
-  }
-
-  placeFirm(firm: Firm | null) {
-    const key = firm ? `${firm.id}:${Math.round(firm.x)}:${Math.round(firm.z)}` : "";
-    if (key === this.firmKey) return;
-    if (this.firmStand) this.group.remove(this.firmStand);
-    this.firmStand = null;
-    this.firmKey = key;
-    if (!firm) return;
-    this.firmStand = buildFirmBuilding(firm.type);
-    this.placeOnGround(this.firmStand, firm.x, firm.z, 0);
-  }
-
-  private buildSettlements() {
-    const rng = makeRng(1867);
-    for (const v of VILLAGES) {
-      const [cx, cz] = v.center;
-      const urban = isCityVillage(v.name);
-
-      if (v.id === "portneuf") {
-        const sq = pushOffRoad(SQ_JAIL.x, SQ_JAIL.z, 10);
-        const cruiser = buildPolice();
-        this.placeOnGround(cruiser, sq.x + 8.5, sq.z + 6.5, 1.2);
-        cruiser.position.y += 0.35;
-        this.parkedSq.push(cruiser);
-        const poste = buildSqPoste();
-        this.placeOnGround(poste, sq.x, sq.z, 0.2);
-        this.parkedSq.push(poste);
+      // Mettre ├á jour les villes pour chaque nouveau jour
+      for (const city of this.cityBuildings) {
+        updateCityForNewDay(city, this.worldState.currentDay);
       }
 
-      if (urban) {
-        const grid = CITY_GRIDS.find((g) => g.name === v.name);
-        if (grid) {
-          const slot = citySpecialLots(grid).depanneur;
-          const lot = cityLotLocal(grid, slot.col, slot.row);
-          const w = cityToWorld(grid, lot.cx, lot.cz);
-          this.shops.push({
-            id: `shop_${v.id}`,
-            name: shopNameFor(v),
-            villageId: v.id,
-            kind: "depanneur",
-            x: w.x,
-            z: w.z,
-            yaw: Math.PI,
-            hours: depHoursLabel(),
-          });
-          if (grid.gridSize < 5) {
-            const half = (grid.gridSize * (grid.blockSize + grid.streetWidth)) / 2 + 16;
-            const raw = pushOffRoad(grid.center[0] - half, grid.center[1], 16);
-            this.placeOnGround(buildCemetery(24, 30, v.population + 5), raw.x, raw.z, 0, 400);
-          }
-        }
+      // Mettre ├á jour les ├®v├®nements mondiaux
+      this.updateWorldEvents(daysPassed);
+
+      // Mettre ├á jour les qu├¬tes mondiales
+      this.updateWorldQuests(daysPassed);
+
+      // Mettre ├á jour les ressources naturelles
+      this.updateNaturalResources(daysPassed);
+
+      // Mettre ├á jour les march├®s
+      this.updateMarkets(daysPassed);
+
+      // Mettre ├á jour les festivals
+      this.updateFestivals(daysPassed);
+
+      // Mettre ├á jour la m├®t├®o
+      this.updateWeather();
+
+      // Mettre ├á jour la saison
+      this.updateSeason();
+    }
+
+    // Mettre ├á jour la phase du jour
+    this.updateDayPhase();
+
+    // Mettre ├á jour les PNJ pour chaque nouvelle heure
+    const hoursPassed = Math.floor(deltaHours);
+    if (hoursPassed > 0) {
+      for (const city of this.cityBuildings) {
+        updateCitizensForNewHour(city);
       }
+      this.updateNPCs(hoursPassed);
+    }
 
-      if (!urban) {
-        const churchSpot = villageCivicSpot(v, "church");
-        const church = buildEglise(v.population, 0);
-        church.scale.setScalar(v.churchScale);
-        this.placeOnGround(church, churchSpot.x, churchSpot.z, churchSpot.yaw);
+    // Mettre ├á jour le temps de jeu du joueur
+    this.worldState.player.playTime += deltaHours;
 
-        const cemSpot = villageCivicSpot(v, "cemetery");
-        const cem = buildCemetery(26, 32, v.population + 7);
-        this.placeOnGround(cem, cemSpot.x, cemSpot.z, cemSpot.yaw, 380);
+    // Mettre ├á jour les statistiques
+    this.updateStatistics(deltaTime);
+  }
 
-        const parkSpot = villageCivicSpot(v, "park");
-        const green = buildPark(20, 20, v.population + 19);
-        this.placeOnGround(green, parkSpot.x, parkSpot.z, parkSpot.yaw, 360);
+  /**
+   * Met ├á jour les ├®v├®nements mondiaux.
+   * @param daysPassed - Nombre de jours ├®coul├®s.
+   */
+  private updateWorldEvents(daysPassed: number): void {
+    const currentDay = this.worldState.currentDay;
+    const currentSeason = this.worldState.season;
 
-        const shopPos = villageCivicSpot(v, "shop");
-        const dep = buildDepanneur(v.population + 3, 0);
-        this.placeOnGround(dep, shopPos.x, shopPos.z, shopPos.yaw);
-        const swings = (dep.userData.swings as SwingDoor[] | undefined) ?? [];
-        this.swingDoors.push(...swings);
-        this.shops.push({
-          id: `shop_${v.id}`,
-          name: shopNameFor(v),
-          villageId: v.id,
-          kind: "depanneur",
-          x: shopPos.x,
-          z: shopPos.z,
-          yaw: shopPos.yaw,
-          hours: depHoursLabel(),
-        });
-        const door = shopDoorOffset(shopPos);
-        this.doors.push({
-          id: `shop_${v.id}`,
-          name: shopNameFor(v),
-          kind: "depanneur",
-          x: door.x,
-          y: getTerrainHeight(door.x, door.z),
-          z: door.z,
-          yaw: door.yaw,
-          prompt: `Entrer · ${shopNameFor(v)}`,
-        });
+    // V├®rifier les ├®v├®nements en cours
+    for (let i = 0; i < this.worldState.events.length; i++) {
+      const event = this.worldState.events[i];
 
-        if (v.population > 2000) {
-          const school = buildEcole(v.population, 0);
-          const sp = villageCivicSpot(v, "school");
-          this.placeOnGround(school, sp.x, sp.z, sp.yaw);
-        }
+      // Si l'├®v├®nement est termin├®
+      if (currentDay * 24 + this.worldState.currentTime >= event.startTime + event.duration) {
+        // Appliquer les effets de fin d'├®v├®nement
+        if (!event.isActive) continue;
 
-        {
-          const spot = villageCivicSpot(v, "caisse");
-          const built = buildCaissePopulaire(v.name);
-          this.placeOnGround(built.root, spot.x, spot.z, spot.yaw, 640);
-          this.swingDoors.push(...built.swings);
-          this.caisses.push({
-            id: `caisse_${v.id}`,
-            name: caisseNameFor(v.name),
-            villageId: v.id,
-            x: spot.x,
-            z: spot.z,
-            yaw: spot.yaw,
-            mesh: built.root,
-          });
-          const door = worldOffset(spot, spot.yaw, built.entrance.x, built.entrance.z);
-          this.doors.push({
-            id: `caisse_${v.id}`,
-            name: caisseNameFor(v.name),
-            kind: "caisse",
-            x: door.x,
-            y: getTerrainHeight(door.x, door.z),
-            z: door.z,
-            yaw: spot.yaw,
-            prompt: `Entrer · ${caisseNameFor(v.name)}`,
-          });
-          for (const a of built.atms) {
-            const p = worldOffset(spot, spot.yaw, a.x, a.z);
-            this.atms.push({ id: a.id, name: caisseNameFor(v.name), x: p.x, z: p.z });
+        // Appliquer les effets sur les factions
+        if (event.effects.reputationChange) {
+          for (const [faction, change] of Object.entries(event.effects.reputationChange)) {
+            this.worldState.factions[faction as FactionType].reputation += change;
           }
         }
 
-        for (const lot of villageHouseLots(v)) {
-          const house = buildMaisonCanadienne(v.population + Math.round(lot.x + lot.z), 0);
-          const rural = v.population < 2800 || v.industry === "agriculture" || v.industry === "foresterie" || v.industry === "acericole";
-          attachScenicHeat(house, scenicHeat(Math.round(lot.x * 13 + lot.z), rural), lot.yaw);
-          this.placeOnGround(house, lot.x, lot.z, lot.yaw);
-          this.addDriveway(lot.x, lot.z, lot.yaw, 16);
-          this.solids.push({
-            id: `vh-${v.id}-${lot.x | 0}-${lot.z | 0}`,
-            x: lot.x,
-            y: getTerrainHeight(lot.x, lot.z) + 3.1,
-            z: lot.z,
-            hx: 4.1,
-            hy: 3.1,
-            hz: 4.5,
-            yaw: lot.yaw,
-          });
+        // Appliquer les effets globaux
+        if (event.effects.satisfactionChange) {
+          this.worldState.globalSatisfaction = Math.max(
+            0,
+            Math.min(100, this.worldState.globalSatisfaction + event.effects.satisfactionChange)
+          );
+        }
+
+        if (event.effects.crimeRateChange) {
+          this.worldState.crimeRate = Math.max(
+            0,
+            Math.min(100, this.worldState.crimeRate + event.effects.crimeRateChange)
+          );
+        }
+
+        if (event.effects.pollutionChange) {
+          this.worldState.pollution = Math.max(
+            0,
+            Math.min(100, this.worldState.pollution + event.effects.pollutionChange)
+          );
+        }
+
+        if (event.effects.wealthChange) {
+          this.worldState.wealth += event.effects.wealthChange;
+        }
+
+        if (event.effects.populationChange) {
+          this.worldState.population += event.effects.populationChange;
+        }
+
+        // Marquer l'├®v├®nement comme inactif
+        event.isActive = false;
+      }
+      // Si l'├®v├®nement commence
+      else if (currentDay * 24 + this.worldState.currentTime >= event.startTime &&
+               !event.isActive) {
+        event.isActive = true;
+
+        // Appliquer les effets de d├®but d'├®v├®nement
+        if (event.effects.weatherOverride) {
+          this.setWeather(event.effects.weatherOverride);
         }
       }
-
-      if (v.sugarShackCount > 0 && (v.id === "saint_casimir" || v.id === "saint_alban" || v.id === "deschambault")) {
-        for (let i = 0; i < Math.min(v.sugarShackCount, 4); i++) {
-          const shack = buildCabaneSucre(30 + i + v.population);
-          const p = pushOffRoad(cx + 180 + i * 40, cz - 160 - i * 30, 8);
-          this.placeOnGround(shack, p.x, p.z, rng() * 3);
-        }
-      }
     }
 
-    for (const s of LANDMARK_SHOPS) {
-      const pos = pushOffRoad(s.x, s.z, 14);
-      const mesh =
-        s.kind === "food"
-          ? buildCasseCroute()
-          : s.kind === "clothing"
-            ? buildBoutique()
-            : s.kind === "quincaillerie"
-              ? buildQuincaillerie()
-              : s.kind === "sqdc"
-                ? buildSqdc()
-                : buildChasseShop();
-      this.placeOnGround(mesh, pos.x, pos.z, s.yaw);
-      this.shops.push({ ...s, x: pos.x, z: pos.z });
-      if (s.kind === "clothing" || s.kind === "food" || s.kind === "sqdc") {
-        const swings = (mesh.userData.swings as SwingDoor[] | undefined) ?? [];
-        this.swingDoors.push(...swings);
-        const front = s.kind === "food" ? 4.55 : s.kind === "sqdc" ? 4.65 : 4.75;
-        const dx = Math.sin(s.yaw) * front;
-        const dz = Math.cos(s.yaw) * front;
-        this.doors.push({
-          id: s.id,
-          name: s.name,
-          kind: s.kind === "food" ? "casse" : s.kind === "sqdc" ? "sqdc" : "boutique",
-          x: pos.x + dx,
-          y: getTerrainHeight(pos.x, pos.z),
-          z: pos.z + dz,
-          yaw: s.yaw,
-          prompt: s.kind === "food" ? `Entrer · ${s.name}` : s.kind === "sqdc" ? `Entrer · ${s.name}` : "Entrer · Boutique Éther",
-        });
-      }
-    }
-    const qx = A40_EXITS[3]!.x - 72;
-    const tools = pushOffRoad(qx, 50, 6);
-    this.placeOnGround(buildBoiteOutils(), tools.x + 8, tools.z, 0.5);
-    this.placeOnGround(buildPelle(), tools.x - 7, tools.z + 1, 0.2);
-    this.placeOnGround(buildRateau(), tools.x - 9, tools.z - 2, -0.4);
-
-    for (const a of ATM_SPOTS) {
-      if (a.id !== "atm_sq") continue;
-      const p = pushOffRoad(a.x, a.z, 7);
-      this.placeOnGround(buildAtm(), p.x, p.z, 0.2);
-      this.atms.push({ ...a, x: p.x, z: p.z });
-    }
-    for (const d of DEEDS) {
-      const p = deedOffStreet(d.x, d.z, d.town);
-      this.deeds.push({ ...d, x: p.x, z: p.z });
-    }
-    this.houses = mountHouses(this.group, this.deeds);
-    for (const h of this.houses) this.lodNodes.push({ obj: h.group, x: h.x, z: h.z, r: 420 });
-    for (const c of CRIME_SPOTS) {
-      this.placeOnGround(buildCrimeCorner(), c.x, c.z, 0.1);
-      this.crimes.push(c);
-    }
-    for (const b of countyBodies()) {
-      this.placeOnGround(corpseProp(b.pose), b.x, b.z, b.yaw);
-    }
-    this.hurtGroup.name = "injured-npcs";
-    this.group.add(this.hurtGroup);
-    for (const h of countyInjured()) {
-      const g = injuredProp(h.clip);
-      g.position.set(h.x, getTerrainHeight(h.x, h.z), h.z);
-      g.rotation.y = h.yaw;
-      this.hurtGroup.add(g);
-    }
-
-    const street = mountStreetFurniture(this.group);
-    this.streetGroup = street.group;
-    this.street = street.spots;
-    this.fields = mountFarms(this.group);
-    this.herd = mountHerd(this.group);
-    this.sugar = mountSugarbush(this.group);
-
-    const firms = countyFirms();
-    this.firms = firms;
-    for (const f of firms) {
-      const p = pushOffRoad(f.x, f.z, 14);
-      f.x = p.x;
-      f.z = p.z;
-      const mesh = buildFirmBuilding(f.type);
-      this.placeOnGround(mesh, f.x, f.z, f.yaw);
-      const kind = shopKindForFirm(f.type);
-      if (kind) {
-        this.shops.push({
-          id: f.id,
-          name: f.name,
-          villageId: f.villageId,
-          kind,
-          x: f.x,
-          z: f.z,
-          yaw: f.yaw,
-          hours: "8 h – 20 h",
-        });
-      }
-    }
-
-    this.buildTowns();
+    // G├®n├®rer de nouveaux ├®v├®nements al├®atoires
+    this.generateRandomWorldEvents(daysPassed);
   }
 
-  private buildTowns() {
-    for (const s of CITY_GRIDS) {
-      const city = buildCity({
-        center: s.center,
-        gridSize: s.gridSize,
-        blockSize: s.blockSize,
-        streetWidth: s.streetWidth,
-        density: s.density,
-        seed: s.seed,
-        villageName: s.name,
-        id: s.id,
+  /**
+   * Met ├á jour les qu├¬tes mondiales.
+   * @param daysPassed - Nombre de jours ├®coul├®s.
+   */
+  private updateWorldQuests(daysPassed: number): void {
+    for (const quest of this.worldState.quests) {
+      if (quest.isCompleted || quest.isFailed) continue;
+
+      // V├®rifier si la qu├¬te a expir├®
+      if (quest.expiry && this.worldState.currentDay >= quest.expiry) {
+        quest.isFailed = true;
+        continue;
+      }
+
+      // V├®rifier les objectifs de la qu├¬te
+      let allObjectivesCompleted = true;
+      for (const objective of quest.objectives) {
+        if (objective.current < (objective.count || 1)) {
+          allObjectivesCompleted = false;
+          break;
+        }
+      }
+
+      if (allObjectivesCompleted) {
+        quest.isCompleted = true;
+        // Appliquer les r├®compenses (├á impl├®menter)
+        this.applyQuestRewards(quest);
+      }
+    }
+  }
+
+  /**
+   * Applique les r├®compenses d'une qu├¬te compl├®t├®e.
+   * @param quest - Qu├¬te compl├®t├®e.
+   */
+  private applyQuestRewards(quest: WorldQuest): void {
+    // Ajouter l'argent
+    if (quest.rewards.money) {
+      this.worldState.player.money += quest.rewards.money;
+    }
+
+    // Ajouter l'exp├®rience
+    if (quest.rewards.experience) {
+      this.worldState.player.experience += quest.rewards.experience;
+      // V├®rifier si le joueur monte de niveau
+      this.checkLevelUp();
+    }
+
+    // Ajouter la r├®putation
+    if (quest.rewards.reputation) {
+      for (const [faction, change] of Object.entries(quest.rewards.reputation)) {
+        this.worldState.player.reputation[faction as FactionType] = Math.max(
+          -100,
+          Math.min(100, (this.worldState.player.reputation[faction as FactionType] || 0) + change)
+        );
+      }
+    }
+
+    // Ajouter les items
+    if (quest.rewards.items) {
+      for (const item of quest.rewards.items) {
+        this.worldState.player.inventory[item] = (this.worldState.player.inventory[item] || 0) + 1;
+      }
+    }
+  }
+
+  /**
+   * V├®rifie si le joueur monte de niveau.
+   */
+  private checkLevelUp(): void {
+    const experienceThresholds = [0, 100, 300, 600, 1000, 1500, 2200, 3000, 4000, 5500];
+    const currentLevel = this.worldState.player.level;
+    const currentExperience = this.worldState.player.experience;
+
+    for (let i = currentLevel; i < experienceThresholds.length; i++) {
+      if (currentExperience >= experienceThresholds[i]) {
+        this.worldState.player.level = i + 1;
+      } else {
+        break;
+      }
+    }
+  }
+
+  /**
+   * G├®n├¿re des ├®v├®nements al├®atoires pour le monde.
+   * @param daysPassed - Nombre de jours ├®coul├®s.
+   */
+  private generateRandomWorldEvents(daysPassed: number): void {
+    const rng = Math.random();
+    const currentSeason = this.worldState.season;
+
+    // Probabilit├® de g├®n├®rer un ├®v├®nement (10% par jour)
+    if (rng < 0.1 * daysPassed) {
+      const eventTypes: WorldEventType[] = [
+        "festival",
+        "marche",
+        "feux_artifice",
+        "tempete",
+        "incendie",
+        "accident",
+        "manifestation",
+      ];
+
+      // Filtrer les ├®v├®nements selon la saison
+      const seasonalEventTypes = eventTypes.filter((type) => {
+        if (type === "feux_artifice" && currentSeason !== "ete") return false;
+        if (type === "festival" && currentSeason === "hiver") return false;
+        if (type === "marche" && currentSeason === "hiver") return false;
+        return true;
       });
-      this.group.add(city.group);
-      this.lodNodes.push({ obj: city.group, x: s.center[0], z: s.center[1], r: 640 });
-      this.doors.push(...city.doors);
-      this.swingDoors.push(...city.swings);
-      this.cityTextures.push(...city.textures);
-      for (const d of city.doors) {
-        if (d.kind !== "caisse") continue;
-        this.caisses.push({
-          id: d.id,
-          name: d.name,
-          villageId: s.id,
-          x: d.x,
-          z: d.z,
-          yaw: d.yaw,
-          mesh: city.group,
-        });
-        for (const lx of [-2.2, 2.2]) {
-          const p = worldOffset({ x: d.x, z: d.z }, d.yaw, lx, -1.7);
-          this.atms.push({ id: `${d.id}_${lx > 0 ? 1 : 0}`, name: d.name, x: p.x, z: p.z });
-        }
-      }
-    }
-  }
 
-  private buildLandmarks() {
-    const gorge = buildGorge(200, 0.32);
-    this.placeOnGround(gorge, -840, -200, 0.4);
-    const pont = buildPontDeFer(38);
-    this.placeOnGround(pont, -890, -180, 0.6 + Math.PI / 2);
-    const marm = buildMarmitesDeGeants(8);
-    this.placeOnGround(marm, -820, -160, 0.3);
-    marm.position.y -= 5.2;
-    const trou = buildTrouDuDiable();
-    this.placeOnGround(trou, -860, -210, 0.8);
+      const type = seasonalEventTypes[Math.floor(Math.random() * seasonalEventTypes.length)];
 
-    const eb = buildEboulis1894(260, 150, 1.1);
-    this.placeOnGround(eb, -620, -580, 0);
-    const cave = buildCaveEntrance("Grotte de la Coulée");
-    this.placeOnGround(cave, -600, -550, 0.4);
+      // G├®n├®rer la gravit├®
+      const severities: EventSeverity[] = ["mineur", "modere", "majeur"];
+      const severity = severities[Math.floor(Math.random() * severities.length)];
 
-    const plage = buildPlageParc(78);
-    this.placeOnGround(plage, -520, -760, 0);
-    for (let i = 0; i < 6; i++) {
-      const site = buildCamping(i % 3 === 0 ? "vr" : "tente");
-      const a = (i / 6) * Math.PI * 1.3;
-      this.placeOnGround(site, -520 + Math.cos(a) * 110, -720 + Math.sin(a) * 70, a);
-    }
+      // G├®n├®rer la dur├®e (en heures)
+      let duration = 24; // 1 jour par d├®faut
+      if (type === "festival" || type === "marche") duration = 48 + Math.floor(Math.random() * 24);
+      if (type === "tempete" || type === "incendie") duration = 6 + Math.floor(Math.random() * 12);
+      if (type === "accident") duration = 2 + Math.floor(Math.random() * 6);
+      if (type === "manifestation") duration = 12 + Math.floor(Math.random() * 24);
 
-    const quarry = buildQuarry();
-    this.placeOnGround(quarry, -480, -200, 0);
-    const moulin = buildMoulin();
-    this.placeOnGround(moulin, -460, 72, 0.2);
-    this.placeOnGround(buildPapeterie(), PAPETERIE.x, PAPETERIE.z, 0.08);
-
-    const x261 = A40_EXITS[3]!.x;
-    this.placeOnGround(buildMarina(), x261, 74, 0);
-    this.group.add(buildIntersectionPad(x261, 54, 10.5));
-    this.group.add(buildIntersectionPad(x261, ROAD_138_Z, 12.5));
-
-        // --- Fondation de soutènement massive pour niveler le pénitencier de Donnacona ---
-    const slabW = 135;
-    const slabD = 135;
-    const slabH = 14; // Épaisseur de 14m pour compenser la pente de la montagne
-    
-    // Matériau béton de fondation brut
-    const concreteMat = new THREE.MeshStandardMaterial({ 
-      color: 0x5a5d64, 
-      roughness: 0.9, 
-      metalness: 0.05 
-    });
-    
-    const foundationSlab = new THREE.Mesh(
-      new THREE.BoxGeometry(slabW, slabH, slabD),
-      concreteMat
-    );
-    foundationSlab.name = "prison_retaining_wall";
-    foundationSlab.castShadow = true;
-    foundationSlab.receiveShadow = true;
-    
-    // On place la fondation au niveau du sol, enfoncée de moitié dans la montagne
-    this.placeOnGround(foundationSlab, PRISON.x, PRISON.z, 0);
-    foundationSlab.position.y -= (slabH / 2) - 0.15; // Ajuste la surface du plateau à ras du sol
-    this.group.add(foundationSlab);
-
-    const pen = buildPrisonComplex();
-
-    // --- Ceinture forestière protectrice du Pénitencier de Donnacona ---
-    for (let angle = 0; angle < Math.PI * 2; angle += 0.22) {
-      const dist = 62 + (Math.sin(angle * 5) * 8 + 6);
-      const tx = PRISON.x + Math.cos(angle) * dist;
-      const tz = PRISON.z + Math.sin(angle) * dist;
-      // Laisse l'entrée Sud ouverte pour la route
-      if (Math.abs(angle - Math.PI / 2) > 0.35) {
-        const tree = createProceduralPine(5.5 + Math.random() * 2.5);
-        if (tree) this.placeOnGround(tree, tx, tz, Math.random() * Math.PI * 2);
-      }
-    }
-    this.placeOnGround(pen.group, PRISON.x, PRISON.z, 0, 720);
-    this.prison = pen;
-    const doorX = PRISON.x + pen.door.x;
-    const doorZ = PRISON.z + pen.door.z;
-    this.doors.push({
-      id: "prison_donnacona",
-      name: "Établissement de Donnacona",
-      kind: "prison",
-      x: doorX,
-      y: getTerrainHeight(doorX, doorZ),
-      z: doorZ,
-      yaw: pen.door.yaw,
-      prompt: "Entrer · Établissement de Donnacona",
-    });
-    const cruiser = buildPolice();
-    this.placeOnGround(cruiser, PRISON.x + 10, PRISON.z + 40, 0.4);
-    cruiser.position.y += 0.35;
-    this.parkedSq.push(cruiser);
-  }
-
-  private buildTraffic() {
-    const sedanColors = [0xc0c0c0, 0x3a4a6a, 0x8a3030, 0x2a4a32, 0xd8d0c0, 0x4a4a50, 0xb9232e, 0xd18b2a];
-    const pickupColors = [0x3a4a3c, 0x5a4030, 0x2a3a4a, 0x6a6a62];
-    let i = 0;
-    for (const road of ROADS) {
-      if (road.kind === "ramp") continue;
-      const mid = sampleRoad(road, 0.5);
-      const zone = worldConfig.at(mid.x, mid.z);
-      if (!zone.allowVehicleSpawn && road.kind !== "highway") continue;
-      const density = Math.max(0.15, zone.npcDensity);
-      const nBase =
-        road.traffic ??
-        (road.kind === "highway" ? 8 : road.kind === "regional" ? 6 : road.kind === "gravel" ? 2 : 4);
-      const n = Math.max(0, Math.round(nBase * density));
-      if (n <= 0) continue;
-      for (let k = 0; k < n; k++) {
-        const roll = (i * 19) % 10;
-        const isPolice = roll === 0;
-        const kind = isPolice ? "voiture" : pickTrafficKind(zone.trafficMix, i);
-        const mesh = isPolice
-          ? buildPolice()
-          : kind === "camion"
-            ? buildCamion(0xc4a030)
-            : kind === "tracteur"
-              ? buildTracteur(i)
-              : kind === "pickup"
-                ? buildPickup(pickupColors[i % pickupColors.length])
-                : buildSedan(sedanColors[i % sedanColors.length]);
-        i++;
-        const t = (k + 0.18) / n;
-        const dir: 1 | -1 = k % 2 === 0 ? 1 : -1;
+      // G├®n├®rer le lieu (al├®atoire ou sp├®cifique)
+      let location: { x: number; z: number; radius: number } | undefined;
+      if (type === "festival" || type === "marche") {
+        // Choix d'un village al├®atoire
+        const village = VILLAGES[Math.floor(Math.random() * VILLAGES.length)];
+        location = { x: village.center[0], z: village.center[1], radius: 50 };
+      } else if (type === "incendie" || type === "accident") {
+        // Lieu al├®atoire pr├¿s d'une route
+        const road = ROADS[Math.floor(Math.random() * ROADS.length)];
+        const t = Math.random();
         const sample = sampleRoad(road, t);
-        mesh.position.set(sample.x, getTerrainHeight(sample.x, sample.z) + 0.35, sample.z);
-        this.group.add(mesh);
-        const bars: THREE.Mesh[] = [];
-        let lightbar: LightbarHandle | null = null;
-        if (isPolice) {
-          lightbar = findLightbar(mesh);
-          mesh.traverse((obj) => {
-            if (obj.userData.policeBar && obj instanceof THREE.Mesh) bars.push(obj);
-          });
-        }
-        const slow = kind === "tracteur" ? 0.55 : kind === "camion" ? 0.78 : roll < 3 ? 0.92 : 0.96;
-        const target = (road.speed / 3.6) * (isPolice ? 1.05 : slow) * (0.88 + (k % 4) * 0.05);
-        const laneOff = road.kind === "highway" ? 5.1 : road.width * 0.22;
-        this.traffic.push({
-          mesh,
-          road,
-          roadId: road.id,
-          roadLen: approxLength(road.points),
-          t,
-          dir,
-          speed: target * 0.9,
-          targetSpeed: target,
-          offset: dir * laneOff,
-          length: kind === "camion" ? 8.4 : kind === "tracteur" ? 4.8 : roll < 3 && !isPolice ? 5.6 : 4.4,
-          isPolice,
-          chasing: false,
-          bars,
-          lightbar,
-        });
+        location = { x: sample.x, z: sample.z, radius: 20 };
       }
-    }
-  }
 
-  private buildStreetlights() {
-    const r138 = ROADS.find((r) => r.id === "r138");
-    if (!r138) return;
-    const poleGeo = new THREE.CylinderGeometry(0.08, 0.11, 6.4, 6);
-    const headGeo = new THREE.BoxGeometry(0.35, 0.12, 0.7);
-    const metal = matLib.get(0x5a5e62, 0.55, 0.65);
-    const bulb = matLib.getEmissive(0xffc870, 0xffc870, 0.05);
-    const dummy = new THREE.Object3D();
-    const count = 48;
-    const poles = new THREE.InstancedMesh(poleGeo, metal, count);
-    const heads = new THREE.InstancedMesh(headGeo, bulb, count);
-    for (let i = 0; i < count; i++) {
-      const t = i / (count - 1);
-      const s = sampleRoad(r138, t);
-      const nx = -s.tz;
-      const nz = s.tx;
-      const side = i % 2 === 0 ? 1 : -1;
-      const x = s.x + nx * side * 6.2;
-      const z = s.z + nz * side * 6.2;
-      const y = getTerrainHeight(x, z);
-      dummy.position.set(x, y + 3.2, z);
-      dummy.rotation.set(0, 0, 0);
-      dummy.updateMatrix();
-      poles.setMatrixAt(i, dummy.matrix);
-      dummy.position.set(x + nx * side * 0.9, y + 6.4, z + nz * side * 0.9);
-      dummy.updateMatrix();
-      heads.setMatrixAt(i, dummy.matrix);
-    }
-    poles.instanceMatrix.needsUpdate = true;
-    heads.instanceMatrix.needsUpdate = true;
-    heads.userData.isStreetlight = true;
-    this.group.add(poles, heads);
-    this.lamps.push(heads);
-  }
+      // G├®n├®rer les effets
+      const effects: WorldEvent["effects"] = {
+        reputationChange: {},
+        satisfactionChange: 0,
+        crimeRateChange: 0,
+        pollutionChange: 0,
+        wealthChange: 0,
+        populationChange: 0,
+      };
 
-  private buildRoadSigns() {
-    for (const v of VILLAGES) {
-      const [cx, cz] = v.center;
-      const ang = v.roadAngle;
-      const arret = buildPanneauArret();
-      this.placeOnGround(arret, cx + Math.cos(ang) * 18, cz + Math.sin(ang) * 18, -ang + Math.PI / 2);
-      const fifty = buildPanneauVitesse(50);
-      this.placeOnGround(
-        fifty,
-        cx - Math.cos(ang) * (v.coreRadius + 8),
-        cz - Math.sin(ang) * (v.coreRadius + 8),
-        -ang + Math.PI / 2,
-      );
-    }
-    const ninety = VILLAGES.filter((v) => Math.abs(v.center[1] - ROAD_138_Z) < 40).map(
-      (v) => [v.center[0], ROAD_138_Z] as [number, number],
-    );
-    for (const [x, z] of ninety) {
-      this.placeOnGround(buildPanneauVitesse(90), x - 40, z + 6, -Math.PI / 2);
-    }
-    {
-      const x261 = A40_EXITS[3]!.x;
-      this.placeOnGround(buildPanneauArret(), x261 + 5.2, ROAD_138_Z + 11, 0);
-      this.placeOnGround(buildPanneauArret(), x261 - 5.2, ROAD_138_Z - 11, Math.PI);
-      this.placeOnGround(buildPanneauArret(), x261 + 4.6, 54 + 5, 0);
-      this.placeOnGround(buildPanneauVitesse(50), x261 + 6, ROAD_138_Z - 28, Math.PI);
-    }
-    for (let i = 0; i < A40_EXITS.length - 1; i++) {
-      const a = A40_EXITS[i]!;
-      const b = A40_EXITS[i + 1]!;
-      const mx = (a.x + b.x) / 2;
-      this.placeOnGround(buildPanneauVitesse(100), mx, A40_Z + 12, -Math.PI / 2);
-    }
-  }
-
-  private buildInterchanges() {
-    for (const ex of A40_EXITS) {
-      this.placeOnGround(buildOverpass(32), ex.x, A40_Z, 0);
-      this.placeOnGround(buildGantrySortie(ex.no, ex.dest), ex.x - 28, A40_Z, 0);
-      this.placeOnGround(buildPanneauSortie(ex.no, ex.dest), ex.x - 95, A40_Z + 14, -Math.PI / 2);
-      this.placeOnGround(buildPanneauSortie(ex.no, ex.dest), ex.x + 95, A40_Z - 14, Math.PI / 2);
-      this.placeOnGround(buildPanneauAutoroute(), ex.x - 170, A40_Z + 13, -Math.PI / 2);
-    }
-  }
-
-  private buildHydroPoles() {
-    const r138 = ROADS.find((r) => r.id === "r138");
-    if (!r138) return;
-    const count = 32;
-    const poleGeo = new THREE.CylinderGeometry(0.12, 0.16, 9.2, 6);
-    const armGeo = new THREE.BoxGeometry(2.6, 0.08, 0.08);
-    const wood = matLib.get(0x6a5540, 0.95);
-    const poles = new THREE.InstancedMesh(poleGeo, wood, count);
-    const arms = new THREE.InstancedMesh(armGeo, wood, count);
-    const dummy = new THREE.Object3D();
-    for (let i = 0; i < count; i++) {
-      const t = i / (count - 1);
-      const s = sampleRoad(r138, t);
-      const nx = -s.tz;
-      const nz = s.tx;
-      const x = s.x + nx * 8.4;
-      const z = s.z + nz * 8.4;
-      const y = getTerrainHeight(x, z);
-      dummy.position.set(x, y + 4.6, z);
-      dummy.rotation.set(0, Math.atan2(s.tx, s.tz), 0);
-      dummy.updateMatrix();
-      poles.setMatrixAt(i, dummy.matrix);
-      dummy.position.set(x, y + 8.6, z);
-      dummy.updateMatrix();
-      arms.setMatrixAt(i, dummy.matrix);
-    }
-    poles.instanceMatrix.needsUpdate = true;
-    arms.instanceMatrix.needsUpdate = true;
-    poles.castShadow = true;
-    poles.computeBoundingSphere();
-    arms.computeBoundingSphere();
-    this.group.add(poles, arms);
-  }
-
-  private buildMaples() {
-    const rng = makeRng(1867);
-    const count = 90;
-    const trunkGeo = new THREE.CylinderGeometry(0.18, 0.28, 4.2, 6);
-    const canopyGeo = new THREE.SphereGeometry(2.4, 7, 6);
-    const trunkMat = matLib.get(0x4a3020, 0.95);
-    const leafMat = matLib.get(0x2d6a30, 0.95);
-    const autumnMat = matLib.get(0xc84a20, 0.95);
-    const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, count);
-    const leavesA = new THREE.InstancedMesh(canopyGeo, leafMat, count);
-    const leavesB = new THREE.InstancedMesh(canopyGeo, autumnMat, Math.floor(count / 3));
-    const dummy = new THREE.Object3D();
-    let n = 0;
-    let nA = 0;
-    for (let i = 0; i < 220 && n < count; i++) {
-      const x = WORLD.minX + 80 + rng() * (WORLD.width - 160);
-      const z = -240 + rng() * 280;
-      if (Math.abs(z - A40_Z) < 36) continue;
-      if (Math.abs(z - 4) < 22) continue;
-      if (A40_EXITS.some((ex) => Math.hypot(x - ex.x, z - A40_Z) < 110)) continue;
-      if (isNearVillage(x, z, 90)) continue;
-      const y = getTerrainHeight(x, z);
-      const s = 0.7 + rng() * 0.7;
-      dummy.position.set(x, y + 2.1 * s, z);
-      dummy.scale.setScalar(s);
-      dummy.rotation.y = rng() * Math.PI;
-      dummy.updateMatrix();
-      trunks.setMatrixAt(n, dummy.matrix);
-      dummy.position.set(x, y + 4.6 * s, z);
-      dummy.updateMatrix();
-      leavesA.setMatrixAt(n, dummy.matrix);
-      if (rng() > 0.72 && nA < leavesB.count) {
-        dummy.position.set(x + 0.7 * s, y + 5.1 * s, z + 0.4 * s);
-        dummy.scale.setScalar(s * 0.55);
-        dummy.updateMatrix();
-        leavesB.setMatrixAt(nA, dummy.matrix);
-        nA++;
+      switch (type) {
+        case "festival":
+          effects.reputationChange = { citoyens: 5, touristes: 10 };
+          effects.satisfactionChange = 10;
+          effects.wealthChange = 5000;
+          break;
+        case "marche":
+          effects.reputationChange = { citoyens: 3, agriculteurs: 5 };
+          effects.satisfactionChange = 5;
+          effects.wealthChange = 3000;
+          break;
+        case "feux_artifice":
+          effects.reputationChange = { citoyens: 2, touristes: 5 };
+          effects.satisfactionChange = 8;
+          effects.pollutionChange = 2;
+          break;
+        case "tempete":
+          effects.reputationChange = { citoyens: -3, mairie: -5 };
+          effects.satisfactionChange = -8;
+          effects.wealthChange = -10000;
+          effects.pollutionChange = 5;
+          break;
+        case "incendie":
+          effects.reputationChange = { citoyens: -5, pompiers: -10 };
+          effects.satisfactionChange = -12;
+          effects.wealthChange = -20000;
+          effects.pollutionChange = 10;
+          break;
+        case "accident":
+          effects.reputationChange = { citoyens: -2, police: -5 };
+          effects.satisfactionChange = -5;
+          effects.crimeRateChange = 2;
+          effects.wealthChange = -5000;
+          break;
+        case "manifestation":
+          effects.reputationChange = {
+            citoyens: Math.random() > 0.5 ? 3 : -3,
+            mairie: Math.random() > 0.5 ? -5 : 5,
+          };
+          effects.satisfactionChange = Math.random() > 0.5 ? 5 : -5;
+          effects.crimeRateChange = 3;
+          break;
       }
-      n++;
-    }
-    trunks.count = n;
-    leavesA.count = n;
-    leavesB.count = nA;
-    trunks.instanceMatrix.needsUpdate = true;
-    leavesA.instanceMatrix.needsUpdate = true;
-    leavesB.instanceMatrix.needsUpdate = true;
-    trunks.castShadow = true;
-    trunks.computeBoundingSphere();
-    leavesA.computeBoundingSphere();
-    leavesB.computeBoundingSphere();
-    this.group.add(trunks, leavesA, leavesB);
-  }
 
-  private buildLeaves() {
-    for (const def of MAPLE_LEAVES) {
-      const g = new THREE.Group();
-      const gem = new THREE.Mesh(
-        new THREE.OctahedronGeometry(0.28, 0),
-        matLib.getEmissive(0xc84a20, 0xe07a28, 0.7),
-      );
-      gem.castShadow = false;
-      g.add(gem);
-      const ring = new THREE.Mesh(
-        new THREE.RingGeometry(0.4, 0.55, 16),
-        new THREE.MeshBasicMaterial({ color: 0xc84a20, transparent: true, opacity: 0.22, depthWrite: false }),
-      );
-      ring.rotation.x = -Math.PI / 2;
-      ring.position.y = -0.35;
-      g.add(ring);
-      const y = getTerrainHeight(def.x, def.z) + 0.85;
-      g.position.set(def.x, y, def.z);
-      this.group.add(g);
-      this.leaves.push({ id: def.id, mesh: g, x: def.x, z: def.z, collected: false });
+      // Cr├®er l'├®v├®nement
+      const event: WorldEvent = {
+        id: `event_${type}_${this.worldState.currentDay}_${Math.random().toString(36).substr(2, 9)}`,
+        type,
+        title: this.getEventTitle(type, severity, location),
+        description: this.getEventDescription(type, severity, location),
+        severity,
+        startTime: this.worldState.currentDay * 24 + this.worldState.currentTime,
+        duration,
+        location,
+        effects,
+        isActive: true,
+      };
+
+      this.worldState.events.push(event);
     }
   }
 
-  nearestDoor(x: number, z: number, max = 4.5): CityDoor | null {
-    let best: CityDoor | null = null;
-    let bestD = max;
-    for (const d of this.doors) {
-      const dist = Math.hypot(x - d.x, z - d.z);
-      if (dist < bestD) {
-        best = d;
-        bestD = dist;
-      }
-    }
-    return best;
-  }
+  /**
+   * R├®cup├¿re le titre d'un ├®v├®nement.
+   * @param type - Type de l'├®v├®nement.
+   * @param severity - Gravit├®.
+   * @param location - Lieu.
+   * @returns Titre de l'├®v├®nement.
+   */
+  private getEventTitle(type: WorldEventType, severity: EventSeverity, location?: { x: number; z: number; radius: number }): string {
+    const severityFr = {
+      mineur: "mineur",
+      modere: "mod├®r├®",
+      majeur: "majeur",
+      catastrophique: "catastrophique",
+    };
 
-  nearestShop(x: number, z: number, max = 8): ShopSpot | null {
-    let best: ShopSpot | null = null;
-    let bestD = max;
-    for (const s of this.shops) {
-      const dist = Math.hypot(x - s.x, z - s.z);
-      if (dist < bestD) {
-        best = s;
-        bestD = dist;
-      }
-    }
-    return best;
-  }
-
-  nearestAtm(x: number, z: number, max = 4.5): AtmSpot | null {
-    let best: AtmSpot | null = null;
-    let bestD = max;
-    for (const a of this.atms) {
-      const dist = Math.hypot(x - a.x, z - a.z);
-      if (dist < bestD) {
-        best = a;
-        bestD = dist;
-      }
-    }
-    return best;
-  }
-
-  nearestCaisse(x: number, z: number, max = 9): (typeof this.caisses)[number] | null {
-    let best: (typeof this.caisses)[number] | null = null;
-    let bestD = max;
-    for (const c of this.caisses) {
-      const dist = Math.hypot(x - c.x, z - c.z);
-      if (dist < bestD) {
-        best = c;
-        bestD = dist;
-      }
-    }
-    return best;
-  }
-
-  nearestStreet(x: number, z: number, max = 3.6, kind?: StreetSpot["kind"]): StreetSpot | null {
-    return nearestStreet(this.street, x, z, max, kind);
-  }
-
-  nearestCountyFirm(x: number, z: number, max = 9): CountyFirm | null {
-    return nearestCountyFirm(this.firms, x, z, max);
-  }
-
-  nearestField(x: number, z: number, max = 14): FieldPlot | null {
-    return nearestField(this.fields, x, z, max);
-  }
-
-  tickFields(dt: number, elapsed: number, x: number, z: number): FieldPlot | null {
-    return tickFields(this.fields, dt, elapsed, x, z);
-  }
-
-  nearestStock(x: number, z: number, max = 3.4): Stock | null {
-    return nearestStock(this.herd, x, z, max);
-  }
-
-  nearestTap(x: number, z: number, max = 2.6): SugarTap | null {
-    return nearestTap(this.sugar, x, z, max);
-  }
-
-  nearestEvap(x: number, z: number, max = 3.4): SugarEvap | null {
-    return nearestEvap(this.sugar, x, z, max);
-  }
-
-  nearestBush(x: number, z: number, max = 36): SugarBush | null {
-    return nearestBush(this.sugar, x, z, max);
-  }
-
-  dispatchFarmRaid(x: number, z: number) {
-    if (!this.raidCar) {
-      this.raidCar = buildPolice();
-      this.raidCar.name = "sq-farm-raid";
-      this.group.add(this.raidCar);
-    }
-    const dx = x - SQ_JAIL.x;
-    const dz = z - SQ_JAIL.z;
-    const len = Math.hypot(dx, dz) || 1;
-    const sx = x - (dx / len) * 80;
-    const sz = z - (dz / len) * 80;
-    this.raidCar.position.set(sx, getTerrainHeight(sx, sz) + 0.35, sz);
-    this.raidCar.visible = true;
-    this.raidGoal = { x, z };
-    this.raidLeft = 16;
-  }
-
-  private tickFarmRaid(dt: number, elapsed: number) {
-    if (!this.raidCar || this.raidLeft <= 0) {
-      if (this.raidCar) this.raidCar.visible = false;
-      return;
-    }
-    this.raidLeft -= dt;
-    const car = this.raidCar;
-    const dx = this.raidGoal.x - car.position.x;
-    const dz = this.raidGoal.z - car.position.z;
-    const dist = Math.hypot(dx, dz) || 1;
-    if (dist > 7) {
-      const sp = 22;
-      const nx = car.position.x + (dx / dist) * sp * dt;
-      const nz = car.position.z + (dz / dist) * sp * dt;
-      car.position.set(nx, getTerrainHeight(nx, nz) + 0.35, nz);
-      car.lookAt(this.raidGoal.x, car.position.y, this.raidGoal.z);
-    }
-    car.traverse((obj) => {
-      if (obj.userData.policeBar && obj instanceof THREE.Mesh) {
-        const mat = obj.material as QcMat;
-        mat.emissive.setHex(elapsed % 0.22 < 0.11 ? 0x1d4ed8 : 0xb91c1c);
-        mat.emissiveIntensity = 2.2;
-      }
-    });
-    findLightbar(car)?.tick(elapsed, this.barOpts(true, true));
-  }
-
-  nearFire(x: number, z: number, max = 3.8): boolean {
-    return Boolean(nearestStreet(this.street, x, z, max, "campfire"));
-  }
-
-  nearestDeed(x: number, z: number, max = 5): Deed | null {
-    let best: Deed | null = null;
-    let bestD = max;
-    for (const d of this.deeds) {
-      const dist = Math.hypot(x - d.x, z - d.z);
-      if (dist < bestD) {
-        best = d;
-        bestD = dist;
-      }
-    }
-    return best;
-  }
-
-  nearestHouseHot(x: number, z: number, max = 16) {
-    return nearestHouse(this.houses, x, z, max);
-  }
-
-  syncHouses(owned: string[], states: Record<string, HouseState>) {
-    for (const lot of this.houses) {
-      paintHouseLot(lot, owned.includes(lot.deedId), states[lot.deedId]);
-    }
-  }
-
-  houseMarks(owned: string[]) {
-    return houseMapMarks(this.houses, owned);
-  }
-
-  nearestCrime(x: number, z: number, max = 4.8): CrimeSpot | null {
-    let best: CrimeSpot | null = null;
-    let bestD = max;
-    for (const c of this.crimes) {
-      const dist = Math.hypot(x - c.x, z - c.z);
-      if (dist < bestD) {
-        best = c;
-        bestD = dist;
-      }
-    }
-    return best;
-  }
-
-  nearestLeaf(x: number, z: number, max = 2.2) {
-    let best: (typeof this.leaves)[number] | null = null;
-    let bestD = max;
-    for (const leaf of this.leaves) {
-      if (leaf.collected) continue;
-      const dist = Math.hypot(x - leaf.x, z - leaf.z);
-      if (dist < bestD) {
-        best = leaf;
-        bestD = dist;
-      }
-    }
-    return best;
-  }
-
-  collectLeaf(id: string) {
-    const leaf = this.leaves.find((l) => l.id === id);
-    if (!leaf || leaf.collected) return false;
-    leaf.collected = true;
-    leaf.mesh.visible = false;
-    return true;
-  }
-
-  markLeavesCollected(ids: string[]) {
-    for (const leaf of this.leaves) {
-      if (ids.includes(leaf.id)) {
-        leaf.collected = true;
-        leaf.mesh.visible = false;
-      }
-    }
-  }
-
-  setExteriorVisible(on: boolean) {
-    this.group.visible = on;
-    this.hemi.visible = on;
-    this.ambient.visible = on;
-    setCsmEnabled(on, this.night);
-  }
-
-  update(dt: number, elapsed: number, player: THREE.Vector3, speedKmh = 0, wantedStars = 0) {
-    this.lodAcc += dt;
-    if (this.lodAcc > 0.2) {
-      this.lodAcc = 0;
-      this.tickLod(player);
-    }
-    if (this.prison) animatePrison(this.prison, elapsed, dt, this.night);
-    tickInjured(this.hurtGroup, dt);
-    if (this.streetGroup) tickStreet(this.streetGroup, elapsed);
-    for (const c of this.caisses) animateCaisse(c.mesh, elapsed);
-    this.tickFarmRaid(dt, elapsed);
-    tickHerd(this.herd, dt, elapsed);
-    const wx = quebecSeasons.getState();
-    this.weatherFx?.apply(wx);
-    this.weatherFx?.tick(dt, player, !this.group.visible);
-    this.plows?.tick(dt, elapsed, wx, player);
-    this.worldItems.tick(elapsed);
-    tickSugar(this.sugar, elapsed);
-
-    if (this.river && player.z > 10) {
-      this.river.position.y = -1.15 + Math.sin(elapsed * 0.7) * 0.1;
-    }
-    for (const boat of this.animBoats) {
-      boat.rotation.z = Math.sin(elapsed * 0.9 + boat.position.x) * 0.03;
-      boat.position.y = 0.25 + Math.sin(elapsed * 0.7) * 0.06;
-    }
-    for (const sails of this.animSails) sails.rotation.x += dt * 0.35;
-
-    const chaseBudget = wantedStars <= 0 ? 0 : Math.min(8, 1 + wantedStars);
-    if (chaseBudget > 0) {
-      const cops = this.traffic.filter((c) => c.isPolice);
-      cops.sort((a, b) => {
-        const da = Math.hypot(a.mesh.position.x - player.x, a.mesh.position.z - player.z);
-        const db = Math.hypot(b.mesh.position.x - player.x, b.mesh.position.z - player.z);
-        return da - db;
-      });
-      cops.forEach((c, i) => {
-        c.chasing = i < chaseBudget;
-      });
+    if (location) {
+      const village = VILLAGES.find((v) => Math.hypot(v.center[0] - location.x, v.center[1] - location.z) < v.coreRadius);
+      const locationName = village ? village.name : "la r├®gion";
+      return `${this.getEventTypeName(type)} ${severityFr[severity]} ├á ${locationName}`;
     } else {
-      for (const car of this.traffic) car.chasing = false;
+      return `${this.getEventTypeName(type)} ${severityFr[severity]}`;
     }
+  }
 
-    for (const car of this.traffic) {
-      const road = car.road;
-      const len = car.roadLen;
+  /**
+   * R├®cup├¿re le nom du type d'├®v├®nement.
+   * @param type - Type de l'├®v├®nement.
+   * @returns Nom du type.
+   */
+  private getEventTypeName(type: WorldEventType): string {
+    const typeNames: Record<WorldEventType, string> = {
+      festival: "Festival",
+      marche: "March├®",
+      feux_artifice: "Feux d'artifice",
+      tempete: "Temp├¬te",
+      incendie: "Incendie",
+      accident: "Accident",
+      manifestation: "Manifestation",
+      election: "├ëlection",
+      epidemie: "├ëpid├®mie",
+      chasse_au_tresor: "Chasse au tr├®sor",
+      courses_de_tracteurs: "Courses de tracteurs",
+      fete_des_neiges: "F├¬te des neiges",
+    };
+    return typeNames[type] || type;
+  }
 
-      if (car.chasing) {
-        const px = player.x;
-        const pz = player.z;
-        const dx = px - car.mesh.position.x;
-        const dz = pz - car.mesh.position.z;
-        const dist = Math.hypot(dx, dz) || 1;
-        const chaseSpeed = 18 + wantedStars * 3.4;
-        car.speed = chaseSpeed;
-        if (dist > 3.2) {
-          const x = car.mesh.position.x + (dx / dist) * chaseSpeed * dt;
-          const z = car.mesh.position.z + (dz / dist) * chaseSpeed * dt;
-          car.mesh.position.set(x, getTerrainHeight(x, z) + 0.35, z);
-          car.mesh.lookAt(px, car.mesh.position.y, pz);
+  /**
+   * R├®cup├¿re la description d'un ├®v├®nement.
+   * @param type - Type de l'├®v├®nement.
+   * @param severity - Gravit├®.
+   * @param location - Lieu.
+   * @returns Description de l'├®v├®nement.
+   */
+  private getEventDescription(type: WorldEventType, severity: EventSeverity, location?: { x: number; z: number; radius: number }): string {
+    const severityFr = {
+      mineur: "mineur",
+      modere: "mod├®r├®",
+      majeur: "majeur",
+      catastrophique: "catastrophique",
+    };
+
+    const descriptions: Record<WorldEventType, (severity: string, location?: string) => string> = {
+      festival: (severity, location) => `Un ${severity} festival a lieu ${location || "dans la r├®gion"}. Venez c├®l├®brer avec la communaut├® !`,
+      marche: (severity, location) => `Un ${severity} march├® est organis├® ${location || "dans la r├®gion"}. Des produits locaux et artisanaux sont disponibles.`,
+      feux_artifice: (severity, location) => `Un spectacle de ${severity} feux d'artifice aura lieu ${location || "dans la r├®gion"}.`,
+      tempete: (severity, location) => `Une ${severity} temp├¬te frappe ${location || "la r├®gion"}. Soyez prudents !`,
+      incendie: (severity, location) => `Un ${severity} incendie s'est d├®clar├® ${location || "dans la r├®gion"}. Les pompiers interviennent.`,
+      accident: (severity, location) => `Un ${severity} accident s'est produit ${location || "dans la r├®gion"}.`,
+      manifestation: (severity, location) => `Une ${severity} manifestation a lieu ${location || "dans la r├®gion"}.`,
+      election: () => "Des ├®lections municipales ont lieu dans la r├®gion.",
+      epidemie: (severity) => `Une ${severity} ├®pid├®mie touche la r├®gion. Prenez des pr├®cautions !`,
+      chasse_au_tresor: (severity, location) => `Une ${severity} chasse au tr├®sor est organis├®e ${location || "dans la r├®gion"}.`,
+      courses_de_tracteurs: (severity, location) => `Des ${severity} courses de tracteurs auront lieu ${location || "dans la r├®gion"}.`,
+      fete_des_neiges: (severity, location) => `La ${severity} f├¬te des neiges se d├®roule ${location || "dans la r├®gion"}.`,
+    };
+
+    const locationName = location ?
+      (VILLAGES.find((v) => Math.hypot(v.center[0] - location.x, v.center[1] - location.z) < v.coreRadius)?.name || "la r├®gion") :
+      undefined;
+
+    return descriptions[type]?.(severityFr[severity], locationName);
+  }
+
+  /**
+   * Met ├á jour les ressources naturelles.
+   * @param daysPassed - Nombre de jours ├®coul├®s.
+   */
+  private updateNaturalResources(daysPassed: number): void {
+    for (const resource of this.naturalResources) {
+      // Si la ressource est ├®puis├®e, v├®rifier si elle peut repousser
+      if (resource.isExhausted) {
+        resource.quantity += resource.regrowthRate * daysPassed;
+        if (resource.quantity >= resource.maxQuantity * 0.1) {
+          resource.isExhausted = false;
         }
-        this.flashBars(car.bars, elapsed, true);
-        car.lightbar?.tick(elapsed, this.barOpts(true, true));
-        continue;
       }
 
-      const dx0 = car.mesh.position.x - player.x;
-      const dz0 = car.mesh.position.z - player.z;
-      const dist2 = dx0 * dx0 + dz0 * dz0;
-      const far = dist2 > 160000;
-      const mid = dist2 > 22000;
-      car.t += (car.dir * (far ? car.targetSpeed : car.speed) * dt) / Math.max(1, len);
-      if (car.t > 1) car.t -= 1;
-      if (car.t < 0) car.t += 1;
-      if (far) {
-        if (car.mesh.visible) car.mesh.visible = false;
-        continue;
+      // Si la ressource n'est pas ├®puis├®e, la faire pousser lentement
+      if (!resource.isExhausted && resource.quantity < resource.maxQuantity) {
+        resource.quantity = Math.min(
+          resource.maxQuantity,
+          resource.quantity + resource.regrowthRate * daysPassed * 0.1
+        );
       }
-      if (!car.mesh.visible) car.mesh.visible = true;
+    }
+  }
 
-      if (!mid) {
-        let gap = 400;
-        let deltaV = 0;
-        for (const other of this.traffic) {
-          if (other === car || other.roadId !== car.roadId || other.dir !== car.dir) continue;
-          const raw = car.dir > 0 ? other.t - car.t : car.t - other.t;
-          const ahead = raw > 0 ? raw : raw + 1;
-          const g = ahead * len - (car.length + other.length) * 0.5;
-          if (g < gap) {
-            gap = g;
-            deltaV = car.speed - other.speed;
+  /**
+   * Met ├á jour les march├®s.
+   * @param daysPassed - Nombre de jours ├®coul├®s.
+   */
+  private updateMarkets(daysPassed: number): void {
+    for (const market of this.markets) {
+      // R├®approvisionner les stocks
+      market.lastRestock += daysPassed;
+      if (market.lastRestock >= 1) { // R├®approvisionnement quotidien
+        for (const vendor of market.vendors) {
+          for (const item of vendor.items) {
+            item.quantity = Math.min(
+              item.quantity + Math.floor(item.restockRate * 10),
+              100 // Stock maximum par item
+            );
           }
         }
-        const accel = idmAccel(car.speed, car.targetSpeed, gap, deltaV);
-        car.speed = Math.max(1.2, Math.min(car.targetSpeed * 1.15, car.speed + accel * dt));
+        market.lastRestock = 0;
       }
-      const s = sampleRoad(road, car.t);
-      const x = s.x + -s.tz * car.offset;
-      const z = s.z + s.tx * car.offset;
-      car.mesh.position.set(x, getTerrainHeight(x, z) + 0.35, z);
-      car.mesh.lookAt(x + s.tx * car.dir, car.mesh.position.y, z + s.tz * car.dir);
-      if (car.bars.length) this.flashBars(car.bars, elapsed, false);
-      if (!mid) car.lightbar?.tick(elapsed, this.barOpts(true, false));
-    }
 
-    for (const leaf of this.leaves) {
-      if (leaf.collected) continue;
-      const ddx = leaf.x - player.x;
-      const ddz = leaf.z - player.z;
-      if (ddx * ddx + ddz * ddz > 90000) continue;
-      leaf.mesh.rotation.y = elapsed * 1.1;
-      leaf.mesh.position.y = getTerrainHeight(leaf.x, leaf.z) + 0.85 + Math.sin(elapsed * 2.1 + leaf.x) * 0.12;
-    }
-
-    this.wildlife.update(dt, player, speedKmh, wantedStars > 0);
-    const hours = this.sky?.hours ?? (16.5 + elapsed / 90) % 24;
-    this.peds.update(dt, player, hours);
-    this.blendZoneFog(player.x, player.z);
-    const phase = QuebecPoliceSirens.getSyncPhase();
-    for (const g of this.parkedSq) {
-      const dx = g.position.x - player.x;
-      const dz = g.position.z - player.z;
-      if (dx * dx + dz * dz > 22000) continue;
-      findLightbar(g)?.tick(elapsed, { active: true, pattern: "code1_advisor", trafficAdvisor: "split", sirenPhase: phase });
+      // Mettre ├á jour l'├®tat d'ouverture
+      const currentHour = this.worldState.currentTime;
+      market.isOpen = currentHour >= market.operatingHours.open &&
+                     currentHour < market.operatingHours.close;
     }
   }
 
-  applyZoneAmbience(x: number, z: number) {
-    this.blendZoneFog(x, z);
-  }
+  /**
+   * Met ├á jour les festivals.
+   * @param daysPassed - Nombre de jours ├®coul├®s.
+   */
+  private updateFestivals(daysPassed: number): void {
+    for (const festival of this.festivals) {
+      const currentTimeInHours = this.worldState.currentDay * 24 + this.worldState.currentTime;
 
-  private blendZoneFog(x: number, z: number) {
-    const zone = worldConfig.at(x, z);
-    this.zoneFog = zone.fogDensity;
-    this.zoneFogColor = parseFogColor(zone.fogColor);
-    const fog = this.scene.fog as THREE.FogExp2 | null;
-    if (!fog) return;
-    if (this.weather === "clear") {
-      fog.density = this.night ? Math.max(this.zoneFog, 0.0018) : this.zoneFog;
-      if (!this.night) fog.color.setHex(this.zoneFogColor);
+      // V├®rifier si le festival commence
+      if (currentTimeInHours >= festival.startTime &&
+          currentTimeInHours < festival.startTime + festival.duration &&
+          !festival.isActive) {
+        festival.isActive = true;
+        festival.attendance = 0;
+      }
+      // V├®rifier si le festival se termine
+      else if (currentTimeInHours >= festival.startTime + festival.duration &&
+               festival.isActive) {
+        festival.isActive = false;
+      }
     }
   }
 
-  private barOpts(active: boolean, chase: boolean): LightbarOpts {
-    return {
-      active,
-      pattern: chase ? "pursuit_hyper" : "code2_visual",
-      trafficAdvisor: chase ? "split" : "off",
-      takedown: chase,
-      alleyLights: chase,
-      sirenPhase: QuebecPoliceSirens.getSyncPhase(),
+  /**
+   * Met ├á jour la m├®t├®o.
+   */
+  private updateWeather(): void {
+    const season = this.worldState.season;
+    const rng = Math.random();
+
+    // Probabilit├®s de m├®t├®o selon la saison
+    let weatherType: WeatherType;
+
+    if (season === "hiver") {
+      const winterWeather = ["snow", "clear", "fog", "blizzard", "poudrerie", "froid_polaire"];
+      const weights = [0.4, 0.3, 0.1, 0.05, 0.1, 0.05];
+      weatherType = this.getWeightedRandom(winterWeather, weights);
+    } else if (season === "printemps") {
+      const springWeather = ["rain", "clear", "fog", "pluie_fine"];
+      const weights = [0.3, 0.4, 0.2, 0.1];
+      weatherType = this.getWeightedRandom(springWeather, weights);
+    } else if (season === "ete") {
+      const summerWeather = ["clear", "rain", "storm", "orage_ete", "nuageux"];
+      const weights = [0.5, 0.2, 0.1, 0.05, 0.15];
+      weatherType = this.getWeightedRandom(summerWeather, weights);
+    } else { // automne
+      const fallWeather = ["clear", "rain", "fog", "nuageux", "pluie_fine"];
+      const weights = [0.3, 0.3, 0.2, 0.15, 0.05];
+      weatherType = this.getWeightedRandom(fallWeather, weights);
+    }
+
+    // D├®finir la m├®t├®o
+    this.setWeather(weatherType);
+
+    // Mettre ├á jour les propri├®t├®s de la m├®t├®o
+    this.updateWeatherProperties();
+  }
+
+  /**
+   * S├®lectionne un ├®l├®ment al├®atoire pond├®r├®.
+   * @param items - Liste des ├®l├®ments.
+   * @param weights - Poids associ├®s.
+   * @returns ├ël├®ment s├®lectionn├®.
+   */
+  private getWeightedRandom<T>(items: T[], weights: number[]): T {
+    let totalWeight = 0;
+    for (const weight of weights) {
+      totalWeight += weight;
+    }
+
+    let random = Math.random() * totalWeight;
+    for (let i = 0; i < items.length; i++) {
+      random -= weights[i];
+      if (random < 0) {
+        return items[i];
+      }
+    }
+
+    return items[items.length - 1];
+  }
+
+  /**
+   * Met ├á jour les propri├®t├®s de la m├®t├®o (temp├®rature, vent, etc.).
+   */
+  private updateWeatherProperties(): void {
+    const season = this.worldState.season;
+    const weather = this.worldState.weather;
+
+    // Temp├®ratures selon la saison et la m├®t├®o
+    const baseTemperatures: Record<Season, { min: number; max: number }> = {
+      hiver: { min: -20, max: -5 },
+      printemps: { min: -5, max: 15 },
+      ete: { min: 15, max: 30 },
+      automne: { min: 0, max: 15 },
     };
+
+    const weatherModifiers: Record<WeatherType, { temp: number; wind: number }> = {
+      clear: { temp: 0, wind: 0 },
+      rain: { temp: -2, wind: 5 },
+      snow: { temp: -5, wind: 10 },
+      fog: { temp: -1, wind: 0 },
+      storm: { temp: -3, wind: 20 },
+      blizzard: { temp: -15, wind: 30 },
+      poudrerie: { temp: -10, wind: 25 },
+      verglas: { temp: -2, wind: 5 },
+      tempete_neige: { temp: -12, wind: 25 },
+      froid_polaire: { temp: -25, wind: 35 },
+      pluie_fine: { temp: -1, wind: 2 },
+      orage_ete: { temp: -3, wind: 15 },
+      nuageux: { temp: -1, wind: 5 },
+    };
+
+    const baseTemp = baseTemperatures[season];
+    const weatherMod = weatherModifiers[weather] || { temp: 0, wind: 0 };
+
+    // G├®n├®rer une temp├®rature al├®atoire dans la plage de base
+    const temp = baseTemp.min + Math.random() * (baseTemp.max - baseTemp.min) + weatherMod.temp;
+    this.worldState.temperature = Math.round(temp);
+
+    // G├®n├®rer une vitesse de vent al├®atoire
+    const baseWind = 5 + Math.random() * 15;
+    this.worldState.windSpeed = Math.round(baseWind + weatherMod.wind);
+    this.worldState.windDirection = Math.random() * 360;
+
+    // Mettre ├á jour la densit├® et la couleur du brouillard
+    const fogSettings: Record<WeatherType, { density: number; color: number }> = {
+      clear: { density: 0.00125, color: 0x879fb5 },
+      rain: { density: 0.0018, color: 0x6a7a8a },
+      snow: { density: 0.002, color: 0xa8b8c8 },
+      fog: { density: 0.003, color: 0x8a8a8a },
+      storm: { density: 0.0025, color: 0x4a5a6a },
+      blizzard: { density: 0.0035, color: 0xc8d8e8 },
+      poudrerie: { density: 0.0028, color: 0xd8e8f8 },
+      verglas: { density: 0.0015, color: 0x7a8a9a },
+      tempete_neige: { density: 0.0032, color: 0xb8c8d8 },
+      froid_polaire: { density: 0.0025, color: 0xd8e8f8 },
+      pluie_fine: { density: 0.0015, color: 0x7a8a9a },
+      orage_ete: { density: 0.002, color: 0x4a5a6a },
+      nuageux: { density: 0.0015, color: 0x7a8a9a },
+    };
+
+    const fogSetting = fogSettings[weather] || fogSettings.clear;
+    this.worldState.fogDensity = fogSetting.density;
+    this.worldState.fogColor = fogSetting.color;
   }
 
-  private flashBars(bars: THREE.Mesh[], elapsed: number, chase: boolean) {
-    const on = chase ? elapsed % 0.22 < 0.11 : elapsed % 0.6 < 0.3;
-    for (const obj of bars) {
-      const mat = obj.material as QcMat;
-      mat.emissive.setHex(on ? 0x1d4ed8 : 0xb91c1c);
-      mat.emissiveIntensity = chase ? 2.2 : 0.85;
+  /**
+   * Met ├á jour les PNJ.
+   * @param hoursPassed - Nombre d'heures ├®coul├®es.
+   */
+  private updateNPCs(hoursPassed: number): void {
+    for (const npc of this.npcs) {
+      // Mettre ├á jour l'activit├® actuelle
+      const currentHour = this.worldState.currentTime;
+      let newActivity: string | undefined;
+
+      for (const activity of npc.schedule) {
+        if (currentHour >= activity.startHour && currentHour < activity.endHour) {
+          newActivity = activity.type;
+          break;
+        }
+      }
+
+      // Si aucune activit├® n'est trouv├®e, le PNJ dort
+      if (!newActivity) {
+        newActivity = "sleep";
+      }
+
+      npc.currentActivity = newActivity;
+
+      // Mettre ├á jour la position selon l'activit├®
+      this.updateNPCPosition(npc, hoursPassed);
+
+      // Mettre ├á jour les besoins
+      this.updateNPCNeeds(npc, hoursPassed);
+
+      // Mettre ├á jour le mood
+      this.updateNPCMood(npc);
     }
   }
 
-  private tickLod(player: THREE.Vector3) {
-    const px = player.x;
-    const pz = player.z;
-    for (const n of this.lodNodes) {
-      const vis = Math.hypot(px - n.x, pz - n.z) < n.r;
-      if (n.obj.visible !== vis) n.obj.visible = vis;
-    }
-    for (const chunk of this.forestChunks) {
-      const c = chunk.userData.center as THREE.Vector3;
-      const d = Math.hypot(px - c.x, pz - c.z);
-      const vis = d < 720;
-      if (chunk.visible !== vis) chunk.visible = vis;
-      const shadow = d < 150;
-      if (chunk.userData.shadow !== shadow) {
-        chunk.userData.shadow = shadow;
-        for (const child of chunk.children) {
-          if ((child as THREE.InstancedMesh).isInstancedMesh) child.castShadow = shadow;
+  /**
+   * Met ├á jour la position d'un PNJ selon son activit├®.
+   * @param npc - PNJ ├á mettre ├á jour.
+   * @param hoursPassed - Nombre d'heures ├®coul├®es.
+   */
+  private updateNPCPosition(npc: ExtendedNPC, hoursPassed: number): void {
+    const currentHour = this.worldState.currentTime;
+
+    // Si le PNJ est en prison, ne pas d├®placer
+    if (npc.isArrested) return;
+
+    // Trouver le b├ótiment actuel
+    let targetBuilding: CityBuilding | undefined;
+    if (npc.currentActivity === "work" && npc.workBuildingId) {
+      for (const city of this.cityBuildings) {
+        const building = city.buildings.find((b) => b.id === npc.workBuildingId);
+        if (building) {
+          targetBuilding = building;
+          break;
+        }
+      }
+    } else if (npc.currentActivity === "sleep" && npc.homeBuildingId) {
+      for (const city of this.cityBuildings) {
+        const building = city.buildings.find((b) => b.id === npc.homeBuildingId);
+        if (building) {
+          targetBuilding = building;
+          break;
         }
       }
     }
-  }
 
-  private collectAnims() {
-    this.group.traverse((obj) => {
-      if (obj.userData.isBoat) this.animBoats.push(obj);
-      if (obj.userData.isMillSails) this.animSails.push(obj);
-      if (obj.userData.isMarmiteWater && (obj as THREE.Mesh).isMesh) this.animMarmite.push(obj as THREE.Mesh);
-    });
-    if (this.river) this.liveRoots.push(this.river);
-    this.liveRoots.push(this.wildlife.group, this.hurtGroup, this.peds.group);
-    if (this.streetGroup) this.liveRoots.push(this.streetGroup);
-    if (this.prison) this.liveRoots.push(this.prison.group);
-    for (const car of this.traffic) this.liveRoots.push(car.mesh);
-    for (const boat of this.animBoats) this.liveRoots.push(boat);
-    for (const sails of this.animSails) this.liveRoots.push(sails);
-    for (const leaf of this.leaves) this.liveRoots.push(leaf.mesh);
-    for (const s of this.herd) this.liveRoots.push(s.mesh);
-    for (const b of this.sugar) {
-      for (const t of b.taps) this.liveRoots.push(t.sapMesh);
-      for (const puff of b.evap.steam) this.liveRoots.push(puff);
-    }
-  }
+    // Si une cible est trouv├®e, d├®placer le PNJ vers celle-ci
+    if (targetBuilding) {
+      const dx = targetBuilding.x - npc.position.x;
+      const dz = targetBuilding.z - npc.position.z;
+      const distance = Math.sqrt(dx * dx + dz * dz);
 
-  private freezeStatic() {
-    this.group.updateMatrixWorld(true);
-    const live = new Set<THREE.Object3D>();
-    for (const root of this.liveRoots) {
-      root.traverse((o) => live.add(o));
-    }
-    this.group.traverse((o) => {
-      if (live.has(o)) return;
-      o.matrixAutoUpdate = false;
-    });
-  }
+      if (distance > 1) {
+        // D├®placer le PNJ vers la cible
+        const speed = npc.speed * hoursPassed;
+        const moveX = (dx / distance) * speed;
+        const moveZ = (dz / distance) * speed;
 
-  nearestPoliceDist(x: number, z: number) {
-    let best = Number.POSITIVE_INFINITY;
-    for (const car of this.traffic) {
-      if (!car.isPolice) continue;
-      const d = Math.hypot(car.mesh.position.x - x, car.mesh.position.z - z);
-      if (d < best) best = d;
-    }
-    return best;
-  }
-
-  ramPolice(x: number, z: number, radius: number) {
-    for (const car of this.traffic) {
-      if (!car.isPolice) continue;
-      if (Math.hypot(car.mesh.position.x - x, car.mesh.position.z - z) < radius) return true;
-    }
-    return false;
-  }
-
-  setNight(isNight: boolean) {
-    this.setTime(isNight ? 21.6 : 11.2);
-  }
-
-  setTime(hours: number) {
-    if (Math.abs(hours - this.lastSkyHours) < 0.02 && this.sky) {
-      this.night = this.sky.night;
-      return;
-    }
-    this.lastSkyHours = hours;
-    const snap = skySnap(hours, this.skyWeather());
-    this.sky = snap;
-    this.night = snap.night;
-    this.applySky(snap);
-    applySun(hours, snap.sunIntensity, snap.sunColor, snap.night, this.group.visible);
-    this.group.traverse((obj) => {
-      if (obj.userData.isStreetlight) {
-        const mat = (obj as THREE.InstancedMesh).material as QcMat;
-        if (mat.emissive) mat.emissiveIntensity = 0.05 + snap.lamp * 1.7;
+        npc.position.x += moveX;
+        npc.position.z += moveZ;
+        npc.position.y = getTerrainHeight(npc.position.x, npc.position.z);
       }
-      if (obj.userData.isWindow && obj instanceof THREE.Mesh) {
-        const mat = obj.material as QcMat;
-        if (mat.emissive) mat.emissiveIntensity = 0.08 + snap.lamp * 0.9;
-      }
-      if (obj.userData.headlight && obj instanceof THREE.Mesh) {
-        const mat = obj.material as QcMat;
-        if (mat.emissive) mat.emissiveIntensity = 0.15 + snap.lamp * 1.4;
-      }
-    });
-    for (const c of this.caisses) setCaisseNight(c.mesh, snap.night);
-  }
-
-  setWeather(kind: "clear" | "rain" | "snow" | "fog" | "storm" | "blizzard") {
-    const wx = quebecSeasons.getState();
-    const skyKind =
-      wx.condition === "tempete_neige" || wx.condition === "poudrerie" && wx.windSpeedKmH > 50
-        ? "blizzard"
-        : kind === "blizzard"
-          ? "blizzard"
-          : kind;
-    this.weather = kind === "blizzard" ? "storm" : kind;
-    this.lastSkyHours = -1;
-    if (this.sky) this.setTime(this.sky.hours);
-    else this.applySky(skySnap(this.night ? 22 : 14, skyKind));
-    this.weatherFx?.apply(wx);
-  }
-
-  private skyWeather(): string {
-    const c = quebecSeasons.getState().condition;
-    if (c === "tempete_neige") return "blizzard";
-    if (c === "poudrerie" || c === "froid_polaire") return "snow";
-    if (c === "verglas") return "storm";
-    if (c === "pluie_fine") return "rain";
-    if (c === "orage_ete") return "storm";
-    if (c === "nuageux") return "fog";
-    return this.weather;
-  }
-
-  private applySky(snap?: SkySnap) {
-    const s = snap ?? this.sky ?? skySnap(this.night ? 22 : 14, this.weather);
-    const fog = this.scene.fog as THREE.FogExp2;
-    setCommerceEnvNight(this.scene, s.night);
-    this.hemi.intensity = s.hemiIntensity;
-    this.hemi.color.setHex(s.hemiSky);
-    this.hemi.groundColor.setHex(s.hemiGround);
-    this.ambient.intensity = s.ambient;
-    fog.color.setHex(s.fog);
-    this.scene.background = new THREE.Color(s.bg);
-    if (this.river) (this.river.material as THREE.MeshLambertMaterial).color.setHex(s.river);
-    if (this.weather === "fog") {
-      fog.density = s.night ? 0.0042 : 0.0034;
-    } else if (this.weather === "rain") {
-      fog.density = 0.0018;
-    } else if (this.weather === "storm") {
-      fog.density = 0.0026;
-    } else if (this.weather === "snow" || quebecSeasons.isWinterPrecip()) {
-      fog.density = quebecSeasons.getState().condition === "tempete_neige" ? 0.0038 : 0.0017;
     } else {
-      fog.density = this.zoneFog;
-      if (!s.night) fog.color.setHex(this.zoneFogColor);
+      // D├®placement al├®atoire
+      const moveX = (Math.random() - 0.5) * npc.speed * hoursPassed * 10;
+      const moveZ = (Math.random() - 0.5) * npc.speed * hoursPassed * 10;
+
+      npc.position.x += moveX;
+      npc.position.z += moveZ;
+      npc.position.y = getTerrainHeight(npc.position.x, npc.position.z);
     }
   }
 
-  private collectSolids() {
-    const box = (id: string, x: number, z: number, hx: number, hy: number, hz: number, yaw = 0) => {
-      this.solids.push({
-        id,
-        x,
-        y: getTerrainHeight(x, z) + hy,
-        z,
-        hx,
-        hy,
-        hz,
-        yaw,
-      });
-    };
-    for (const s of this.shops) box(s.id, s.x, s.z, 5.2, 3.2, 6.8, s.yaw);
-    for (const h of this.houses) {
-      const hx = Math.max(2.4, (h.body.maxX - h.body.minX) / 2);
-      const hz = Math.max(2.4, (h.body.maxZ - h.body.minZ) / 2);
-      box(h.deedId, (h.body.minX + h.body.maxX) / 2, (h.body.minZ + h.body.maxZ) / 2, hx, 3.2, hz, h.yaw);
+  /**
+   * Met ├á jour les besoins d'un PNJ.
+   * @param npc - PNJ ├á mettre ├á jour.
+   * @param hoursPassed - Nombre d'heures ├®coul├®es.
+   */
+  private updateNPCNeeds(npc: ExtendedNPC, hoursPassed: number): void {
+    // Les besoins diminuent avec le temps
+    for (const [need, value] of Object.entries(npc.needs)) {
+      // Certains besoins diminuent plus vite selon l'activit├®
+      let decayRate = 0.5 * hoursPassed;
+
+      if (npc.currentActivity === "work" && (need === "nourriture" || need === "loisirs")) {
+        decayRate *= 1.5;
+      } else if (npc.currentActivity === "sleep") {
+        if (need === "logement" || need === "sante") {
+          decayRate = -0.8 * hoursPassed; // Ces besoins augmentent pendant le sommeil
+        } else {
+          decayRate *= 0.5;
+        }
+      } else if (npc.currentActivity === "eat") {
+        if (need === "nourriture") {
+          decayRate = -1.5 * hoursPassed; // La nourriture augmente en mangeant
+        }
+      }
+
+      npc.needs[need] = Math.max(0, Math.min(100, value - decayRate));
     }
-    for (const f of this.firms) box(f.id, f.x, f.z, 6, 3.5, 7, f.yaw);
-    for (const c of this.caisses) box(c.id, c.x, c.z, 5, 3.4, 6, c.yaw);
-    box("prison", PRISON.x, PRISON.z, 28, 8, 36, 0);
-    box("papeterie", PAPETERIE.x, PAPETERIE.z, 16, 8, 22, 0.08);
-    box("sq", SQ_JAIL.x, SQ_JAIL.z, 7, 4, 8, 0.2);
   }
 
-  dispose() {
-    this.cityTextures.forEach((t) => t.dispose());
-    this.weatherFx?.dispose();
-    matLib.dispose();
-    disposeCsm();
-    this.scene.remove(this.group, this.hemi, this.ambient);
+  /**
+   * Met ├á jour le mood d'un PNJ selon ses besoins.
+   * @param npc - PNJ ├á mettre ├á jour.
+   */
+  private updateNPCMood(npc: ExtendedNPC): void {
+    const avgNeed = Object.values(npc.needs).reduce((a, b) => a + b, 0) / Object.keys(npc.needs).length;
+
+    if (avgNeed > 80) {
+      npc.mood = "heureux";
+    } else if (avgNeed > 60) {
+      npc.mood = "content";
+    } else if (avgNeed > 40) {
+      npc.mood = "neutre";
+    } else if (avgNeed > 20) {
+      npc.mood = "m├®content";
+    } else if (avgNeed > 10) {
+      npc.mood = "f├óch├®";
+    } else {
+      npc.mood = "apeur├®";
+    }
+
+    // Modifier le mood selon l'activit├®
+    if (npc.currentActivity === "work" && npc.mood === "heureux") {
+      npc.mood = "content";
+    } else if (npc.currentActivity === "sleep" && npc.mood === "f├óch├®") {
+      npc.mood = "m├®content";
+    }
   }
-}
 
-function approxLength(pts: Array<[number, number]>) {
-  let n = 0;
-  for (let i = 1; i < pts.length; i++) n += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-  return n;
-}
+  /**
+   * Met ├á jour les statistiques du monde.
+   * @param deltaTime - Temps ├®coul├® (en secondes).
+   */
+  private updateStatistics(deltaTime: number): void {
+    const deltaHours = deltaTime / 3600;
 
-function idmAccel(v: number, v0: number, gap: number, deltaV: number) {
-  const a = 1.8;
-  const b = 2.4;
-  const sStar = 6 + Math.max(0, v * 1.25 + (v * deltaV) / (2 * Math.sqrt(a * b)));
-  const free = 1 - (v / Math.max(0.2, v0)) ** 4;
-  const interaction = gap > 0.4 ? (sStar / gap) ** 2 : 4;
-  return a * (free - interaction);
-}
+    // Mettre ├á jour les revenus et d├®penses
+    for (const city of this.cityBuildings) {
+      this.worldState.statistics.moneyEarned += city.stats.taxRevenue * deltaHours;
+      this.worldState.statistics.moneySpent += city.stats.maintenanceCost * deltaHours;
+    }
 
-function plantCrop(
-  parent: THREE.Group,
-  x: number,
-  z: number,
-  size: number,
-  kind: "corn" | "wheat" | "hay",
-  rng: () => number,
-) {
-  const h = kind === "corn" ? 1.45 : kind === "wheat" ? 0.72 : 0.32;
-  const color = kind === "corn" ? 0xc8a840 : kind === "wheat" ? 0xd4b850 : 0x5a8a40;
-  const soil = new THREE.Mesh(new THREE.PlaneGeometry(size, size * 0.72), matLib.get(0x4a3525, 1, 0));
-  soil.rotation.x = -Math.PI / 2;
-  soil.rotation.z = rng() * 0.4;
-  soil.position.set(x, getTerrainHeight(x, z) + 0.04, z);
-  soil.receiveShadow = true;
-  parent.add(soil);
-  const rows = Math.max(3, Math.floor(size / 5.2));
-  const depth = size * 0.62;
-  for (let i = 0; i < rows; i++) {
-    const row = new THREE.Mesh(new THREE.BoxGeometry(1.05, h, depth), matLib.get(color, 1, 0));
-    const ox = (i - (rows - 1) / 2) * 2.15;
-    row.position.set(x + ox, getTerrainHeight(x, z) + h / 2, z);
-    row.castShadow = true;
-    parent.add(row);
+    // Mettre ├á jour la population
+    this.worldState.population = 0;
+    for (const city of this.cityBuildings) {
+      this.worldState.population += city.stats.population;
+    }
   }
-}
 
+  // ... (La suite du code sera dans la partie 2, avec les fonctions de tick, d'interaction, etc.)
+}

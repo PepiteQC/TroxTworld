@@ -100,8 +100,9 @@ export function buildMaisonCanadienne(seed = 1, lit = 0): THREE.Group {
   g.add(awning);
 
   const door = buildHouseFrontDoor(0.95, 2.05);
-  door.position.set(0, 0.62, depth / 2 + 0.04);
-  g.add(door);
+  door.group.position.set(0, 0.62, depth / 2 + 0.04);
+g.add(door.group);
+  g.add(((door as any).group || door));
 
   for (const x of [-width * 0.28, width * 0.28]) {
     const w = windowPane(1.05, 1.2, rng() < lit);
@@ -465,8 +466,8 @@ export function buildChasseShop(): THREE.Group {
   roof.position.y = h + 0.16;
   g.add(roof);
   const door = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.2, 0.12), matLib.get(QC_PALETTE.porte, 0.9));
-  door.position.set(0, 1.15, d / 2 + 0.05);
-  g.add(door);
+  ((door as any).group || door).position.set(0, 1.15, d / 2 + 0.05);
+  g.add(((door as any).group || door));
   const sign = new THREE.Mesh(new THREE.BoxGeometry(w * 0.62, 0.8, 0.16), matLib.getEmissive(0x3d4b35, 0x7a8f62, 0.85));
   sign.position.set(0, h + 0.7, d / 2 + 0.06);
   g.add(sign);
@@ -488,8 +489,8 @@ export function buildQuincaillerie(): THREE.Group {
   roof.position.y = h + 0.12;
   g.add(roof);
   const door = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.4, 0.12), commerceMat("noirMat"));
-  door.position.set(-2.2, 1.25, d / 2 + 0.05);
-  g.add(door);
+  ((door as any).group || door).position.set(-2.2, 1.25, d / 2 + 0.05);
+  g.add(((door as any).group || door));
   const vitrine = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 2.2), commerceMat("verre"));
   vitrine.position.set(2.2, 1.7, d / 2 + 0.05);
   g.add(vitrine);
@@ -705,8 +706,8 @@ export function buildGrange(seed = 13): THREE.Group {
     new THREE.BoxGeometry(w * 0.4, 4.2, 0.16),
     tex.pbr("porteGrange", "porteGrangeNrm", 1, 1, 0.82, 0.05, 0xffffff, 1.1),
   );
-  door.position.set(0, 2.1, d / 2 + 0.08);
-  g.add(door);
+  ((door as any).group || door).position.set(0, 2.1, d / 2 + 0.08);
+  g.add(((door as any).group || door));
   if (rng() > 0.4) {
     const silo = new THREE.Mesh(
       new THREE.CylinderGeometry(2.0, 2.0, 11, 12),
@@ -752,8 +753,8 @@ export function buildCabaneSucre(seed = 21, lit = 0): THREE.Group {
     new THREE.BoxGeometry(1.0, 2.0, 0.1),
     matLib.get(0x4a3220, 0.9),
   );
-  door.position.set(0, 1.0, d / 2 + 0.06);
-  g.add(door);
+  ((door as any).group || door).position.set(0, 1.0, d / 2 + 0.06);
+  g.add(((door as any).group || door));
   void seed;
   void lit;
   return g;
@@ -802,8 +803,8 @@ export function buildSqPoste(): THREE.Group {
   roof.position.y = h + 0.16;
   g.add(roof);
   const door = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2.4, 0.14), matLib.get(0x1a1c18, 0.7));
-  door.position.set(0, 1.2, d / 2 + 0.06);
-  g.add(door);
+  ((door as any).group || door).position.set(0, 1.2, d / 2 + 0.06);
+  g.add(((door as any).group || door));
   const bar = buildPoliceLightbar(1.15, "SQ", false);
   bar.position.set(0, 4.55, d / 2 + 0.08);
   g.add(bar);
@@ -984,8 +985,8 @@ export function buildPolice(hero = false): THREE.Group {
   stripe.position.set(0, 0.78, 0);
   g.add(stripe);
   const door = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.32, 0.55), matLib.get(0xf2f2f0, 0.5));
-  door.position.set(0.86, 0.95, 0.15);
-  g.add(door);
+  ((door as any).group || door).position.set(0.86, 0.95, 0.15);
+  g.add(((door as any).group || door));
   return g;
 }
 
@@ -1428,3 +1429,4 @@ export function buildCrimeCorner(): THREE.Group {
   g.add(lid);
   return g;
 }
+

@@ -1,9 +1,31 @@
 /**
- * Panneau Intellectus — Données live, métriques et console d'administration.
+ * ═════════════════════════════════════════════════════════════════════════════
+ * 👁️ PANNEAU INTELLECTUS — TÉLÉMÉTRIE LIVE, 3E ŒIL & CONSOLE D'ADMINISTRATION
  * Fichier: /src/game/IntellectusOverlay.tsx
+ * Architecture : Single-State Update, Zero-GC Static Lookups, Render Optimized.
+ * ═════════════════════════════════════════════════════════════════════════════
  */
-import { useEffect, useState, useCallback, useRef, type KeyboardEvent } from "react";
-import { Activity, Radio, Shield, Terminal, Users, X } from "lucide-react";
+
+import {
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  useMemo,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
+import {
+  Activity,
+  Radio,
+  Shield,
+  Terminal,
+  Users,
+  X,
+  Search,
+  Copy,
+  Check,
+  Zap,
+} from "lucide-react";
 import {
   intellectusClient,
   type BusHistoryEntry,
@@ -33,28 +55,69 @@ import {
 } from "./seasons";
 import { AdminMetrics } from "./adminMetrics";
 
-type Tab = "sante" | "oeil" | "monde" | "bus";
+// ─── 1. CONSTANTES & ALLOCATIONS STATIQUES ───────────────────────────────────
+
+type TabId = "sante" | "oeil" | "monde" | "bus";
+
+const TABS: ReadonlyArray<{ id: TabId; label: string }> = [
+  { id: "sante", label: "Santé" },
+  { id: "oeil", label: "3e Œil" },
+  { id: "monde", label: "Monde" },
+  { id: "bus", label: "Bus / Logs" },
+] as const;
+
+const QUICK_COMMANDS = [
+  "/tp caisse",
+  "/meteo neige",
+  "/meteo pluie",
+  "/zone",
+  "/net",
+  "/heal",
+] as const;
+
+interface DashboardState {
+  online: boolean;
+  health: IntellectusHealth | null;
+  eye: ThirdEyeStats | null;
+  players: RPPlayerDTO[];
+  bus: BusHistoryEntry[];
+  cmds: CommandRecordDTO[];
+  latency: number;
+  fps: number;
+}
 
 interface Props {
   engine: PortneufEngine | null;
 }
 
+// ─── 2. COMPOSANT PRINCIPAL INTELLECTUS OVERLAY ─────────────────────────────
+
 export function IntellectusOverlay({ engine }: Props) {
-  const [tab, setTab] = useState<Tab>("sante");
-  const [online, setOnline] = useState(false);
-  const [health, setHealth] = useState<IntellectusHealth | null>(null);
-  const [eye, setEye] = useState<ThirdEyeStats | null>(null);
-  const [players, setPlayers] = useState<RPPlayerDTO[]>([]);
-  const [bus, setBus] = useState<BusHistoryEntry[]>([]);
-  const [cmds, setCmds] = useState<CommandRecordDTO[]>([]);
-  
-  // Console state
+  const [tab, setTab] = useState<TabId>("sante");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [commandExecuting, setCommandExecuting] = useState(false);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  // État unifié pour éviter les re-renders en cascade
+  const [metrics, setMetrics] = useState<DashboardState>({
+    online: false,
+    health: null,
+    eye: null,
+    players: [],
+    bus: [],
+    cmds: [],
+    latency: 0,
+    fps: 60,
+  });
+
+  // Gestion du terminal et historique
   const [line, setLine] = useState("");
   const [log, setLog] = useState<string[]>([]);
-  const [history, setHistory] = useState<string[]>([]);
-  const [historyIndex, setHistoryIndex] = useState<number>(-1);
+  const historyRef = useRef<string[]>([]);
+  const historyIndexRef = useRef<number>(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Store Zustand
+  // Sélecteurs Zustand
   const season = useGameStore((s) => s.season);
   const wxCondition = useGameStore((s) => s.wxCondition);
   const wxTemp = useGameStore((s) => s.wxTemp);
@@ -63,20 +126,23 @@ export function IntellectusOverlay({ engine }: Props) {
   const eventBanner = useGameStore((s) => s.eventBanner);
   const closeIntel = useGameStore((s) => s.closeIntel);
 
+  // ─── BOUCLE DE SYNCHRONISATION (POLLING 2000ms) ───────────────────────────
+
   useEffect(() => {
     let active = true;
-    let timerId: number;
+    let timerId: ReturnType<typeof setTimeout>;
 
     const tick = async () => {
       if (!active) return;
+      const startTime = performance.now();
+
       try {
-        const remote = await intellectusClient.getHealth();
+        const remoteHealth = await intellectusClient.getHealth();
         if (!active) return;
 
-        if (remote) {
-          setOnline(true);
-          setHealth(remote);
+        const currentFps = AdminMetrics.getMetrics?.()?.fps ?? 60;
 
+        if (remoteHealth) {
           const [remoteEye, remotePlayers, remoteBus, remoteCmds] = await Promise.all([
             intellectusClient.getThirdEye(),
             intellectusClient.getPlayers(),
@@ -85,27 +151,47 @@ export function IntellectusOverlay({ engine }: Props) {
           ]);
 
           if (!active) return;
-          setEye(remoteEye ?? liveThirdEye());
-          setPlayers(remotePlayers ?? []);
-          setBus(remoteBus?.history ?? liveBus().history);
-          setCmds(remoteCmds?.records ?? liveCommands().records);
+
+          const latency = Math.round(performance.now() - startTime);
+
+          setMetrics({
+            online: true,
+            health: remoteHealth,
+            eye: remoteEye ?? liveThirdEye(),
+            players: remotePlayers ?? [],
+            bus: remoteBus?.history ?? liveBus().history,
+            cmds: remoteCmds?.records ?? liveCommands().records,
+            latency,
+            fps: currentFps,
+          });
         } else {
-          setOnline(false);
-          setHealth(liveHealth());
-          setEye(liveThirdEye());
-          setPlayers(livePlayers());
-          setBus(liveBus().history);
-          setCmds(liveCommands().records);
+          // Fallback noyau local
+          setMetrics({
+            online: false,
+            health: liveHealth(),
+            eye: liveThirdEye(),
+            players: livePlayers(),
+            bus: liveBus().history,
+            cmds: liveCommands().records,
+            latency: 0,
+            fps: currentFps,
+          });
         }
       } catch (error) {
+        console.error("[Intellectus] Erreur de synchronisation:", error);
         if (active) {
-          setOnline(false);
-          setHealth(liveHealth());
-          setEye(liveThirdEye());
+          setMetrics((prev) => ({
+            ...prev,
+            online: false,
+            health: liveHealth(),
+            eye: liveThirdEye(),
+            latency: 0,
+            fps: AdminMetrics.getMetrics?.()?.fps ?? 60,
+          }));
         }
       } finally {
         if (active) {
-          timerId = window.setTimeout(tick, 2000);
+          timerId = setTimeout(tick, 2000);
         }
       }
     };
@@ -114,232 +200,399 @@ export function IntellectusOverlay({ engine }: Props) {
 
     return () => {
       active = false;
-      window.clearTimeout(timerId);
+      if (timerId) clearTimeout(timerId);
     };
   }, []);
 
-  const run = useCallback(async () => {
-    const raw = line.trim();
-    if (!raw) return;
+  // ─── RACCOURCI CLAVIER ÉCHAP ──────────────────────────────────────────────
 
-    setHistory((prev) => [raw, ...prev.filter((c) => c !== raw)].slice(0, 50));
-    setHistoryIndex(-1);
-    setLine("");
-
-    const local = engine?.runAdmin(raw);
-    pushCommand(raw, local?.ok ?? false, local?.ok ? undefined : local?.message);
-
-    const remote = await intellectusClient.dispatch(raw, {}, "local");
-    const msg = local?.message ?? remote?.error ?? (remote?.ok ? "Exécuté avec succès" : "Commande transmise");
-
-    setLog((prev) => [`${local?.ok || remote?.ok ? "✔" : "✖"} ${raw} → ${msg}`, ...prev].slice(0, 10));
-    intellectusClient.clearCache();
-  }, [line, engine]);
-
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "ArrowUp") {
-      e.preventDefault();
-      if (history.length === 0) return;
-      const nextIdx = Math.min(historyIndex + 1, history.length - 1);
-      setHistoryIndex(nextIdx);
-      setLine(history[nextIdx] ?? "");
-    } else if (e.key === "ArrowDown") {
-      e.preventDefault();
-      if (historyIndex <= 0) {
-        setHistoryIndex(-1);
-        setLine("");
-      } else {
-        const prevIdx = historyIndex - 1;
-        setHistoryIndex(prevIdx);
-        setLine(history[prevIdx] ?? "");
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") {
+        closeIntel();
       }
-    }
-  };
+    };
 
-  const risk = eye?.stats.riskLevel ?? "GREEN";
-  const riskCls =
-    risk === "RED"
-      ? "text-red-500"
-      : risk === "ORANGE"
-      ? "text-amber-500"
-      : risk === "YELLOW"
-      ? "text-yellow-400"
-      : "text-emerald-400";
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [closeIntel]);
+
+  // Focus automatique du terminal lors du passage sur l'onglet Bus
+  useEffect(() => {
+    if (tab === "bus" && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [tab]);
+
+  // ─── EXÉCUTION DES COMMANDES ADMIN ────────────────────────────────────────
+
+  const runCommand = useCallback(
+    async (cmdToRun?: string) => {
+      const raw = (cmdToRun ?? line).trim();
+      if (!raw || commandExecuting) return;
+
+      setCommandExecuting(true);
+
+      // Historique de navigation
+      const currentHistory = historyRef.current;
+      const idx = currentHistory.indexOf(raw);
+      if (idx !== -1) currentHistory.splice(idx, 1);
+      currentHistory.unshift(raw);
+      if (currentHistory.length > 50) currentHistory.pop();
+
+      historyIndexRef.current = -1;
+      setLine("");
+
+      try {
+        // 1. Exécution locale sur le moteur
+        const local = engine?.runAdmin(raw);
+        pushCommand(raw, local?.ok ?? false, local?.ok ? undefined : local?.message);
+
+        // 2. Dispatch distant vers le serveur Intellectus
+        const remote = await intellectusClient.dispatch(raw, {}, "local");
+        const msg =
+          local?.message ??
+          remote?.error ??
+          (remote?.ok ? "Exécuté avec succès" : "Commande transmise");
+
+        const success = local?.ok || remote?.ok;
+        const logEntry = `${success ? "✔" : "✖"} ${raw} → ${msg}`;
+
+        setLog((prev) => [logEntry, ...prev].slice(0, 20));
+        intellectusClient.clearCache();
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : "Erreur d'exécution";
+        setLog((prev) => [`✖ ${raw} → ${errorMsg}`, ...prev].slice(0, 20));
+      } finally {
+        setCommandExecuting(false);
+      }
+    },
+    [line, engine, commandExecuting]
+  );
+
+  const handleInputKeyDown = useCallback(
+    (e: ReactKeyboardEvent<HTMLInputElement>) => {
+      const history = historyRef.current;
+
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (history.length === 0) return;
+
+        const nextIdx = Math.min(historyIndexRef.current + 1, history.length - 1);
+        historyIndexRef.current = nextIdx;
+        setLine(history[nextIdx] ?? "");
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+
+        if (historyIndexRef.current <= 0) {
+          historyIndexRef.current = -1;
+          setLine("");
+        } else {
+          const prevIdx = historyIndexRef.current - 1;
+          historyIndexRef.current = prevIdx;
+          setLine(history[prevIdx] ?? "");
+        }
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        void runCommand();
+      }
+    },
+    [runCommand]
+  );
+
+  const copyToClipboard = useCallback(async (text: string, index: number) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedIndex(index);
+      setTimeout(() => setCopiedIndex(null), 2000);
+    } catch (error) {
+      console.error("Échec de la copie dans le presse-papier:", error);
+    }
+  }, []);
+
+  // ─── MÉTRIQUES ET FILTRES ─────────────────────────────────────────────────
+
+  const risk = useMemo(() => metrics.eye?.stats.riskLevel ?? "GREEN", [metrics.eye]);
+
+  const riskCls = useMemo(() => {
+    switch (risk) {
+      case "RED":
+        return "text-red-500";
+      case "ORANGE":
+        return "text-amber-500";
+      case "YELLOW":
+        return "text-yellow-400";
+      default:
+        return "text-emerald-400";
+    }
+  }, [risk]);
+
+  const filteredPlayers = useMemo(() => {
+    if (!searchQuery.trim()) return metrics.players;
+    const query = searchQuery.toLowerCase();
+    return metrics.players.filter(
+      (p) => p.name.toLowerCase().includes(query) || p.job.toLowerCase().includes(query)
+    );
+  }, [metrics.players, searchQuery]);
 
   return (
-    <div className="absolute inset-0 z-40 flex items-end justify-center bg-black/70 px-3 py-4 backdrop-blur-sm sm:items-center">
-      <div className="flex max-h-[min(640px,88dvh)] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-white/10 bg-neutral-900 text-neutral-200 shadow-2xl">
+    <div className="absolute inset-0 z-50 flex items-end justify-center bg-black/75 px-3 py-4 backdrop-blur-md sm:items-center">
+      <div className="flex max-h-[min(660px,88dvh)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-white/10 bg-neutral-900/95 text-neutral-200 shadow-2xl">
+        
         {/* En-tête */}
-        <div className="flex items-start justify-between gap-3 px-4 pt-3 pb-2 border-b border-white/5">
+        <div className="flex items-start justify-between gap-3 px-4 pt-3.5 pb-2.5 border-b border-white/5">
           <div>
             <p className="flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.2em] text-neutral-400 uppercase">
               <Activity className="size-3 text-cyan-400 animate-pulse" />
               Noyau Intellectus
             </p>
             <p className="mt-0.5 text-xs text-neutral-400">
-              <span className={online ? "text-emerald-400 font-medium" : "text-amber-400 font-medium"}>
-                {online ? "Serveur Live" : "Noyau Local"}
+              <span className={metrics.online ? "text-emerald-400 font-medium" : "text-amber-400 font-medium"}>
+                {metrics.online ? "Serveur Live" : "Noyau Local"}
               </span>
-              {" · Niveau de Risque : "}
+              {metrics.online && metrics.latency > 0 && (
+                <span className="ml-1.5 text-neutral-500 font-mono">· {metrics.latency}ms</span>
+              )}
+              {" · Risque : "}
               <span className={`font-semibold ${riskCls}`}>{risk}</span>
             </p>
           </div>
           <button
             type="button"
             className="flex size-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-white/5 hover:text-white transition-colors"
-            onClick={() => closeIntel()}
-            aria-label="Fermer"
+            onClick={closeIntel}
+            aria-label="Fermer le panneau (Échap)"
+            title="Fermer (Échap)"
           >
             <X className="size-4" />
           </button>
         </div>
 
-        {/* Navigation Onglets */}
+        {/* Navigation des Onglets */}
         <div className="flex gap-1 px-4 pt-2.5 pb-1 bg-black/20">
-          {(
-            [
-              ["sante", "Santé"],
-              ["oeil", "3e Œil"],
-              ["monde", "Monde"],
-              ["bus", "Bus / Logs"],
-            ] as const
-          ).map(([id, label]) => (
+          {TABS.map((t) => (
             <button
-              key={id}
+              key={t.id}
               type="button"
-              className={`h-7 rounded px-3 text-xs font-medium transition-colors ${
-                tab === id
+              className={`h-7 rounded-md px-3 text-xs font-semibold transition-all ${
+                tab === t.id
                   ? "bg-white/10 text-white shadow-sm"
                   : "text-neutral-400 hover:text-neutral-200 hover:bg-white/5"
               }`}
-              onClick={() => setTab(id)}
+              onClick={() => setTab(t.id)}
             >
-              {label}
+              {t.label}
             </button>
           ))}
         </div>
 
         {/* Corps des onglets */}
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 text-sm">
-          {tab === "sante" && health && (
+          {/* ONGLET SANTÉ */}
+          {tab === "sante" && metrics.health && (
             <ul className="space-y-2 font-mono text-xs text-neutral-300">
-              <li className="rounded bg-black/30 p-2 border border-white/5">
-                <strong className="text-cyan-400">Arcadius</strong> : {health.arcadius.channels} canaux · {health.arcadius.totalSubscriptions} abonnements
+              <li className="rounded-lg bg-black/30 p-2.5 border border-white/5">
+                <strong className="text-cyan-400">Arcadius</strong> : {metrics.health.arcadius.channels} canaux · {metrics.health.arcadius.totalSubscriptions} abonnements
               </li>
-              <li className="rounded bg-black/30 p-2 border border-white/5">
-                <strong className="text-cyan-400">Benedictus</strong> : {health.benedictus.contracts.length} contrats actifs
+              <li className="rounded-lg bg-black/30 p-2.5 border border-white/5">
+                <strong className="text-cyan-400">Benedictus</strong> : {metrics.health.benedictus.contracts.length} contrats actifs
               </li>
-              <li className="rounded bg-black/30 p-2 border border-white/5">
-                <strong className="text-cyan-400">Decaprius</strong> : {health.decaprius.totalRecords} commandes · moyenne {health.decaprius.avgExecutionMs}ms
+              <li className="rounded-lg bg-black/30 p-2.5 border border-white/5">
+                <strong className="text-cyan-400">Decaprius</strong> : {metrics.health.decaprius.totalRecords} commandes · moyenne {metrics.health.decaprius.avgExecutionMs}ms
               </li>
-              <li className="rounded bg-black/30 p-2 border border-white/5">
-                <strong className="text-cyan-400">Lotus</strong> : {health.lotus.snapshots} snapshots · {health.lotus.openTransactions} tx ouvertes
+              <li className="rounded-lg bg-black/30 p-2.5 border border-white/5">
+                <strong className="text-cyan-400">Lotus</strong> : {metrics.health.lotus.snapshots} snapshots · {metrics.health.lotus.openTransactions} transactions
               </li>
-              <li className="rounded bg-black/30 p-2 border border-white/5">
-                <strong className="text-cyan-400">Momentus</strong> : {health.momentus.enabledTasks} tâches · {health.momentus.activeTimers} timers
+              <li className="rounded-lg bg-black/30 p-2.5 border border-white/5">
+                <strong className="text-cyan-400">Momentus</strong> : {metrics.health.momentus.enabledTasks} tâches · {metrics.health.momentus.activeTimers} minuteries
               </li>
             </ul>
           )}
 
-          {tab === "oeil" && eye && (
+          {/* ONGLET 3E ŒIL (ANTI-TRICHE) */}
+          {tab === "oeil" && metrics.eye && (
             <div className="space-y-3">
-              <div className="rounded bg-black/30 p-3 border border-white/5">
-                <p className={`font-mono text-xl font-bold ${riskCls}`}>{eye.stats.riskLevel}</p>
+              <div className="rounded-lg bg-black/30 p-3 border border-white/5">
+                <p className={`font-mono text-xl font-bold ${riskCls}`}>{metrics.eye.stats.riskLevel}</p>
                 <p className="mt-1 text-xs text-neutral-400">
-                  Menaces détectées : {eye.stats.totalThreats} · Score de confiance moyen : {eye.stats.avgTrustScore} · Joueurs bannis : {eye.stats.bannedPlayers}
+                  Menaces détectées : {metrics.eye.stats.totalThreats} · Confiance : {metrics.eye.stats.avgTrustScore} · Bannis : {metrics.eye.stats.bannedPlayers}
                 </p>
               </div>
               <ul className="space-y-2">
-                {eye.threats.length === 0 && <li className="text-xs text-neutral-500 italic">Aucune menace active.</li>}
-                {eye.threats.map((t, i) => (
-                  <li key={`${t.type}-${i}`} className="rounded border border-red-500/20 bg-red-950/20 p-2.5">
-                    <p className="flex items-center gap-1.5 text-xs font-semibold text-red-400">
-                      <Shield className="size-3" />
-                      {t.type} · Sévérité : {t.severity}
-                    </p>
-                    <p className="mt-1 text-[11px] text-neutral-300">{t.details}</p>
-                  </li>
-                ))}
+                {metrics.eye.threats.length === 0 ? (
+                  <li className="text-xs text-neutral-500 italic">Aucune menace active recensée.</li>
+                ) : (
+                  metrics.eye.threats.map((t, i) => (
+                    <li key={`${t.type}-${i}`} className="rounded-lg border border-red-500/20 bg-red-950/20 p-2.5">
+                      <p className="flex items-center gap-1.5 text-xs font-semibold text-red-400">
+                        <Shield className="size-3" />
+                        {t.type} · Sévérité : {t.severity}
+                      </p>
+                      <p className="mt-1 text-[11px] text-neutral-300">{t.details}</p>
+                    </li>
+                  ))
+                )}
               </ul>
             </div>
           )}
 
+          {/* ONGLET MONDE & POPULATION */}
           {tab === "monde" && (
             <div className="space-y-3">
-              <div className="rounded border border-white/10 bg-black/30 p-3">
+              <div className="rounded-lg border border-white/10 bg-black/30 p-3">
                 <p className="text-[10px] font-semibold tracking-wider text-neutral-400 uppercase">Comté de Portneuf</p>
                 <p className="mt-1 text-sm font-medium text-neutral-100">
                   {SEASON_LABEL[season as QuebecSeason]} · {CONDITION_LABEL[wxCondition as WeatherCondition]} · {Math.round(wxTemp)}°C
                 </p>
-                <p className="mt-0.5 text-xs text-neutral-400">
-                  Neige : {Math.round(snowCm)} cm · Déneigement : {PLOW_STATUS_LABEL[plowStatus as SnowPlowStatus]} · {AdminMetrics.getMetrics().fps} FPS
+                <p className="mt-0.5 text-xs text-neutral-400 font-mono">
+                  Neige : {Math.round(snowCm)} cm · Déneigement : {PLOW_STATUS_LABEL[plowStatus as SnowPlowStatus]} · {metrics.fps} FPS
                 </p>
                 {eventBanner && <p className="mt-2 text-xs font-medium text-amber-400">{eventBanner}</p>}
               </div>
 
               <div className="space-y-1.5">
-                <p className="text-[10px] font-semibold uppercase text-neutral-500">Citoyens connectés ({players.length})</p>
-                {players.length === 0 && <p className="text-xs text-neutral-500 italic">Aucun citoyen indexé.</p>}
-                {players.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between rounded border border-white/5 bg-black/20 px-3 py-2">
-                    <span className="flex items-center gap-2 text-xs font-medium text-neutral-200">
-                      <Users className="size-3 text-cyan-400" />
-                      {p.name}
-                    </span>
-                    <span className="text-[11px] text-neutral-400">
-                      {p.job} · <span className={p.wanted > 0 ? "text-amber-400 font-bold" : ""}>{p.wanted}★</span>
-                    </span>
-                  </div>
-                ))}
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-semibold uppercase text-neutral-500">
+                    Citoyens enregistrés ({metrics.players.length})
+                  </p>
+                  {metrics.players.length > 5 && (
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3 text-neutral-500" />
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Rechercher..."
+                        className="h-6 w-32 rounded border border-white/10 bg-black/30 pl-7 pr-2 text-xs text-neutral-200 placeholder:text-neutral-600 focus:outline-none focus:border-cyan-500/50"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {filteredPlayers.length === 0 ? (
+                  <p className="text-xs text-neutral-500 italic py-2">
+                    {searchQuery ? "Aucun citoyen correspondant." : "Aucun citoyen indexé."}
+                  </p>
+                ) : (
+                  filteredPlayers.map((p) => (
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between rounded-lg border border-white/5 bg-black/20 px-3 py-2"
+                    >
+                      <span className="flex items-center gap-2 text-xs font-medium text-neutral-200">
+                        <Users className="size-3 text-cyan-400" />
+                        {p.name}
+                      </span>
+                      <span className="text-[11px] text-neutral-400 font-mono">
+                        {p.job} · <span className={p.wanted > 0 ? "text-amber-400 font-bold" : ""}>{p.wanted}★</span>
+                      </span>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}
 
+          {/* ONGLET BUS & LOGS */}
           {tab === "bus" && (
-            <ul className="space-y-1.5 font-mono text-[11px] text-neutral-400">
-              {bus.length === 0 && cmds.length === 0 && <li className="text-neutral-500 italic">Bus d'événements vide.</li>}
-              {cmds.slice(0, 5).map((c) => (
-                <li key={c.commandId} className="flex items-center gap-2 bg-black/20 px-2 py-1 rounded">
-                  <span className={c.status === "SUCCESS" ? "text-emerald-400" : "text-red-400"}>[{c.status}]</span>
-                  <span className="text-neutral-200">{c.commandName}</span>
-                </li>
-              ))}
-              {bus.slice(0, 5).map((b) => (
-                <li key={b.event.eventId} className="flex items-center gap-1.5 bg-black/20 px-2 py-1 rounded">
-                  <Radio className="size-3 text-cyan-400" />
-                  <span>{b.event.channel}</span>/<span>{b.event.type}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="space-y-2">
+              <ul className="space-y-1.5 font-mono text-[11px] text-neutral-400">
+                {metrics.bus.length === 0 && metrics.cmds.length === 0 && (
+                  <li className="text-neutral-500 italic py-2">Bus d'événements vide.</li>
+                )}
+                {metrics.cmds.slice(0, 5).map((c, i) => {
+                  const isOk =
+                    c.status.toLowerCase() === "ok" ||
+                    c.status.toLowerCase() === "success";
+                  return (
+                    <li
+                      key={c.commandId}
+                      className="flex items-center gap-2 bg-black/20 px-2.5 py-1.5 rounded-lg border border-white/5 group"
+                    >
+                      <span className={isOk ? "text-emerald-400 font-bold" : "text-red-400 font-bold"}>
+                        [{c.status.toUpperCase()}]
+                      </span>
+                      <span className="text-neutral-200 flex-1 truncate">{c.commandName}</span>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(c.commandName, i)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:text-white"
+                        title="Copier la commande"
+                      >
+                        {copiedIndex === i ? (
+                          <Check className="size-3 text-emerald-400" />
+                        ) : (
+                          <Copy className="size-3 text-neutral-500" />
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+                {metrics.bus.slice(0, 5).map((b) => (
+                  <li
+                    key={b.event.eventId}
+                    className="flex items-center gap-1.5 bg-black/20 px-2.5 py-1 rounded border border-white/5"
+                  >
+                    <Radio className="size-3 text-cyan-400" />
+                    <span className="text-neutral-300">{b.event.channel}</span>/
+                    <span className="text-neutral-400">{b.event.type}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
 
-        {/* Console / Terminal Input */}
+        {/* Console / Terminal & Quick Commands */}
         <form
-          className="border-t border-white/10 bg-black/40 p-2.5"
+          className="border-t border-white/10 bg-black/40 p-2.5 space-y-2"
           onSubmit={(e) => {
             e.preventDefault();
-            void run();
+            void runCommand();
           }}
         >
+          {/* Suggestions de commandes rapides */}
+          <div className="flex flex-wrap gap-1.5">
+            {QUICK_COMMANDS.map((cmd) => (
+              <button
+                key={cmd}
+                type="button"
+                onClick={() => void runCommand(cmd)}
+                disabled={commandExecuting}
+                className="flex items-center gap-1 rounded bg-white/5 border border-white/10 px-2 py-0.5 font-mono text-[10px] text-neutral-400 hover:bg-white/10 hover:text-cyan-400 transition-all disabled:opacity-40"
+              >
+                <Zap className="size-2.5 text-cyan-400" />
+                {cmd}
+              </button>
+            ))}
+          </div>
+
           {log.length > 0 && (
-            <div className="mb-2 max-h-16 overflow-y-auto space-y-0.5 font-mono text-[11px]">
-              {log.slice(0, 3).map((l, i) => (
-                <p key={i} className="text-neutral-300 truncate">
+            <div className="max-h-20 overflow-y-auto space-y-0.5 font-mono text-[11px] rounded bg-black/50 p-1.5 border border-white/5">
+              {log.slice(0, 5).map((l, i) => (
+                <p key={i} className="text-neutral-300 truncate" title={l}>
                   {l}
                 </p>
               ))}
             </div>
           )}
-          <div className="flex items-center gap-2 rounded-md border border-white/10 bg-black/50 px-2.5">
-            <Terminal className="size-3.5 text-neutral-500" />
+
+          <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/50 px-2.5">
+            <Terminal
+              className={`size-3.5 shrink-0 ${
+                commandExecuting ? "text-cyan-400 animate-pulse" : "text-neutral-500"
+              }`}
+            />
             <input
+              ref={inputRef}
               type="text"
               value={line}
               onChange={(e) => setLine(e.target.value)}
-              onKeyDown={handleKeyDown}
+              onKeyDown={handleInputKeyDown}
               placeholder="/tp caisse  ·  /meteo neige  ·  /zone"
-              className="h-9 flex-1 bg-transparent font-mono text-xs text-white placeholder:text-neutral-600 focus:outline-none"
+              disabled={commandExecuting}
+              maxLength={200}
+              className="h-9 flex-1 bg-transparent font-mono text-xs text-white placeholder:text-neutral-600 focus:outline-none disabled:opacity-50"
             />
           </div>
         </form>
@@ -347,6 +600,8 @@ export function IntellectusOverlay({ engine }: Props) {
     </div>
   );
 }
+
+// ─── MINUTERIE DE HEARTBEAT CLIENT ───────────────────────────────────────────
 
 export function startIntellectusHeartbeat(): number {
   const beat = () => {

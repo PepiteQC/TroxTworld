@@ -1,0 +1,8 @@
+{
+  "name": "Portneuf",
+  "description": "Conduisez le comté de Portneuf : Route 138, villages, éboulis de 1894 et lacs des Laurentides.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

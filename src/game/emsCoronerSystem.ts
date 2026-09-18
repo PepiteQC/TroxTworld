@@ -1,51 +1,117 @@
-/**
- * C:\TroxTWorld\src\game\emsCoronerSystem.ts
- * Système Paramédic & Coroner — Urgences de Portneuf & Autopsie.
+﻿/**
+ * ═══════════════════════════════════════════════════════════════════
+ *  EMS & CORONER FORENSIC MEDICAL SYSTEM — PRO EDITION v2.0
+ * ═══════════════════════════════════════════════════════════════════
+ * Simulation avancée des secours, états cliniques, thanatologie,
+ * et processus d'enquête criminelle / accidentelle pour TroxTWorld.
  */
-import { useGameStore } from "./store";
 
-export interface AutopsyReport {
+import * as THREE from "three";
+import { netEmit } from "./net";
+
+export interface DecoyBody {
   id: string;
   victimName: string;
-  timeOfDeath: string;
-  cause: "Traumatisme balistique" | "Hypothermie sévère" | "Polytraumatisme routier" | "Arrêt cardiorespiratoire";
-  coronerBadge: string;
-  notes: string;
+  timeOfDeath: number;
+  causeOfDeath: string;
+  isBagged: boolean;
+  position: THREE.Vector3;
+  inventory: string[];
+  evidenceTagged: boolean;
 }
 
-export class EmsCoronerSystem {
+export class EMSCoronerSystem {
+  private static instance: EMSCoronerSystem;
+  private bodies: Map<string, DecoyBody> = new Map();
+  private coronerUnitActive: boolean = false;
+
+  private constructor() {
+    console.log("🚑 [EMS & Coroner System] Initialisé avec succès !");
+  }
+
+  public static getInstance(): EMSCoronerSystem {
+    if (!EMSCoronerSystem.instance) {
+      EMSCoronerSystem.instance = new EMSCoronerSystem();
+    }
+    return EMSCoronerSystem.instance;
+  }
+
   /**
-   * Réanimer un citoyen inconscient.
+   * Enregistre un décès clinique et génère un corps à analyser
    */
-  public revivePatient(targetPlayerName: string): { ok: boolean; message: string } {
-    const store = useGameStore.getState();
-    if (store.rpJob !== "ambulancier" && (store.inventory.medkit ?? 0) < 1) {
-      return { ok: false, message: "Vous n'avez pas de trousse de premiers soins !" };
+  public reportDeceased(victimName: string, cause: string, pos: THREE.Vector3, belongings: string[]): DecoyBody {
+    const bodyId = `corpse_${Date.now()}`;
+    const corpse: DecoyBody = {
+      id: bodyId,
+      victimName,
+      timeOfDeath: Date.now(),
+      causeOfDeath: cause,
+      isBagged: false,
+      position: pos.clone(),
+      inventory: belongings,
+      evidenceTagged: false
+    };
+    
+    this.bodies.set(bodyId, corpse);
+    netEmit("coroner:new_body", corpse);
+    return corpse;
+  }
+
+  /**
+   * EMS : Essaye de réanimer un joueur à l'aide d'un défibrillateur
+   */
+  public attemptResuscitation(bodyId: string, medicalLevel: number): boolean {
+    const body = this.bodies.get(bodyId);
+    if (!body) return false;
+
+    // Si décédé depuis plus de 4 minutes réelles, impossible de réanimer
+    const minsSinceDeath = (Date.now() - body.timeOfDeath) / 1000 / 60;
+    if (minsSinceDeath > 4) {
+      console.log("❌ Le cerveau n'est plus irrigué. Réanimation impossible.");
+      return false;
     }
 
-    store.useItem("medkit");
-    store.addCash(120, "Acte médical d'urgence (Assurance Maladie)");
+    const successChance = 0.3 + (medicalLevel * 0.1);
+    const success = Math.random() < successChance;
 
-    return { ok: true, message: `${targetPlayerName} a été stabilisé et réanimé.` };
+    if (success) {
+      this.bodies.delete(bodyId);
+      netEmit("coroner:revived", { id: bodyId, victimName: body.victimName });
+    }
+    return success;
   }
 
   /**
-   * Rédiger un rapport d'autopsie officiel du Coroner.
+   * Coroner : Place la dépouille dans un sac mortuaire
    */
-  public performAutopsy(victimName: string, estimatedCause: AutopsyReport["cause"]): AutopsyReport {
-    const store = useGameStore.getState();
-    const report: AutopsyReport = {
-      id: `COR-${Math.floor(1000 + Math.random() * 9000)}`,
-      victimName,
-      timeOfDeath: new Date().toLocaleTimeString("fr-CA"),
-      cause: estimatedCause,
-      coronerBadge: store.appearance.name || "Dr. Coroner",
-      notes: "Constat de décès officiel pour enquête Sûreté du Québec.",
-    };
+  public bagBody(bodyId: string): boolean {
+    const body = this.bodies.get(bodyId);
+    if (!body) return false;
+    body.isBagged = true;
+    netEmit("coroner:body_bagged", { id: bodyId });
+    return true;
+  }
 
-    store.addItem("rapport_coroner", 1);
-    return report;
+  /**
+   * Coroner : Prélève des indices pour l'enquête du Coroner (Autopsie)
+   */
+  public performAutopsy(bodyId: string): { cause: string; toxScreen: string; verdict: string } {
+    const body = this.bodies.get(bodyId);
+    if (!body) throw new Error("Corps introuvable pour l'autopsie");
+
+    const causes = ["Traumatisme crânien par projectile", "Choc cardiogénique suite à une chute", "Inhalation de monoxyde", "Surdose de stimulants"];
+    const detectedCause = body.causeOfDeath || causes[Math.floor(Math.random() * causes.length)];
+
+    return {
+      cause: detectedCause,
+      toxScreen: Math.random() > 0.5 ? "Alcoolémie élevée, traces de THC" : "Négatif pour tous narcotiques",
+      verdict: "Dossier médico-légal transmis à la Sûreté du Québec."
+    };
+  }
+
+  public getBodies(): DecoyBody[] {
+    return Array.from(this.bodies.values());
   }
 }
 
-export const emsCoronerSystem = new EmsCoronerSystem();
+export const emsCoroner = EMSCoronerSystem.getInstance();

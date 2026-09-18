@@ -1,30 +1,13 @@
 /**
- * ═══════════════════════════════════════════════════════════════════
- * IMMOBILIER QUÉBÉCOIS & MULTIJOUEUR — Système MLS, TAL et Hydro
- * ═══════════════════════════════════════════════════════════════════
- *
- * CONCEPT D'IMMERSION VRAIE VIE :
- *  - Courtiers immobiliers (joueurs) : gèrent les fiches Centris/MLS, font visiter et touchent des commissions.
- *  - Notaires (joueurs) : authentifient les ventes et rédigent les actes de vente officiels.
- *  - Tribunal administratif du logement (TAL) : gère les litiges, non-paiements, avis d'éviction et rénovictions.
- *  - Baux officiels du Québec : baux résidentiels (3½, 4½, 5½) ou commerciaux signés entre vrais joueurs.
- *  - Hypothèques Desjardins : calculées avec mise de fonds (min 5%), amortissement et taux d'intérêt.
- *  - Hydro-Québec : factures d'électricité basées sur la consommation réelle. Coupure de courant si impayé !
- *  - Serrures & Clés physiques/numériques : les joueurs peuvent changer les serrures, crocheter ou squatter.
- *  - Entretien & Sinistres : moisissure, dégâts d'eau, usure du temps, incendies ou dommages de grow-ops.
- *  - Huissiers de justice & SQ/SPVM : exécution légale des ordonnances d'expulsion du TAL.
- *
- * INTÉGRATIONS :
- *  - banking.ts (comptes Desjardins, prélèvements automatiques, cotes de crédit)
- *  - character.ts (propriétaires, locataires, inventaires de clés)
- *  - house.ts (valeurs, meubles, structures 3D)
- *  - police.ts (évictions forcées, mandats d'intrusion, perquisitions)
- *  - net.ts / remotes.ts (RPC et synchronisation multijoueur)
- *  - phone.tsx (alertes Centris, factures Hydro, baux à signer)
- * ═══════════════════════════════════════════════════════════════════
+ * ═════════════════════════════════════════════════════════════════════════════
+ * 🏡 IMMOBILIER QUÉBÉCOIS & MULTIJOUEUR — SYSTÈME CENTRIS, TAL ET HYDRO-QC
+ * Fichier : src/game/realestate.ts
+ * Architecture : Marché Centris O(1) Cache, Proximité d'effraction O(N) Sq,
+ *                Immutabilité du cycle journalier, signatures Desjardins corrigées.
+ * ═════════════════════════════════════════════════════════════════════════════
  */
 
-import { netEmit, netOn } from "./net";
+import { netEmit } from "./net";
 import { registerRemote } from "./remotes";
 import { sendPrivateMessage, sendChatMessage } from "./chat";
 import { triggerNotification } from "./phone";
@@ -34,26 +17,20 @@ import { getPlayerData } from "./character";
 import { getAccount, pushTx, removeCash, addCash, getCreditProfile } from "./banking";
 import { addWantedPoints, dispatchPolice } from "./police";
 import { VILLAGES } from "./worlddata";
+import { DEEDS, deedById, type Deed } from "./rp";
 
-// ═══════════════════════════════════════════════════════════
-// UTILS LOCAUX
-// ═══════════════════════════════════════════════════════════
+// ─── §1 — UTILS LOCAUX ───────────────────────────────────────────────────────
 
-// CORRECTION: Ajout de la fonction uid manquante
 function uid(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-// CORRECTION: Ajout de la fonction round2 manquante
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-// ═══════════════════════════════════════════════════════════
-// ENUMS ET TYPES QUÉBÉCOIS
-// ═══════════════════════════════════════════════════════════
+// ─── §2 — ENUMS ET TYPES QUÉBÉCOIS ───────────────────────────────────────────
 
-// CORRECTION: Ajout de "penthouse" au type PropertyType
 export type PropertyType =
   | "house"          // Maison unifamiliale / Bungalow
   | "apartment"      // Condo, 1½, 3½, 4½, 5½
@@ -73,11 +50,11 @@ export type PropertyZone =
   | "luxe";          // Quartier chic / Domaines
 
 export type LeaseStatus =
-  | "pending_signature" // En attente de signature
-  | "active"            // En vigueur
-  | "expired"           // Terminé
-  | "dispute"           // En litige au TAL
-  | "evicted";          // Ordonnance d'expulsion prononcée
+  | "pending_signature"
+  | "active"
+  | "expired"
+  | "dispute"
+  | "evicted";
 
 export type MortgageStatus =
   | "active"
@@ -94,28 +71,26 @@ export interface MarketProperty {
   town: string;
   x: number;
   z: number;
-  price: number;              // Prix de vente suggéré ou affiché
-  municipalEvaluation: number;// Évaluation foncière pour les taxes
+  price: number;
+  municipalEvaluation: number;
   bedrooms: number;
   bathrooms: number;
   squareFeet: number;
   furnished: boolean;
   features: string[];
-  rentPerDay: number;         // Équivalent d'un loyer quotidien RP
+  rentPerDay: number;
   garageCapacity: number;
-  hydroAccountNumber: string; // Numéro de compte Hydro-Québec
+  hydroAccountNumber: string;
 }
 
-// ═══════════════════════════════════════════════════════════
-// ETATS DU DOSSIER IMMOBILIER (MLS / CENTRIS)
-// ═══════════════════════════════════════════════════════════
+// ─── §3 — ÉTATS DU DOSSIER IMMOBILIER (MLS / CENTRIS) ─────────────────────────
 
 export interface ListingState {
   price: number;
   description: string;
   listed: boolean;
-  listedByBrokerId: string | null; // ID du courtier affilié
-  commissionRate: number;          // % de commission (ex: 4% standard QC)
+  listedByBrokerId: string | null;
+  commissionRate: number;
   views: number;
   offers: PropertyOffer[];
 }
@@ -125,14 +100,12 @@ export interface PropertyOffer {
   buyerId: string;
   buyerName: string;
   amount: number;
-  conditions: string[];            // ["inspection", "financement Desjardins"]
+  conditions: string[];
   expiryDate: number;
   status: "pending" | "accepted" | "refused" | "expired";
 }
 
-// ═══════════════════════════════════════════════════════════
-// LE BAIL OFFICIEL (Tribunal Administratif du Logement)
-// ═══════════════════════════════════════════════════════════
+// ─── §4 — LE BAIL OFFICIEL (Tribunal Administratif du Logement) ───────────────
 
 export interface QuebecLease {
   leaseId: string;
@@ -141,77 +114,71 @@ export interface QuebecLease {
   landlordName: string;
   tenantId: string;
   tenantName: string;
-  rentAmount: number;              // Loyer par jour ou semaine de jeu
+  rentAmount: number;
   status: LeaseStatus;
   startDate: number;
   durationDays: number;
   unpaidRentsCount: number;
   talDisputeId: string | null;
-  securityDeposit?: number;        // Illégal au QC en théorie, mais pratiqué en RP
+  securityDeposit?: number;
   autoRenew: boolean;
 }
 
 export interface TalCase {
   disputeId: string;
   leaseId: string;
-  plaintiffId: string;             // Demandeur
-  defendantId: string;             // Défendeur
+  plaintiffId: string;
+  defendantId: string;
   reason: "non_payment" | "noise" | "damage" | "illegal_sublet" | "renoviction";
   filedAt: number;
   hearingDate: number;
   judgmentDate: number | null;
   judgment: "eviction_ordered" | "dismissed" | "payment_plan" | "lease_termination";
-  bailiffAssignedId: string | null; // Huissier assigné pour exécution forcée
+  bailiffAssignedId: string | null;
   resolved: boolean;
 }
 
-// ═══════════════════════════════════════════════════════════
-// LE SYSTÈME HYPOTHÉCAIRE DESJARDINS
-// ═══════════════════════════════════════════════════════════
+// ─── §5 — LE SYSTÈME HYPOTHÉCAIRE DESJARDINS ─────────────────────────────────
 
 export interface QuebecMortgage {
   propertyId: string;
   ownerId: string;
   ownerName: string;
   purchasePrice: number;
-  downPayment: number;             // Mise de fonds (min 5% au Canada)
-  principalLoanAmount: number;     // Prêt initial
-  remainingPrincipal: number;      // Principal restant
-  interestRate: number;            // Taux fixe Desjardins (ex: 5.2%)
-  amortizationMonths: number;      // Durée du prêt en mois de jeu
-  monthlyPayment: number;          // Mensualité
+  downPayment: number;
+  principalLoanAmount: number;
+  remainingPrincipal: number;
+  interestRate: number;
+  amortizationMonths: number;
+  monthlyPayment: number;
   remainingMonths: number;
   missedPaymentsInARow: number;
   status: MortgageStatus;
   nextPaymentDueDay: number;
-  autoDebitAccountId: string;      // Compte chèque lié
+  autoDebitAccountId: string;
 }
 
-// ═══════════════════════════════════════════════════════════
-// HYDRO-QUÉBEC & SERVICES PUBLICS
-// ═══════════════════════════════════════════════════════════
+// ─── §6 — HYDRO-QUÉBEC & SERVICES PUBLICS ────────────────────────────────────
 
 export interface HydroState {
   propertyId: string;
   accountNumber: string;
-  currentPayerId: string | null;   // Joueur responsable (propriétaire ou locataire)
+  currentPayerId: string | null;
   electricityUsageKwh: number;
   balanceDue: number;
-  isPowerCut: boolean;             // Si vrai: plus de lumière, frigo arrêté, etc.
+  isPowerCut: boolean;
   lastMeterReading: number;
 }
 
-// ═══════════════════════════════════════════════════════════
-// SYSTÈME DE CONDITION & RESTRUCTURATION 3D
-// ═══════════════════════════════════════════════════════════
+// ─── §7 — ETATS DE STRUCTURE & VERROUS ───────────────────────────────────────
 
 export interface PropertyCondition {
   propertyId: string;
-  cleanliness: number;             // 0 à 100
-  structuralIntegrity: number;     // 0 à 100 (dégradation, trous)
-  hasMold: boolean;                // Moisissure (dû à l'humidité/cannabis)
-  isInfested: boolean;             // Rats/coquerelles
-  growOpDamages: boolean;          // Dommages causés par l'humidité d'un grow-op
+  cleanliness: number;
+  structuralIntegrity: number;
+  hasMold: boolean;
+  isInfested: boolean;
+  growOpDamages: boolean;
   plumbingDamages: boolean;
   electricityDamages: boolean;
 }
@@ -222,13 +189,9 @@ export interface LockSystem {
   lockType: "standard" | "reinforced" | "electronic_pin" | "smart_keycard";
   pinCode?: string;
   isLocked: boolean;
-  brokenState: number;             // 0 (intact) à 100 (complètement défoncé)
-  authorizedKeyHolders: string[];  // playerIds
+  brokenState: number;
+  authorizedKeyHolders: string[];
 }
-
-// ═══════════════════════════════════════════════════════════
-// REALTYS STATE PRINCIPAL (Synchronisé)
-// ═══════════════════════════════════════════════════════════
 
 export interface RealtyState {
   commercials: string[];
@@ -254,9 +217,7 @@ export const EMPTY_REALTY: RealtyState = {
   visits: [],
 };
 
-// ═══════════════════════════════════════════════════════════
-// CATALOGUES DE PROPRIÉTÉS STATIQUES DU COMTE
-// ═══════════════════════════════════════════════════════════
+// ─── §8 — CATALOGUES & PLACEMENTS DU COMTE ────────────────────────────────────
 
 function village(id: string) {
   return VILLAGES.find((v) => v.id === id);
@@ -371,7 +332,6 @@ export const COMMERCIALS: MarketProperty[] = [
   },
 ];
 
-// CORRECTION: KIND_LABEL contient déjà "penthouse", maintenant PropertyType l'inclut aussi
 export const KIND_LABEL: Record<PropertyType, string> = {
   house: "Maison unifamiliale",
   apartment: "Appartement / Condo",
@@ -392,13 +352,11 @@ export const ZONE_LABEL: Record<PropertyZone, string> = {
   luxe: "Domaine huppé",
 };
 
-// ═══════════════════════════════════════════════════════════
-// INSTANCIATION DES DONNÉES ET CACHE
-// ═══════════════════════════════════════════════════════════
+// ─── §9 — INSTANCIATION DES DONNÉES ET CACHE CACHÉ (O(1) OPTIMISÉ) ────────────
 
-const DEEDS_CACHE: Map<string, MarketProperty> = new Map();
-
-import { DEEDS, deedById, type Deed } from "./rp";
+const DEEDS_CACHE = new Map<string, MarketProperty>();
+let _catalogCache: MarketProperty[] | null = null;
+let _catalogMap: Map<string, MarketProperty> | null = null;
 
 export function houseAsMarket(deed: Deed): MarketProperty {
   const cached = DEEDS_CACHE.get(deed.id);
@@ -430,11 +388,22 @@ export function houseAsMarket(deed: Deed): MarketProperty {
 }
 
 export function catalog(): MarketProperty[] {
-  return [...DEEDS.map(houseAsMarket), ...COMMERCIALS];
+  if (!_catalogCache) {
+    _catalogCache = [...DEEDS.map(houseAsMarket), ...COMMERCIALS];
+    _catalogMap = new Map(_catalogCache.map((p) => [p.id, p]));
+  }
+  return _catalogCache;
 }
 
 export function propertyById(id: string): MarketProperty | undefined {
-  return catalog().find((p) => p.id === id);
+  if (!_catalogMap) catalog();
+  return _catalogMap!.get(id);
+}
+
+export function invalidateCatalogCache(): void {
+  _catalogCache = null;
+  _catalogMap = null;
+  DEEDS_CACHE.clear();
 }
 
 export function isHouseDeed(id: string): boolean {
@@ -445,9 +414,7 @@ export function isCommercial(id: string): boolean {
   return COMMERCIALS.some((c) => c.id === id);
 }
 
-// ═══════════════════════════════════════════════════════════
-// PARSING ET INITIALISATION DE L'ÉTAT IMMOBILIER
-// ═══════════════════════════════════════════════════════════
+// ─── §10 — PARSING ET INITIALISATION DE L'ÉTAT IMMOBILIER ────────────────────
 
 export function parseRealty(raw: unknown): RealtyState {
   if (!raw || typeof raw !== "object") {
@@ -513,9 +480,7 @@ export function ensureCondition(realty: RealtyState, propertyId: string): Proper
   return condition;
 }
 
-// ═══════════════════════════════════════════════════════════
-// MULTIJOUEUR — VISITES ET BROKERS
-// ═══════════════════════════════════════════════════════════
+// ─── §11 — VISITES & COURTIERS EN MONDE OUVERT ───────────────────────────────
 
 export function requestVisit(realty: RealtyState, propertyId: string, visitorName: string): RealtyState {
   const row = { id: `vis_${Date.now().toString(36)}`, propertyId, name: visitorName, at: Date.now() };
@@ -536,9 +501,7 @@ export function requestVisit(realty: RealtyState, propertyId: string, visitorNam
   };
 }
 
-// ═══════════════════════════════════════════════════════════
-// NOTAIRE — TRANSACTION DE VENTE PAR JOUEUR
-// ═══════════════════════════════════════════════════════════
+// ─── §12 — NOTAIRE JOUEUR — TRANSACTION ATOMIQUE COMPLÈTE (DESJARDINS) ───────
 
 export interface DeedTransactionResult {
   success: boolean;
@@ -563,7 +526,7 @@ export function finalizeSaleWithNotary(
   if (!buyerAcct) return { success: false, message: "Compte chèque de l'acheteur introuvable", realty };
 
   const commission = Math.round(agreedPrice * 0.04); // 4% Courtier
-  const notaryFee = 1500; // Frais fixes du notaire QC
+  const notaryFee = 1500; // Frais de notaire du Québec
   const totalCostForBuyer = agreedPrice + notaryFee;
 
   if (buyerAcct.balance < totalCostForBuyer) {
@@ -573,9 +536,9 @@ export function finalizeSaleWithNotary(
   // Transferts monétaires via banking
   removeCash(totalCostForBuyer, buyerId);
   addCash(agreedPrice - commission, sellerId);
-  addCash(notaryFee, notaryPlayerId); // Paiement du notaire joueur
+  addCash(notaryFee, notaryPlayerId);
 
-  // Payer le courtier si listé
+  // Versement commission courtier
   const listing = realty.listings[propertyId];
   if (listing && listing.listedByBrokerId) {
     addCash(commission, listing.listedByBrokerId);
@@ -600,9 +563,24 @@ export function finalizeSaleWithNotary(
   const hydro = ensureHydro(realty, propertyId, buyerId);
   hydro.currentPayerId = buyerId;
 
-  // Envoi des logs Desjardins
-  pushTx(buyerAcct, "transfer", totalCostForBuyer, `Achat immobilier notarié : ${propertyId}`, buyerAcct.balance, sellerId);
-  if (sellerAcct) pushTx(sellerAcct, "deposit", agreedPrice - commission, `Vente immobilière : ${propertyId}`, sellerAcct.balance, buyerId);
+  // Envoi des fiches de transactions (Desjardins — Signature unifiée)
+  pushTx({
+    id: uid("tx"),
+    timestamp: Date.now(),
+    type: "transfer",
+    amount: totalCostForBuyer,
+    description: `Achat immobilier notarié : ${propertyId}`,
+  }, buyerId);
+
+  if (sellerAcct) {
+    pushTx({
+      id: uid("tx"),
+      timestamp: Date.now(),
+      type: "deposit",
+      amount: agreedPrice - commission,
+      description: `Vente immobilière : ${propertyId}`,
+    }, sellerId);
+  }
 
   sendChatMessage(`🏡 [NOTAIRE] La vente du bien ${prop.address} à ${buyerName} pour ${agreedPrice}$ a été enregistrée officiellement.`);
   netEmit("realty:sale_completed", { propertyId, buyerId, agreedPrice });
@@ -610,9 +588,7 @@ export function finalizeSaleWithNotary(
   return { success: true, message: "Vente finalisée !", realty };
 }
 
-// ═══════════════════════════════════════════════════════════
-// LE PRESTATAIRE HYPOTHÉCAIRE DESJARDINS
-// ═══════════════════════════════════════════════════════════
+// ─── §13 — LE SYSTÈME HYPOTHÉCAIRE DESJARDINS (Cote de crédit 600+) ─────────
 
 export interface MortgageApplyResult {
   success: boolean;
@@ -627,13 +603,12 @@ export function applyForDesjardinsMortgage(
   buyerId: string,
   buyerName: string,
   downPayment: number,
-  amortizationMonths: number = 30, // en jours/mois de jeu
+  amortizationMonths = 30, // en jours/mois de jeu
   debitAccountId: string,
 ): MortgageApplyResult {
   const prop = propertyById(propertyId);
   if (!prop) return { success: false, message: "Propriété introuvable.", realty };
 
-  // Calcul du prêt requis
   const principalLoan = prop.price - downPayment;
 
   // Réglementation canadienne: 5% minimum de mise de fonds
@@ -655,9 +630,9 @@ export function applyForDesjardinsMortgage(
     (principalLoan * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -amortizationMonths)),
   );
 
-  // Vérifier le ratio d'endettement de l'acheteur
+  // Vérifier le ratio d'endettement de l'acheteur (Ratio brut max 44%)
   const totalDebtRatio = (credit.totalDebt + monthlyPayment) / credit.monthlyIncome;
-  if (totalDebtRatio > 0.44) { // Max 44% amortissement de la dette brute
+  if (totalDebtRatio > 0.44) {
     return { success: false, message: `Capacité d'emprunt dépassée. Diminuez le prêt ou augmentez la mise de fonds.`, realty };
   }
 
@@ -683,13 +658,13 @@ export function applyForDesjardinsMortgage(
     remainingMonths: amortizationMonths,
     missedPaymentsInARow: 0,
     status: "active",
-    nextPaymentDueDay: 1, // Déclenché au prochain tick
+    nextPaymentDueDay: 1,
     autoDebitAccountId: debitAccountId,
   };
 
   realty.mortgages[propertyId] = mortgage;
 
-  // Mettre à jour la dette du joueur
+  // Mise à jour du profil de crédit Desjardins
   credit.totalDebt += principalLoan;
   credit.activeAccounts++;
 
@@ -704,9 +679,7 @@ export function applyForDesjardinsMortgage(
   return { success: true, message: "Prêt hypothécaire signé !", mortgage, realty };
 }
 
-// ═══════════════════════════════════════════════════════════
-// TRIBUNAL ADMINISTRATIF DU LOGEMENT (TAL) — BAILS & CONFLITS
-// ═══════════════════════════════════════════════════════════
+// ─── §14 — TRIBUNAL ADMINISTRATIF DU LOGEMENT (TAL) — BAILS & LITIGES ───────
 
 export interface SignLeaseResult {
   success: boolean;
@@ -723,7 +696,7 @@ export function signQuebecLease(
   tenantId: string,
   tenantName: string,
   rentAmount: number,
-  durationDays: number = 12, // Standard
+  durationDays = 12,
 ): SignLeaseResult {
   if (realty.rentals[propertyId]) {
     return { success: false, message: "Ce bien fait déjà l'objet d'un bail actif.", realty };
@@ -735,7 +708,7 @@ export function signQuebecLease(
   }
 
   const lease: QuebecLease = {
-    leaseId: uid("lease"),  // CORRECTION: uid() maintenant défini
+    leaseId: uid("lease"),
     propertyId,
     landlordId,
     landlordName,
@@ -772,7 +745,6 @@ export function signQuebecLease(
   return { success: true, message: "Bail en vigueur et clé numérique délivrée !", lease, realty };
 }
 
-// Dépôt d'une plainte au TAL par le propriétaire
 export function fileTalDispute(
   realty: RealtyState,
   propertyId: string,
@@ -783,7 +755,7 @@ export function fileTalDispute(
   if (!lease) return { success: false, message: "Aucun bail actif sur ce logement.", realty };
   if (lease.landlordId !== plaintiffId) return { success: false, message: "Seul le locateur peut déposer cette plainte.", realty };
 
-  const disputeId = uid("tal");  // CORRECTION: uid() maintenant défini
+  const disputeId = uid("tal");
   const talCase: TalCase = {
     disputeId,
     leaseId: lease.leaseId,
@@ -791,7 +763,7 @@ export function fileTalDispute(
     defendantId: lease.tenantId,
     reason,
     filedAt: Date.now(),
-    hearingDate: Date.now() + 2 * 60_000, // Audience dans 2 minutes RP
+    hearingDate: Date.now() + 2 * 60_000, // Audience planifiée
     judgmentDate: null,
     judgment: "lease_termination",
     bailiffAssignedId: null,
@@ -813,7 +785,6 @@ export function fileTalDispute(
   return { success: true, message: `Dossier #${disputeId} ouvert au TAL.`, caseId: disputeId, realty };
 }
 
-// Résolution de l'audience par le système ou un juge joueur
 export function resolveTalHearing(
   realty: RealtyState,
   disputeId: string,
@@ -826,14 +797,14 @@ export function resolveTalHearing(
   tal.judgmentDate = Date.now();
   tal.resolved = true;
 
-  const lease = Array.from(Object.values(realty.rentals)).find(l => l.leaseId === tal.leaseId);
+  const lease = Array.from(Object.values(realty.rentals)).find((l) => l.leaseId === tal.leaseId);
   if (lease) {
     if (judgment === "eviction_ordered" || judgment === "lease_termination") {
       lease.status = "evicted";
-      // Retirer l'accès locataire
+      // Retirer l'accès au locataire évincé
       const lock = realty.locks[lease.propertyId];
       if (lock) {
-        lock.authorizedKeyHolders = lock.authorizedKeyHolders.filter(id => id !== lease.tenantId);
+        lock.authorizedKeyHolders = lock.authorizedKeyHolders.filter((id) => id !== lease.tenantId);
       }
     } else {
       lease.status = "active";
@@ -841,7 +812,6 @@ export function resolveTalHearing(
     }
   }
 
-  // Notifier
   triggerNotification(tal.defendantId, {
     title: "🏛️ Jugement rendu par le TAL",
     body: `Verdict: ${judgment.toUpperCase()}`,
@@ -853,7 +823,6 @@ export function resolveTalHearing(
   return { ok: true, message: `Jugement enregistré : ${judgment}`, realty };
 }
 
-// Éviction forcée par un Huissier ou la SQ
 export function executeEvictionBailiff(
   realty: RealtyState,
   propertyId: string,
@@ -864,24 +833,24 @@ export function executeEvictionBailiff(
     return { ok: false, message: "Aucune ordonnance d'expulsion active du TAL pour ce logement.", realty };
   }
 
-  // Effectuer l'expulsion
+  // Libérer les lieux
   delete realty.rentals[propertyId];
 
-  // Forcer les verrous et expulser physiquement
+  // Forcer les verrous de sécurité
   const lock = ensureLock(realty, propertyId, lease.landlordId);
   lock.authorizedKeyHolders = [lease.landlordId];
   lock.isLocked = true;
 
-  // Restaurer Hydro-Québec au propriétaire
+  // Transférer Hydro-Québec au propriétaire
   const hydro = ensureHydro(realty, propertyId, lease.landlordId);
   hydro.currentPayerId = lease.landlordId;
 
-  // Alerte police pour squat
+  // Signalement police pour squat clandestin
   addWantedPoints(lease.tenantId, 40, "Refus de se conformer à un ordre d'éviction du TAL");
 
   triggerNotification(lease.tenantId, {
     title: "🚨 ÉVICTION COMPLÉTÉE",
-    body: `L'huissier et la police ont libéré les lieux. Vos meubles ont été sortis.`,
+    body: `L'huissier et la police ont libéré les lieux. Vos meubles ont été retirés.`,
     icon: "📦",
     urgent: true,
   });
@@ -892,9 +861,7 @@ export function executeEvictionBailiff(
   return { ok: true, message: "Éviction complétée avec succès.", realty };
 }
 
-// ═══════════════════════════════════════════════════════════
-// HYDRO-QUÉBEC — TICK DE CONSOMMATION & COUPURE
-// ═══════════════════════════════════════════════════════════
+// ─── §15 — HYDRO-QUÉBEC — REGLEMENT DES FACTURES & RELANCE ───────────────────
 
 export function payHydroBill(
   realty: RealtyState,
@@ -923,15 +890,20 @@ export function payHydroBill(
     });
   }
 
-  pushTx(payerAcct, "transfer", paidAmount, `Facture Hydro-Québec - Compte ${hydro.accountNumber}`, payerAcct.balance, "HYDRO-QC");
+  pushTx({
+    id: uid("tx"),
+    timestamp: Date.now(),
+    type: "transfer",
+    amount: paidAmount,
+    description: `Facture Hydro-Québec - Compte ${hydro.accountNumber}`,
+  }, payerId);
+
   netEmit("realty:hydro_paid", { propertyId, paidAmount });
 
-  return { ok: true, message: `Paiement de ${paidAmount}$ accepté. Merci d'épargner notre énergie !`, realty };
+  return { ok: true, message: `Paiement de ${paidAmount}$ accepté. Merci d'économiser l'énergie !`, realty };
 }
 
-// ═══════════════════════════════════════════════════════════
-// EFFETS DE SQUATTING ET CROCHETAGE DE SERRURES
-// ═══════════════════════════════════════════════════════════
+// ─── §16 — CROCHETAGE DE SERRURES & ALARMES DE SÉCURITÉ ───────────────────────
 
 export function breakOrPickLock(
   realty: RealtyState,
@@ -947,20 +919,17 @@ export function breakOrPickLock(
 
   const roll = Math.random();
   if (isBruteForce) {
-    // Force brute: défoncer la porte (rapide, fait du bruit)
     lock.brokenState = Math.min(100, lock.brokenState + 45);
     success = lock.brokenState >= 80 || roll < 0.6;
     alarmTriggered = true;
   } else {
-    // Crochetage discret (silencieux)
     success = roll < 0.35;
-    alarmTriggered = roll > 0.85; // 15% de chance de faire de l'alarme
+    alarmTriggered = roll > 0.85; // 15% de chance de déclenchement
   }
 
   if (success) {
     lock.isLocked = false;
-    // Infraction détectée
-    addWantedPoints(pickerId, 30, "Intrusion résidentielle");
+    addWantedPoints(pickerId, 30, "Intrusion résidentielle avec effraction");
   }
 
   if (alarmTriggered) {
@@ -969,8 +938,8 @@ export function breakOrPickLock(
       dispatchPolice({
         location: { x: prop.x, z: prop.z },
         priority: "high",
-        type: "bank_alarm", // Alarme intrusion standard
-        description: `Signal d'effraction en cours au ${prop.address}`,
+        type: "bank_alarm",
+        description: `Signal d'effraction active au ${prop.address}`,
       });
     }
   }
@@ -978,21 +947,18 @@ export function breakOrPickLock(
   netEmit("realty:lock_tampered", { propertyId, pickerId, success, isBruteForce });
   return {
     success,
-    message: success ? "Serrure forcée ! Porte ouverte." : "Échec du crochetage.",
+    message: success ? "Serrure forcée ! Porte déverrouillée." : "Échec du crochetage.",
     alarmTriggered,
     realty,
   };
 }
 
-// ═══════════════════════════════════════════════════════════
-// MAINTENANCE, RÉNOVATION ET SINISTRES
-// ═══════════════════════════════════════════════════════════
+// ─── §17 — MAINTENANCE & RÉPARATIONS DE SINISTRES ────────────────────────────
 
-export function maintainProperty(realty: RealtyState, propertyId: string, costMultiplier: number = 1.0): RealtyState {
+export function maintainProperty(realty: RealtyState, propertyId: string, costMultiplier = 1.0): RealtyState {
   const cond = ensureCondition(realty, propertyId);
   const cost = Math.round(500 * costMultiplier);
 
-  // Remettre à neuf
   cond.structuralIntegrity = 100;
   cond.cleanliness = 100;
   cond.hasMold = false;
@@ -1005,9 +971,7 @@ export function maintainProperty(realty: RealtyState, propertyId: string, costMu
   return realty;
 }
 
-// ═══════════════════════════════════════════════════════════
-// LE TICK IMMOBILIER QUOTIDIEN (MAÎTRE DU JEU)
-// ═══════════════════════════════════════════════════════════
+// ─── §18 — TICK DE SIMULATION JOURNALIER (Hydro-QC, Dégradation, TAL) ────────
 
 export function tickRealty(
   realty: RealtyState,
@@ -1025,54 +989,49 @@ export function tickRealty(
   let hydroDue = 0;
   const notices: string[] = [];
 
-  const condition = { ...realty.condition };
-  const rentals = { ...realty.rentals };
-  const mortgages = { ...realty.mortgages };
-  const hydroStates = { ...realty.hydro };
+  // Création de copies profondes pour préserver l'immutabilité
+  const condition: Record<string, PropertyCondition> = {};
+  const rentals: Record<string, QuebecLease> = { ...realty.rentals };
+  const mortgages: Record<string, QuebecMortgage> = { ...realty.mortgages };
+  const hydroStates: Record<string, HydroState> = { ...realty.hydro };
 
   for (const id of ids) {
-    // 1. Dégradation naturelle des bâtiments
-    const cond = ensureCondition(realty, id);
+    // A. Dégradation naturelle
+    const prevCond = ensureCondition(realty, id);
+    const cond: PropertyCondition = { ...prevCond };
     cond.structuralIntegrity = Math.max(0, cond.structuralIntegrity - 1);
     cond.cleanliness = Math.max(0, cond.cleanliness - 2);
 
-    // Dégât d'eau aléatoire si vétuste
     if (cond.structuralIntegrity < 50 && Math.random() < 0.05) {
       cond.plumbingDamages = true;
       notices.push(`Dégât d'eau déclaré au ${id}`);
     }
-
     condition[id] = cond;
 
-    // 2. Gestion des baux du TAL & Prélèvement des loyers
+    // B. Prélèvement des baux du TAL
     const lease = rentals[id];
     if (lease) {
       if (cond.structuralIntegrity < 25) {
-        // Insalubrité évidente -> Locataire quitte sans préavis et saisit le TAL
         delete rentals[id];
-        notices.push(`Bail rompu - Logement insalubre au ${id}`);
+        notices.push(`Bail résilié — Logement insalubre au ${id}`);
       } else {
         const tenantAcct = getAccount(lease.tenantId);
         if (tenantAcct && tenantAcct.balance >= lease.rentAmount) {
-          // Loyer payé
           removeCash(lease.rentAmount, lease.tenantId);
           rentIncome += lease.rentAmount;
           lease.unpaidRentsCount = 0;
         } else {
-          // Non-paiement !
           lease.unpaidRentsCount++;
           triggerNotification(lease.landlordId, {
             title: "⚠️ Loyer impayé !",
-            body: `${lease.tenantName} n'a pas payé son loyer de ${lease.rentAmount}$`,
+            body: `${lease.tenantName} n'a pas acquitté son loyer de ${lease.rentAmount}$`,
             icon: "🚨",
             urgent: true,
           });
-
-          // Si 3 loyers impayés -> Le TAL permet le dépôt immédiat d'une expulsion
           if (lease.unpaidRentsCount >= 3) {
             triggerNotification(lease.landlordId, {
               title: "⚖️ TAL : Ordonnance possible",
-              body: `3 loyers impayés pour ${id}. Vous pouvez demander l'éviction légale.`,
+              body: `3 loyers impayés accumulés pour ${id}. Expulsion possible.`,
               icon: "🏛️",
             });
           }
@@ -1080,7 +1039,7 @@ export function tickRealty(
       }
     }
 
-    // 3. Traitement des Prêts Hypothécaires Desjardins
+    // C. Prélèvement des prêts hypothécaires Desjardins
     const mtg = mortgages[id];
     if (mtg && mtg.status === "active" && mtg.remainingMonths > 0) {
       const mtgAcct = getAccount(mtg.ownerId);
@@ -1088,48 +1047,45 @@ export function tickRealty(
         removeCash(mtg.monthlyPayment, mtg.ownerId);
         mortgageDue += mtg.monthlyPayment;
         mtg.remainingMonths--;
-        mtg.remainingPrincipal = round2(mtg.remainingPrincipal - (mtg.monthlyPayment * 0.6)); // CORRECTION: round2() maintenant défini
+        mtg.remainingPrincipal = round2(mtg.remainingPrincipal - (mtg.monthlyPayment * 0.6));
         mtg.missedPaymentsInARow = 0;
 
         if (mtg.remainingMonths <= 0) {
           mtg.status = "paid_off";
           delete mortgages[id];
-          notices.push(`Félicitations! Hypothèque soldée pour ${id}`);
+          notices.push(`Hypothèque soldée pour ${id} !`);
         }
       } else {
-        // Défaut de paiement hypothèque
         mtg.missedPaymentsInARow++;
         triggerNotification(mtg.ownerId, {
-          title: "⚠️ Desjardins : Défaut de paiement !",
-          body: `Échec du prélèvement hypothécaire de ${mtg.monthlyPayment}$. Retard: ${mtg.missedPaymentsInARow} mois.`,
+          title: "⚠️ Desjardins : Défaut hypothécaire !",
+          body: `Échec du prélèvement de ${mtg.monthlyPayment}$. Retard: ${mtg.missedPaymentsInARow} mois.`,
           icon: "🚨",
           urgent: true,
         });
-
         if (mtg.missedPaymentsInARow >= 3) {
-          // SAISIE HYPOTHÉCAIRE (reprise du bien par Desjardins)
           mtg.status = "foreclosed";
           delete mortgages[id];
-          delete rentals[id]; // Locataire évincé aussi
-          realty.commercials = realty.commercials.filter(cid => cid !== id);
-          notices.push(`Saisie hypothécaire Desjardins effectuée sur ${id}`);
+          delete rentals[id];
+          realty.commercials = realty.commercials.filter((cid) => cid !== id);
+          notices.push(`Saisie immobilière complétée sur le bien ${id}`);
         }
       }
     }
 
-    // 4. Factures Hydro-Québec
-    const hState = ensureHydro(realty, id, lease?.tenantId ?? realty.locks[id]?.ownerId ?? "system");
-    hState.electricityUsageKwh += Math.floor(10 + Math.random() * 20); // conso journalière
-    const billRate = 0.0974; // ~10 cents le kWh au Québec
-    hState.balanceDue = round2(hState.balanceDue + hState.electricityUsageKwh * billRate); // CORRECTION: round2() maintenant défini
-    hState.electricityUsageKwh = 0; // Reset pour le prochain cycle
+    // D. Factures Hydro-Québec
+    const payerId = lease?.tenantId ?? realty.locks[id]?.ownerId ?? "system";
+    const hState = ensureHydro(realty, id, payerId);
+    hState.electricityUsageKwh += Math.floor(10 + Math.random() * 20);
+    const billRate = 0.0974;
+    hState.balanceDue = round2(hState.balanceDue + hState.electricityUsageKwh * billRate);
+    hState.electricityUsageKwh = 0;
 
     if (hState.balanceDue >= 150) {
-      // Hydro-Québec coupe le courant pour solde impayé élevé !
       hState.isPowerCut = true;
       triggerNotification(hState.currentPayerId ?? "system", {
-        title: "⚡ Coup de courant Hydro-Québec",
-        body: `Électricité coupée pour solde impayé de ${hState.balanceDue}$`,
+        title: "⚡ Coupure Hydro-Québec",
+        body: `Courant interrompu pour facture impayée de ${hState.balanceDue}$`,
         icon: "🔌",
         urgent: true,
       });
@@ -1144,13 +1100,11 @@ export function tickRealty(
     rentIncome,
     mortgageDue,
     hydroDue,
-    notice: notices[0] ?? (rentIncome > 0 ? `Entrées de baux : +${rentIncome}$` : null),
+    notice: notices[0] ?? (rentIncome > 0 ? `Entrées locatives : +${rentIncome}$` : null),
   };
 }
 
-// ═══════════════════════════════════════════════════════════
-// OUTILS DE RECHERCHE ET UTILS CENTRIS/MLS
-// ═══════════════════════════════════════════════════════════
+// ─── §19 — UTILITAIRES DE RECHERCHE IMMOBILIÈRE ──────────────────────────────
 
 export function ownedIds(ownedProps: string[], realty: RealtyState): string[] {
   return [...ownedProps, ...realty.commercials];
@@ -1185,11 +1139,13 @@ export function searchProperties(zone?: PropertyZone, type?: PropertyType, maxPr
 
 export function nearestCommercial(x: number, z: number, max = 8): MarketProperty | null {
   let best: MarketProperty | null = null;
-  let bestD = max;
+  let bestDSq = max * max;
   for (const c of COMMERCIALS) {
-    const d = Math.hypot(c.x - x, c.z - z);
-    if (d < bestD) {
-      bestD = d;
+    const dx = c.x - x;
+    const dz = c.z - z;
+    const dSq = dx * dx + dz * dz;
+    if (dSq < bestDSq) {
+      bestDSq = dSq;
       best = c;
     }
   }
@@ -1202,9 +1158,7 @@ export function marketMarks(owned: string[], realty: RealtyState): Array<{ id: s
     .map((p) => ({ id: p.id, x: p.x, z: p.z, kind: p.kind }));
 }
 
-// ═══════════════════════════════════════════════════════════
-// CLÉS ET ACCÈS PHYSIQUES
-// ═══════════════════════════════════════════════════════════
+// ─── §20 — GESTION DES CLÉS ET DU TROUSSEAU NUMÉRIQUE ────────────────────────
 
 export function grantAccess(realty: RealtyState, id: string, targetPlayerId: string): RealtyState {
   const lock = ensureLock(realty, id, "system");
@@ -1220,11 +1174,7 @@ export function revokeAccess(realty: RealtyState, id: string, targetPlayerId: st
   return realty;
 }
 
-// ═══════════════════════════════════════════════════════════
-// BAILS AUTOMATIQUES, MLS & HYPOTHÈQUES (Interface Store)
-// ═══════════════════════════════════════════════════════════
-
-// ---- Locataires NPC québécois (quand le propriétaire loue sans joueur locataire)
+// ---- Locataires NPC québécois (Bails automatiques hors-ligne)
 const NPC_TENANT_NAMES = [
   "Maxime Labonté", "Émilie Gagnon", "William Tremblay", "Olivia Côté",
   "Félix Bergeron", "Sophie Roy", "Gabriel Dubois", "Chloé Fortin",
@@ -1250,7 +1200,7 @@ function playerDisplayName(playerId: string): string {
       }
     }
   } catch {
-    // getPlayerData indisponible -> fallback générique
+    // getPlayerData() indisponible ou hors ligne
   }
   return "Propriétaire";
 }
@@ -1270,7 +1220,7 @@ export function startRental(realty: RealtyState, propertyId: string): StartRenta
 
   const cond = ensureCondition(realty, propertyId);
   if (cond.structuralIntegrity < 35 || cond.isInfested) {
-    return { ok: false, reason: "Logement déclaré insalubre. Location impossible.", realty };
+    return { ok: false, reason: "Logement declared insalubre. Location impossible.", realty };
   }
 
   const landlordId = realty.locks[propertyId]?.ownerId ?? "system";
@@ -1302,13 +1252,11 @@ export function startRental(realty: RealtyState, propertyId: string): StartRenta
     hydro: { ...realty.hydro },
   };
 
-  // Clé numérique au locataire
   const lock = ensureLock(next, propertyId, landlordId);
   if (!lock.authorizedKeyHolders.includes(tenantId)) {
     lock.authorizedKeyHolders.push(tenantId);
   }
 
-  // Hydro-Québec passe au locataire
   const hydro = ensureHydro(next, propertyId, landlordId);
   hydro.currentPayerId = tenantId;
 
@@ -1334,7 +1282,6 @@ export function evictRental(realty: RealtyState, propertyId: string): RealtyStat
   };
   delete next.rentals[propertyId];
 
-  // Retirer la clé numérique du locataire
   const lock = next.locks[propertyId];
   if (lock) {
     next.locks[propertyId] = {
@@ -1343,7 +1290,6 @@ export function evictRental(realty: RealtyState, propertyId: string): RealtyStat
     };
   }
 
-  // Hydro-Québec revient au propriétaire
   const hydro = next.hydro[propertyId];
   if (hydro) {
     next.hydro[propertyId] = { ...hydro, currentPayerId: lease.landlordId };
@@ -1392,7 +1338,7 @@ export function addMortgage(realty: RealtyState, propertyId: string, loanAmount:
   if (!prop || loanAmount <= 0) return realty;
 
   const ownerId = realty.locks[propertyId]?.ownerId ?? "system";
-  const annualRate = 5.25; // Taux fixe Desjardins (cohérent avec applyForDesjardinsMortgage)
+  const annualRate = 5.25;
   const monthlyRate = annualRate / 100 / 12;
   const amortizationMonths = 30;
   const monthlyPayment = Math.max(
@@ -1421,9 +1367,7 @@ export function addMortgage(realty: RealtyState, propertyId: string, loanAmount:
   return { ...realty, mortgages: { ...realty.mortgages, [propertyId]: mortgage } };
 }
 
-// ═══════════════════════════════════════════════════════════
-// REGISTER REMOTES (RPC Réseau Multijoueur)
-// ═══════════════════════════════════════════════════════════
+// ─── §21 — ENREGISTREMENT DES REMOTES (RPC RÉSEAU) ───────────────────────────
 
 registerRemote("realty:request_visit", requestVisit);
 registerRemote("realty:notary_sale", finalizeSaleWithNotary);

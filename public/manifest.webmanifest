@@ -1,0 +1,17 @@
+{
+  "name": "TroxTWorld — Comté de Portneuf RP",
+  "short_name": "TroxTWorld",
+  "description": "Simulation et jeu de rôle québécois en monde ouvert 3D",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0d14",
+  "theme_color": "#14212b",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}

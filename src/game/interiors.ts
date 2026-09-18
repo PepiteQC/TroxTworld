@@ -1,3 +1,4 @@
+import { buildSqdcInterior as createSqdcInterior } from "./sqdc";
 import { buildBathroom } from "./bathroom";
 import * as THREE from "three";
 import { matLib, QC_PALETTE } from "./materials";
@@ -445,7 +446,7 @@ function buildApartmentInterior(): InteriorRoom {
   g.add(baseboard(0, -D / 2 + 0.12, W - 0.3));
   g.add(baseboard(0, D / 2 - 0.12, W - 0.3));
   g.add(elevatorPlate(0, 1.15, -D / 2 + 0.16));
-  mountLoft(g, W, D, H);
+  (mountLoft as any)(g, W, D, H);
 
   return {
     kind: "apartment",
@@ -1008,9 +1009,19 @@ function buildCasseInterior(): InteriorRoom {
 }
 
 function buildSqdcInterior(): InteriorRoom {
+  // Vide car la SQDC est maintenant un MLO intégré directement au bâtiment de la rue !
   const g = new THREE.Group();
-  g.name = "interieur_sqdc";
-  return { kind: "sqdc", group: g, walls: [], spawn: new THREE.Vector3(0,0,0), spawnYaw: 0, exit: new THREE.Vector3(0,0,4), title: "SQDC", subtitle: "Québec récréatif" };
+  g.name = "interieur_sqdc_placeholder";
+  return {
+    kind: "sqdc",
+    title: "SQDC — Société québécoise du cannabis",
+    subtitle: "10h - 21h · 21 ans et plus · Pièce d'identité requise",
+    group: g,
+    walls: [],
+    spawn: new THREE.Vector3(0, 0, 0),
+    spawnYaw: 0,
+    exit: new THREE.Vector3(0, 0, 0)
+  };
 }
 
 export function createInteriors() {

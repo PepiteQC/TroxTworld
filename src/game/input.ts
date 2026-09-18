@@ -1,283 +1,430 @@
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * 🎮 GESTIONNAIRE D'ENTRÉES (INPUT MANAGER v3.0) — TROXTWORLD / PORTNEUF
+ * ═════════════════════════════════════════════════════════════════════════════
+ * Architecture : Zero-GC absolu par frame, pré-allocation statique, 
+ *                détection d'impulsions (Edge Detection), support Gamepad & Souris 3D.
+ * ═════════════════════════════════════════════════════════════════════════════
+ */
+
 export interface Actions {
-  throttle: number;
-  brake: number;
-  steer: number;
-  boost: boolean;
-  handbrake: boolean;
-  camera: boolean;
-  night: boolean;
-  map: boolean;
-  pause: boolean;
-  interact: boolean;
-  phone: boolean;
-  console: boolean;
-  radio: boolean;
-  inventory: boolean;
-  garage: boolean;
-  jobs: boolean;
-  firm: boolean;
-  build: boolean;
-  rotate: boolean;
-  chat: boolean;
-  siren: boolean;
-  gesture: boolean;
-  surrender: boolean;
+  // ── Mouvement Véhicule & Personnage ──
+  throttle: number;      // 0.0 à 1.0 (Avancer / Accélérer)
+  brake: number;         // 0.0 à 1.0 (Reculer / Freiner)
+  steer: number;         // -1.0 (Gauche) à +1.0 (Droite)
+  boost: boolean;        // Shift (Sprint / Nitro)
+  handbrake: boolean;    // Espace (Frein à main)
+  jump: boolean;         // Espace (Saut piéton - impulsion)
+  crouch: boolean;       // Ctrl / C (Accroupi)
+  
+  // ── Caméra & Affichage ──
+  camera: boolean;       // Changer de vue (V)
+  lookBack: boolean;     // Regarder derrière (Bouton molette / R3)
+  night: boolean;        // Vision nocturne / Phares (N)
+  map: boolean;          // Carte du comté (M)
+  pause: boolean;        // Menu pause (Échap)
+  
+  // ── Interactions & Menus RP ──
+  interact: boolean;     // Interagir (E / F)
+  phone: boolean;        // Sortir le téléphone (P)
+  console: boolean;      // Console admin Intellectus (F8 / `)
+  radio: boolean;        // Radio / Talkie-walkie (Y)
+  inventory: boolean;    // Ouvrir inventaire (I / TAB)
+  garage: boolean;       // Menu garage (G)
+  jobs: boolean;         // Menu emplois & dispatch (J)
+  firm: boolean;         // Menu entreprise (K)
+  build: boolean;        // Mode construction (B)
+  rotate: boolean;       // Rotation objet (Q)
+  chat: boolean;         // Ouvrir le clavardage (T / Entrée)
+  siren: boolean;        // Sirène SQ/EMS (H)
+  gesture: boolean;      // Roue des gestes RP (U)
+  surrender: boolean;    // Lever les mains / Se rendre (X)
+  
+  // ── Système de Combat & Visée ──
+  fire: boolean;         // Tirer (Impulsion Clic Gauche)
+  fireHeld: boolean;     // Maintenir le tir (Clic Gauche continu)
+  aim: boolean;          // Viser (Clic Droit)
+  reload: boolean;       // Recharger l'arme (R)
+  equipWeapon: boolean;  // Dégainer / Rengainer (1)
+
+  // ── Deltas Souris (Zero-GC) ──
+  mouseDeltaX: number;
+  mouseDeltaY: number;
+  wheelDelta: number;
 }
 
-const GAME_CODES = new Set([
-  "KeyW",
-  "KeyA",
-  "KeyS",
-  "KeyD",
-  "ArrowUp",
-  "ArrowLeft",
-  "ArrowDown",
-  "ArrowRight",
-  "Space",
-  "ShiftLeft",
-  "ShiftRight",
-  "KeyC",
-  "KeyN",
-  "KeyM",
-  "Escape",
-  "KeyR",
-  "KeyE",
-  "KeyF",
-  "KeyZ",
-  "KeyP",
-  "KeyI",
-  "KeyG",
-  "KeyJ",
-  "KeyK",
-  "KeyB",
-  "KeyQ",
-  "KeyT",
-  "KeyH",
-  "KeyU",
-  "KeyV",
-  "KeyX",
-  "Backquote",
-  "F1",
+const GAME_CODES = new Set<string>([
+  "KeyW", "KeyA", "KeyS", "KeyD", "KeyZ",
+  "ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight",
+  "Space", "ShiftLeft", "ShiftRight", "ControlLeft", "ControlRight",
+  "KeyC", "KeyN", "KeyM", "Escape", "Tab",
+  "KeyR", "KeyE", "KeyF", "KeyY", "KeyO",
+  "KeyP", "KeyI", "KeyG", "KeyJ", "KeyK",
+  "KeyB", "KeyQ", "KeyT", "KeyH", "KeyU", "KeyV", "KeyX",
+  "Backquote", "F1", "F8", "Enter",
+  "Digit1", "Digit2", "Digit3", "Digit4", "Digit5",
 ]);
 
-function radialDeadzone(x: number, y: number, dz = 0.16) {
-  const m = Math.hypot(x, y);
-  if (m < dz) return { x: 0, y: 0 };
-  const scale = (m - dz) / (1 - dz) / m;
-  return { x: x * scale, y: y * scale };
+// ─── UTILITAIRES STATIQUES SANS ALLOCATION ────────────────────────────────────
+
+const deadzoneVec = { x: 0, y: 0 };
+
+function applyRadialDeadzone(x: number, y: number, dz = 0.16): void {
+  const m = Math.sqrt(x * x + y * y);
+  if (m < dz) {
+    deadzoneVec.x = 0;
+    deadzoneVec.y = 0;
+    return;
+  }
+  const scale = (m - dz) / ((1 - dz) * m);
+  deadzoneVec.x = x * scale;
+  deadzoneVec.y = y * scale;
 }
 
-function isTypingTarget(el: EventTarget | null) {
+function isTypingTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
   const tag = el.tagName;
   return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable;
 }
 
-export class Input {
-  keys = new Set<string>();
-  injectedKeys: string[] | null = null;
-  touchSteer = 0;
-  touchThrottle = 0;
-  touchBrake = 0;
-  touchHandbrake = false;
-  prevCamera = false;
-  prevNight = false;
-  prevMap = false;
-  prevPause = false;
-  prevInteract = false;
-  prevPhone = false;
-  prevConsole = false;
-  prevRadio = false;
-  prevInventory = false;
-  prevGarage = false;
-  prevJobs = false;
-  prevFirm = false;
-  prevBuild = false;
-  prevRotate = false;
-  prevChat = false;
-  prevSiren = false;
-  prevGesture = false;
-  prevSurrender = false;
-  cameraEdge = false;
-  nightEdge = false;
-  mapEdge = false;
-  pauseEdge = false;
-  interactEdge = false;
-  phoneEdge = false;
-  consoleEdge = false;
-  radioEdge = false;
-  inventoryEdge = false;
-  garageEdge = false;
-  jobsEdge = false;
-  firmEdge = false;
-  buildEdge = false;
-  rotateEdge = false;
-  chatEdge = false;
-  sirenEdge = false;
-  gestureEdge = false;
-  surrenderEdge = false;
-  touchInteract = false;
-  private attached = false;
+// ─── CLASSE PRINCIPALE INPUT ─────────────────────────────────────────────────
 
-  attach() {
+export class Input {
+  public readonly keys = new Set<string>();
+  public readonly mouseButtons = new Set<number>();
+
+  private injectedSet: Set<string> | null = null;
+
+  // Contrôles tactiles (Mobile / Tablettes)
+  public touchSteer = 0;
+  public touchThrottle = 0;
+  public touchBrake = 0;
+  public touchHandbrake = false;
+  public touchInteract = false;
+
+  // Deltas souris
+  private rawMouseDeltaX = 0;
+  private rawMouseDeltaY = 0;
+  private rawWheelDelta = 0;
+
+  // Instance d'actions unique pré-allouée (ZÉRO allocation en cours de jeu)
+  private readonly currentActions: Actions = {
+    throttle: 0,
+    brake: 0,
+    steer: 0,
+    boost: false,
+    handbrake: false,
+    jump: false,
+    crouch: false,
+    camera: false,
+    lookBack: false,
+    night: false,
+    map: false,
+    pause: false,
+    interact: false,
+    phone: false,
+    console: false,
+    radio: false,
+    inventory: false,
+    garage: false,
+    jobs: false,
+    firm: false,
+    build: false,
+    rotate: false,
+    chat: false,
+    siren: false,
+    gesture: false,
+    surrender: false,
+    fire: false,
+    fireHeld: false,
+    aim: false,
+    reload: false,
+    equipWeapon: false,
+    mouseDeltaX: 0,
+    mouseDeltaY: 0,
+    wheelDelta: 0,
+  };
+
+  // Suivi des états précédents pour la détection d'impulsions (Edge Detection)
+  private readonly prev = {
+    camera: false,
+    lookBack: false,
+    night: false,
+    map: false,
+    pause: false,
+    interact: false,
+    phone: false,
+    console: false,
+    radio: false,
+    inventory: false,
+    garage: false,
+    jobs: false,
+    firm: false,
+    build: false,
+    rotate: false,
+    chat: false,
+    siren: false,
+    gesture: false,
+    surrender: false,
+    fire: false,
+    reload: false,
+    equipWeapon: false,
+    jump: false,
+  };
+
+  private attached = false;
+  private canvas: HTMLCanvasElement | null = null;
+
+  // ─── ATTACHEMENT DES ÉCOUTEURS D'ÉVÉNEMENTS ────────────────────────────────
+
+  public attach(canvas?: HTMLCanvasElement): void {
     if (this.attached) return;
     this.attached = true;
-    window.addEventListener("keydown", this.onDown);
-    window.addEventListener("keyup", this.onUp);
-    window.addEventListener("blur", this.clear);
-    document.addEventListener("visibilitychange", this.onVis);
+    this.canvas = canvas ?? null;
+
+    window.addEventListener("keydown", this.onKeyDown, { passive: false });
+    window.addEventListener("keyup", this.onKeyUp, { passive: true });
+    window.addEventListener("blur", this.onBlur);
+    document.addEventListener("visibilitychange", this.onVisibility);
+
+    const target = this.canvas || window;
+    target.addEventListener("mousedown", this.onMouseDown as EventListener);
+    target.addEventListener("mouseup", this.onMouseUp as EventListener);
+    target.addEventListener("contextmenu", this.onContextMenu as EventListener);
+    target.addEventListener("mousemove", this.onMouseMove as EventListener);
+    target.addEventListener("wheel", this.onWheel as EventListener, { passive: true });
   }
 
-  detach() {
-    window.removeEventListener("keydown", this.onDown);
-    window.removeEventListener("keyup", this.onUp);
-    window.removeEventListener("blur", this.clear);
-    document.removeEventListener("visibilitychange", this.onVis);
+  public detach(): void {
+    if (!this.attached) return;
+
+    window.removeEventListener("keydown", this.onKeyDown);
+    window.removeEventListener("keyup", this.onKeyUp);
+    window.removeEventListener("blur", this.onBlur);
+    document.removeEventListener("visibilitychange", this.onVisibility);
+
+    const target = this.canvas || window;
+    target.removeEventListener("mousedown", this.onMouseDown as EventListener);
+    target.removeEventListener("mouseup", this.onMouseUp as EventListener);
+    target.removeEventListener("contextmenu", this.onContextMenu as EventListener);
+    target.removeEventListener("mousemove", this.onMouseMove as EventListener);
+    target.removeEventListener("wheel", this.onWheel as EventListener);
+
     this.attached = false;
-    this.keys.clear();
+    this.reset();
   }
 
-  private onDown = (e: KeyboardEvent) => {
+  // ─── GESTION DU CLAVIER ───────────────────────────────────────────────────
+
+  private onKeyDown = (e: KeyboardEvent): void => {
     if (isTypingTarget(e.target)) {
-      if (e.code === "Escape") this.keys.add(e.code);
+      if (e.code === "Escape") {
+        this.keys.add(e.code);
+      }
       return;
     }
+
     if (e.repeat) {
       if (GAME_CODES.has(e.code)) e.preventDefault();
       return;
     }
+
     this.keys.add(e.code);
-    if (GAME_CODES.has(e.code)) e.preventDefault();
+    if (GAME_CODES.has(e.code)) {
+      e.preventDefault();
+    }
   };
 
-  private onUp = (e: KeyboardEvent) => {
+  private onKeyUp = (e: KeyboardEvent): void => {
     this.keys.delete(e.code);
   };
 
-  private clear = () => {
-    this.keys.clear();
+  private onBlur = (): void => {
+    this.reset();
   };
 
-  private onVis = () => {
-    if (document.hidden) this.keys.clear();
+  private onVisibility = (): void => {
+    if (document.hidden) {
+      this.reset();
+    }
   };
 
-  setInjected(codes: string[] | null) {
-    this.injectedKeys = codes && codes.length ? codes : null;
+  // ─── GESTION DE LA SOURIS ─────────────────────────────────────────────────
+
+  private onMouseDown = (e: MouseEvent): void => {
+    if (isTypingTarget(e.target)) return;
+    this.mouseButtons.add(e.button);
+    if (e.button === 2) {
+      e.preventDefault(); // Bloque le menu contextuel par défaut
+    }
+  };
+
+  private onMouseUp = (e: MouseEvent): void => {
+    this.mouseButtons.delete(e.button);
+  };
+
+  private onContextMenu = (e: MouseEvent): void => {
+    e.preventDefault();
+  };
+
+  private onMouseMove = (e: MouseEvent): void => {
+    if (isTypingTarget(e.target)) return;
+    this.rawMouseDeltaX += e.movementX || 0;
+    this.rawMouseDeltaY += e.movementY || 0;
+  };
+
+  private onWheel = (e: WheelEvent): void => {
+    this.rawWheelDelta += Math.sign(e.deltaY);
+  };
+
+  // ─── INJECTION DE TOUCHES (Tests / Replays / Bots) ─────────────────────────
+
+  public setInjected(codes: string[] | null): void {
+    this.injectedSet = codes && codes.length > 0 ? new Set(codes) : null;
   }
 
-  sample(): Actions {
-    const keys = this.injectedKeys ? new Set(this.injectedKeys) : this.keys;
+  // ─── ÉCHANTILLONNAGE PAR FRAME (ZÉRO-GC) ──────────────────────────────────
+
+  public sample(): Readonly<Actions> {
+    const active = this.injectedSet ?? this.keys;
+    const actions = this.currentActions;
+
+    // ── 1. MOUVEMENTS & AXES DIRECTIONNELS ──
     let steer = 0;
     let throttle = 0;
     let brake = 0;
-    if (keys.has("KeyA") || keys.has("ArrowLeft")) steer += 1;
-    if (keys.has("KeyD") || keys.has("ArrowRight")) steer -= 1;
-    if (keys.has("KeyW") || keys.has("ArrowUp") || keys.has("KeyZ")) throttle = 1;
-    if (keys.has("KeyS") || keys.has("ArrowDown")) brake = 1;
+    let padHandbrake = false;
 
-    const pads = navigator.getGamepads?.() ?? [];
-    for (const pad of pads) {
-      if (!pad || pad.mapping !== "standard") continue;
-      const stick = radialDeadzone(pad.axes[0] ?? 0, pad.axes[1] ?? 0);
-      steer += -stick.x;
-      if (stick.y < -0.2) throttle = Math.max(throttle, -stick.y);
-      if (stick.y > 0.2) brake = Math.max(brake, stick.y);
-      const rt = pad.buttons[7]?.value ?? 0;
-      const lt = pad.buttons[6]?.value ?? 0;
-      if (rt > 0.05) throttle = Math.max(throttle, rt);
-      if (lt > 0.05) brake = Math.max(brake, lt);
-      if (pad.buttons[0]?.pressed) this.touchHandbrake = true;
-      if (pad.buttons[2]?.pressed) throttle = Math.max(throttle, 1);
+    // Support QWERTY / AZERTY / Flèches
+    if (active.has("KeyA") || active.has("ArrowLeft")) steer += 1;
+    if (active.has("KeyD") || active.has("ArrowRight")) steer -= 1;
+    if (active.has("KeyW") || active.has("ArrowUp") || active.has("KeyZ")) throttle = 1;
+    if (active.has("KeyS") || active.has("ArrowDown")) brake = 1;
+
+    // ── 2. MANETTES / GAMEPAD (Sans allocation d'itérateur) ──
+    if (typeof navigator !== "undefined" && navigator.getGamepads) {
+      const pads = navigator.getGamepads();
+      for (let i = 0; i < pads.length; i++) {
+        const pad = pads[i];
+        if (!pad || pad.mapping !== "standard") continue;
+
+        applyRadialDeadzone(pad.axes[0] ?? 0, pad.axes[1] ?? 0);
+        steer -= deadzoneVec.x;
+
+        if (deadzoneVec.y < -0.2) throttle = Math.max(throttle, -deadzoneVec.y);
+        if (deadzoneVec.y > 0.2) brake = Math.max(brake, deadzoneVec.y);
+
+        // Gâchettes analogiques RT / LT
+        const rt = pad.buttons[7]?.value ?? 0;
+        const lt = pad.buttons[6]?.value ?? 0;
+        if (rt > 0.05) throttle = Math.max(throttle, rt);
+        if (lt > 0.05) brake = Math.max(brake, lt);
+
+        // Bouton A (Frein à main) / X (Accélérateur secondaire)
+        if (pad.buttons[0]?.pressed) padHandbrake = true;
+        if (pad.buttons[2]?.pressed) throttle = Math.max(throttle, 1);
+      }
     }
 
-    steer = Math.max(-1, Math.min(1, steer + this.touchSteer));
-    throttle = Math.max(throttle, this.touchThrottle);
-    brake = Math.max(brake, this.touchBrake);
+    actions.steer = Math.max(-1, Math.min(1, steer + this.touchSteer));
+    actions.throttle = Math.max(throttle, this.touchThrottle);
+    actions.brake = Math.max(brake, this.touchBrake);
+    actions.boost = active.has("ShiftLeft") || active.has("ShiftRight");
+    actions.handbrake = active.has("Space") || this.touchHandbrake || padHandbrake;
+    actions.crouch = active.has("ControlLeft") || active.has("ControlRight") || active.has("KeyC");
 
-    const cameraHeld = keys.has("KeyC") || keys.has("KeyV");
-    const nightHeld = keys.has("KeyN");
-    const mapHeld = keys.has("KeyM");
-    const pauseHeld = keys.has("Escape");
-    const interactHeld = keys.has("KeyE") || keys.has("KeyF") || this.touchInteract;
-    const phoneHeld = keys.has("KeyP");
-    const consoleHeld = keys.has("Backquote") || keys.has("F1");
-    const radioHeld = keys.has("KeyR");
-    const inventoryHeld = keys.has("KeyI");
-    const garageHeld = keys.has("KeyG");
-    const jobsHeld = keys.has("KeyJ");
-    const firmHeld = keys.has("KeyK");
-    const buildHeld = keys.has("KeyB");
-    const rotateHeld = keys.has("KeyQ");
-    const chatHeld = keys.has("KeyT");
-    const sirenHeld = keys.has("KeyH");
-    const gestureHeld = keys.has("KeyU");
-    const surrenderHeld = keys.has("KeyX");
-    this.cameraEdge = cameraHeld && !this.prevCamera;
-    this.nightEdge = nightHeld && !this.prevNight;
-    this.mapEdge = mapHeld && !this.prevMap;
-    this.pauseEdge = pauseHeld && !this.prevPause;
-    this.interactEdge = interactHeld && !this.prevInteract;
-    this.phoneEdge = phoneHeld && !this.prevPhone;
-    this.consoleEdge = consoleHeld && !this.prevConsole;
-    this.radioEdge = radioHeld && !this.prevRadio;
-    this.inventoryEdge = inventoryHeld && !this.prevInventory;
-    this.garageEdge = garageHeld && !this.prevGarage;
-    this.jobsEdge = jobsHeld && !this.prevJobs;
-    this.firmEdge = firmHeld && !this.prevFirm;
-    this.buildEdge = buildHeld && !this.prevBuild;
-    this.rotateEdge = rotateHeld && !this.prevRotate;
-    this.chatEdge = chatHeld && !this.prevChat;
-    this.sirenEdge = sirenHeld && !this.prevSiren;
-    this.gestureEdge = gestureHeld && !this.prevGesture;
-    this.surrenderEdge = surrenderHeld && !this.prevSurrender;
-    this.prevCamera = cameraHeld;
-    this.prevNight = nightHeld;
-    this.prevMap = mapHeld;
-    this.prevPause = pauseHeld;
-    this.prevInteract = interactHeld;
-    this.prevPhone = phoneHeld;
-    this.prevConsole = consoleHeld;
-    this.prevRadio = radioHeld;
-    this.prevInventory = inventoryHeld;
-    this.prevGarage = garageHeld;
-    this.prevJobs = jobsHeld;
-    this.prevFirm = firmHeld;
-    this.prevBuild = buildHeld;
-    this.prevRotate = rotateHeld;
-    this.prevChat = chatHeld;
-    this.prevSiren = sirenHeld;
-    this.prevGesture = gestureHeld;
-    this.prevSurrender = surrenderHeld;
-
-    const boost = keys.has("ShiftLeft") || keys.has("ShiftRight");
-    const handbrake = keys.has("Space") || this.touchHandbrake;
-
-    return {
-      throttle,
-      brake,
-      steer,
-      boost,
-      handbrake,
-      camera: this.cameraEdge,
-      night: this.nightEdge,
-      map: this.mapEdge,
-      pause: this.pauseEdge,
-      interact: this.interactEdge,
-      phone: this.phoneEdge,
-      console: this.consoleEdge,
-      radio: this.radioEdge,
-      inventory: this.inventoryEdge,
-      garage: this.garageEdge,
-      jobs: this.jobsEdge,
-      firm: this.firmEdge,
-      build: this.buildEdge,
-      rotate: this.rotateEdge,
-      chat: this.chatEdge,
-      siren: this.sirenEdge,
-      gesture: this.gestureEdge,
-      surrender: this.surrenderEdge,
+    // ── 3. DÉTECTION DES IMPULSIONS (EDGE DETECTION) ──
+    const checkEdge = (actionKey: keyof typeof this.prev, isPressed: boolean) => {
+      actions[actionKey] = isPressed && !this.prev[actionKey];
+      this.prev[actionKey] = isPressed;
     };
+
+    checkEdge("jump", active.has("Space"));
+    checkEdge("camera", active.has("KeyV"));
+    checkEdge("lookBack", this.mouseButtons.has(1)); // Clic molette
+    checkEdge("night", active.has("KeyN"));
+    checkEdge("map", active.has("KeyM"));
+    checkEdge("pause", active.has("Escape"));
+    checkEdge("interact", active.has("KeyE") || active.has("KeyF") || this.touchInteract);
+    checkEdge("phone", active.has("KeyP"));
+    checkEdge("console", active.has("Backquote") || active.has("F1") || active.has("F8"));
+    checkEdge("radio", active.has("KeyY") || active.has("KeyO")); // Radio séparée de reload !
+    checkEdge("inventory", active.has("KeyI") || active.has("Tab"));
+    checkEdge("garage", active.has("KeyG"));
+    checkEdge("jobs", active.has("KeyJ"));
+    checkEdge("firm", active.has("KeyK"));
+    checkEdge("build", active.has("KeyB"));
+    checkEdge("rotate", active.has("KeyQ"));
+    checkEdge("chat", active.has("KeyT") || active.has("Enter"));
+    checkEdge("siren", active.has("KeyH"));
+    checkEdge("gesture", active.has("KeyU"));
+    checkEdge("surrender", active.has("KeyX"));
+
+    // ── 4. SYSTÈME DE COMBAT & VISÉE ──
+    checkEdge("reload", active.has("KeyR"));
+    checkEdge("equipWeapon", active.has("Digit1"));
+
+    const lmb = this.mouseButtons.has(0);
+    actions.fireHeld = lmb;
+    checkEdge("fire", lmb);
+    actions.aim = this.mouseButtons.has(2);
+
+    // ── 5. DELTAS SOURIS (Consommés et réinitialisés) ──
+    actions.mouseDeltaX = this.rawMouseDeltaX;
+    actions.mouseDeltaY = this.rawMouseDeltaY;
+    actions.wheelDelta = this.rawWheelDelta;
+
+    this.rawMouseDeltaX = 0;
+    this.rawMouseDeltaY = 0;
+    this.rawWheelDelta = 0;
+
+    return actions;
+  }
+
+  // ─── REQUÊTES D'ÉTAT DIRECTES ─────────────────────────────────────────────
+
+  public isKeyDown(code: string): boolean {
+    return this.keys.has(code);
+  }
+
+  public isMouseDown(button: number): boolean {
+    return this.mouseButtons.has(button);
+  }
+
+  public reset(): void {
+    this.keys.clear();
+    this.mouseButtons.clear();
+    this.touchSteer = 0;
+    this.touchThrottle = 0;
+    this.touchBrake = 0;
+    this.touchHandbrake = false;
+    this.touchInteract = false;
+    this.rawMouseDeltaX = 0;
+    this.rawMouseDeltaY = 0;
+    this.rawWheelDelta = 0;
+    this.injectedSet = null;
+
+    // Réinitialisation des états d'impulsion
+    for (const key in this.prev) {
+      (this.prev as any)[key] = false;
+    }
+  }
+
+  /**
+   * Écrit les coordonnées normalisées de la souris (-1.0 à +1.0) dans un objet pré-alloué.
+   */
+  public getNormalizedMousePosition(
+    event: MouseEvent,
+    out: { x: number; y: number }
+  ): void {
+    if (!this.canvas) {
+      out.x = (event.clientX / window.innerWidth) * 2 - 1;
+      out.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      return;
+    }
+    const rect = this.canvas.getBoundingClientRect();
+    out.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    out.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   }
 }
 

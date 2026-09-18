@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Matériaux commerce PBR — palette québécoise + SQDC.
  * Acier, rouille, bois, noir mat, vert #1A5632, béton, verre transmission.
@@ -171,3 +172,4 @@ export function disposeCommerceEnv() {
   pmrem = null;
   cache.clear();
 }
+

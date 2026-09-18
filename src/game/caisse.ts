@@ -67,7 +67,7 @@ import {
 import { addWantedPoints, dispatchPolice } from "./police";
 
 // Monde
-import { getGameHour } from "./seasons";
+// import { getGameHour } from "./seasons"; const getGameHour = () => new Date().getHours();
 
 // ═══════════════════════════════════════════════════════════
 // PALETTE & CONSTANTES

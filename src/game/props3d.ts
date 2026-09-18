@@ -1,17 +1,25 @@
 /**
- * Meubles et mobilier de rue — meshes PBR, pas des boîtes nues.
- * Branché au catalogue (buildFromMeta) et au comté (street.ts).
+ * ═════════════════════════════════════════════════════════════════════════════
+ * 🪑 CATALOGUE DE MEUBLES & MOBILIER URBAIN PBR — TROXTWORLD (v4.0)
+ * Fichier : src/game/props3d.ts
+ * Architecture : Zero-GC, cache VRAM unifié via getGeo, matériaux partagés.
+ * ═════════════════════════════════════════════════════════════════════════════
  */
+
 import * as THREE from "three";
-import { getGeo } from "./geo";
+import { getGeo } from "./geometries";
 import { matLib } from "./materials";
 import { tex } from "./textures";
 import { chandelier as lobbyChandelier, kingBed, loungeChair } from "./luxury";
+
+// ─── PALETTE DE COULEURS PARTAGÉES ───────────────────────────────────────────
 
 const GOLD = 0xd4a853;
 const STEEL = 0x8a9098;
 const CHROME = 0xc8ccd0;
 const SQ_GREEN = 0x1a4a32;
+
+// ─── HELPER UNIVERSEL DE CRÉATION DE MESH ────────────────────────────────────
 
 function mesh(
   geo: THREE.BufferGeometry,
@@ -19,7 +27,7 @@ function mesh(
   x: number,
   y: number,
   z: number,
-  shadow = true,
+  shadow = true
 ): THREE.Mesh {
   const m = new THREE.Mesh(geo, mat);
   m.position.set(x, y, z);
@@ -28,15 +36,22 @@ function mesh(
   return m;
 }
 
+// ─── §1 : MOBILIER RÉSIDENTIEL ──────────────────────────────────────────────
+
 export function buildArmchair(): THREE.Group {
-  return loungeChair(0, 0, 0);
+  const g = loungeChair(0, 0, 0);
+  g.userData.rp = "armchair";
+  g.userData.sit = true;
+  return g;
 }
 
 export function buildBed(kind: "bed" | "beds" | "hotelbed" = "bed"): THREE.Group {
   const g = kingBed(0, 0);
   if (kind === "beds") g.scale.set(0.62, 0.92, 0.95);
   if (kind === "hotelbed") g.scale.set(1.05, 1, 1.08);
+  g.userData.rp = kind;
   g.userData.sit = true;
+  g.userData.sleep = true;
   return g;
 }
 
@@ -46,10 +61,7 @@ export function buildDiningTable(): THREE.Group {
   const wood = tex.mat("noyer", 1.8, 1, 0.38, 0.12);
   g.add(mesh(getGeo("box", { w: 1.85, h: 0.06, d: 0.92 }), wood, 0, 0.76, 0));
   for (const [sx, sz] of [
-    [-0.78, -0.34],
-    [0.78, -0.34],
-    [-0.78, 0.34],
-    [0.78, 0.34],
+    [-0.78, -0.34], [0.78, -0.34], [-0.78, 0.34], [0.78, 0.34],
   ] as Array<[number, number]>) {
     g.add(mesh(getGeo("cylinder", { r: 0.028, r2: 0.032, h: 0.74, seg: 8 }), matLib.get(GOLD, 0.22, 0.78), sx, 0.37, sz));
   }
@@ -62,10 +74,7 @@ export function buildCoffeeTable(): THREE.Group {
   g.add(mesh(getGeo("box", { w: 1.18, h: 0.05, d: 0.68 }), tex.mat("noyer", 1.2, 0.7, 0.32, 0.14), 0, 0.38, 0));
   g.add(mesh(getGeo("box", { w: 1.02, h: 0.03, d: 0.52 }), matLib.get(0x2a2430, 0.5), 0, 0.22, 0));
   for (const [sx, sz] of [
-    [-0.48, -0.24],
-    [0.48, -0.24],
-    [-0.48, 0.24],
-    [0.48, 0.24],
+    [-0.48, -0.24], [0.48, -0.24], [-0.48, 0.24], [0.48, 0.24],
   ] as Array<[number, number]>) {
     g.add(mesh(getGeo("cylinder", { r: 0.022, r2: 0.026, h: 0.36, seg: 8 }), matLib.get(GOLD, 0.2, 0.8), sx, 0.18, sz));
   }
@@ -79,8 +88,7 @@ export function buildDesk(): THREE.Group {
   g.add(mesh(getGeo("box", { w: 1.52, h: 0.05, d: 0.72 }), wood, 0, 0.76, 0));
   g.add(mesh(getGeo("box", { w: 0.42, h: 0.52, d: 0.66 }), wood, -0.52, 0.28, 0));
   g.add(mesh(getGeo("box", { w: 0.42, h: 0.52, d: 0.66 }), wood, 0.52, 0.28, 0));
-  const lamp = mesh(getGeo("cylinder", { r: 0.03, h: 0.28, seg: 8 }), matLib.get(GOLD, 0.2, 0.75), 0.52, 0.92, -0.18);
-  g.add(lamp);
+  g.add(mesh(getGeo("cylinder", { r: 0.03, h: 0.28, seg: 8 }), matLib.get(GOLD, 0.2, 0.75), 0.52, 0.92, -0.18));
   g.add(mesh(getGeo("sphere", { r: 0.07, seg: 8 }), matLib.getEmissive(0xfff5e6, 0xfff0d0, 0.55), 0.52, 1.08, -0.18));
   return g;
 }
@@ -116,6 +124,8 @@ export function buildBookshelf(): THREE.Group {
   return g;
 }
 
+// ─── §2 : ÉLECTROMÉNAGERS DE CUISINE ────────────────────────────────────────
+
 export function buildFridge(): THREE.Group {
   const g = new THREE.Group();
   g.name = "fridge";
@@ -124,6 +134,8 @@ export function buildFridge(): THREE.Group {
   g.add(mesh(getGeo("box", { w: 0.66, h: 0.02, d: 0.02 }), matLib.get(CHROME, 0.25, 0.85), 0.28, 1.35, 0.35));
   g.add(mesh(getGeo("box", { w: 0.66, h: 0.02, d: 0.02 }), matLib.get(CHROME, 0.25, 0.85), 0.28, 0.55, 0.35));
   g.add(mesh(getGeo("box", { w: 0.62, h: 0.01, d: 0.01 }), matLib.get(0x1a1a1e, 0.4), 0, 1.12, 0.345));
+  g.userData.rp = "fridge";
+  g.userData.interactable = true;
   return g;
 }
 
@@ -133,14 +145,12 @@ export function buildStove(): THREE.Group {
   g.add(mesh(getGeo("box", { w: 0.62, h: 0.82, d: 0.6 }), matLib.get(0x2a2c30, 0.4, 0.5), 0, 0.41, 0));
   g.add(mesh(getGeo("box", { w: 0.64, h: 0.04, d: 0.62 }), matLib.get(0x1a1a1e, 0.35, 0.6), 0, 0.84, 0));
   for (const [sx, sz] of [
-    [-0.16, -0.12],
-    [0.16, -0.12],
-    [-0.16, 0.14],
-    [0.16, 0.14],
+    [-0.16, -0.12], [0.16, -0.12], [-0.16, 0.14], [0.16, 0.14],
   ] as Array<[number, number]>) {
     g.add(mesh(getGeo("cylinder", { r: 0.09, h: 0.02, seg: 10 }), matLib.get(0x111111, 0.5, 0.4), sx, 0.87, sz));
   }
   g.add(mesh(getGeo("box", { w: 0.5, h: 0.22, d: 0.08 }), matLib.get(0x1a1a1e, 0.4), 0, 1.02, -0.22));
+  g.userData.rp = "stove";
   return g;
 }
 
@@ -170,6 +180,8 @@ export function buildPiano(): THREE.Group {
   return g;
 }
 
+// ─── §3 : POINTS DE VENTE DÉPANNEUR / SERVICES ──────────────────────────────
+
 export function buildAtmDesjardins(): THREE.Group {
   const g = new THREE.Group();
   g.name = "atm";
@@ -178,15 +190,18 @@ export function buildAtmDesjardins(): THREE.Group {
   g.add(mesh(getGeo("box", { w: 0.5, h: 0.34, d: 0.04 }), matLib.getEmissive(0x3dff9a, 0x14532d, 0.75), 0, 1.18, 0.25));
   g.add(mesh(getGeo("box", { w: 0.38, h: 0.04, d: 0.05 }), matLib.get(0x111111, 0.4), 0, 0.82, 0.25));
   g.add(mesh(getGeo("box", { w: 0.26, h: 0.16, d: 0.04 }), matLib.get(0x0f172a, 0.55), 0, 0.56, 0.25));
+  g.userData.rp = "atm";
+  g.userData.interactable = true;
   return g;
 }
 
 export function buildVending(): THREE.Group {
   const g = new THREE.Group();
   g.name = "vending";
-  g.userData.vending = true;
+  g.userData.rp = "vending";
+  g.userData.interactable = true;
   g.add(mesh(getGeo("box", { w: 0.78, h: 1.82, d: 0.52 }), matLib.get(0xb42318, 0.45, 0.2), 0, 0.91, 0));
-  g.add(mesh(getGeo("box", { w: 0.58, h: 1.15, d: 0.04 }), matLib.glass("#7dd3fc", 0.28, 0.08, 0.12), 0, 1.05, 0.27));
+  g.add(mesh(getGeo("box", { w: 0.58, h: 1.15, d: 0.04 }), matLib.glass(0x7dd3fc, 0.28), 0, 1.05, 0.27));
   const cans = [0xc8102e, 0x1a5a32, 0xd4a017, 0x1a3a7a];
   for (let r = 0; r < 4; r++) {
     for (let c = 0; c < 3; c++) {
@@ -205,8 +220,12 @@ export function buildGasPump(): THREE.Group {
   g.add(mesh(getGeo("box", { w: 0.52, h: 0.28, d: 0.18 }), matLib.getEmissive(0x1a1a1e, 0x22c55e, 0.35), 0, 1.28, 0.14));
   g.add(mesh(getGeo("cylinder", { r: 0.03, h: 0.7, seg: 8 }), matLib.get(0x1a1a1e, 0.5), 0.28, 0.85, 0.08));
   g.add(mesh(getGeo("box", { w: 0.08, h: 0.22, d: 0.12 }), matLib.get(0x2a2a2e, 0.45), 0.32, 0.52, 0.08));
+  g.userData.rp = "gaspump";
+  g.userData.interactable = true;
   return g;
 }
+
+// ─── §4 : MOBILIER DE RUE (Bus stop, Hydrant, Mailbox, Lampadaire) ─────────
 
 export function buildBusStop(): THREE.Group {
   const g = new THREE.Group();
@@ -215,10 +234,9 @@ export function buildBusStop(): THREE.Group {
   g.add(mesh(getGeo("cylinder", { r: 0.05, h: 2.55, seg: 8 }), matLib.get(STEEL, 0.4, 0.55), -1.0, 1.28, 0));
   g.add(mesh(getGeo("cylinder", { r: 0.05, h: 2.55, seg: 8 }), matLib.get(STEEL, 0.4, 0.55), 1.0, 1.28, 0));
   g.add(mesh(getGeo("box", { w: 2.2, h: 0.06, d: 0.85 }), matLib.get(0x1a4a7a, 0.5, 0.3), 0, 2.52, 0));
-  g.add(mesh(getGeo("box", { w: 2.05, h: 1.15, d: 0.04 }), matLib.glass("#88cce8", 0.4, 0.1, 0.12), 0, 1.55, -0.38));
+  g.add(mesh(getGeo("box", { w: 2.05, h: 1.15, d: 0.04 }), matLib.glass(0x88cce8, 0.4), 0, 1.55, -0.38));
   g.add(mesh(getGeo("box", { w: 1.7, h: 0.08, d: 0.42 }), matLib.get(0x1a1a22, 0.55), 0, 0.52, 0.05));
-  const plate = mesh(getGeo("box", { w: 0.55, h: 0.7, d: 0.04 }), matLib.get(0x1c5f32, 0.55), 1.12, 1.85, 0.12);
-  g.add(plate);
+  g.add(mesh(getGeo("box", { w: 0.55, h: 0.7, d: 0.04 }), matLib.get(0x1c5f32, 0.55), 1.12, 1.85, 0.12));
   return g;
 }
 
@@ -228,16 +246,21 @@ export function buildHydrant(): THREE.Group {
   const red = matLib.get(0xc03028, 0.45, 0.25);
   g.add(mesh(getGeo("cylinder", { r: 0.11, r2: 0.14, h: 0.72, seg: 10 }), red, 0, 0.36, 0));
   g.add(mesh(getGeo("cylinder", { r: 0.16, h: 0.08, seg: 10 }), red, 0, 0.74, 0));
-  g.add(mesh(getGeo("cylinder", { r: 0.05, h: 0.22, seg: 8 }), matLib.get(GOLD, 0.25, 0.7), 0.16, 0.48, 0));
-  g.children[2]!.rotation.z = Math.PI / 2;
+  const nozzle = mesh(getGeo("cylinder", { r: 0.05, h: 0.22, seg: 8 }), matLib.get(GOLD, 0.25, 0.7), 0.16, 0.48, 0);
+  nozzle.rotation.z = Math.PI / 2;
+  g.add(nozzle);
   return g;
 }
 
-export function buildMailbox(): THREE.Group {
+/**
+ * Boîte aux lettres de rue (Canada Post rouge).
+ * Note : Version urbaine, différente de la boîte aux lettres résidentielle de `house.ts`.
+ */
+export function buildMailboxPost(): THREE.Group {
   const g = new THREE.Group();
-  g.name = "mailb";
+  g.name = "mailb-post";
   g.add(mesh(getGeo("cylinder", { r: 0.04, h: 1.05, seg: 8 }), matLib.get(STEEL, 0.45, 0.4), 0, 0.52, 0));
-  g.add(mesh(getGeo("box", { w: 0.28, h: 0.22, d: 0.18 }), matLib.get(0x1a3a7a, 0.5, 0.2), 0, 1.12, 0));
+  g.add(mesh(getGeo("box", { w: 0.28, h: 0.22, d: 0.18 }), matLib.get(0xc03028, 0.5, 0.2), 0, 1.12, 0));
   g.add(mesh(getGeo("box", { w: 0.2, h: 0.02, d: 0.04 }), matLib.get(GOLD, 0.25, 0.7), 0, 1.12, 0.1));
   return g;
 }
@@ -256,9 +279,12 @@ export function buildLampPost(): THREE.Group {
   return g;
 }
 
-export function buildToilet(): THREE.Group {
+// ─── §5 : SANITAIRE (Fallback simple si fixtures.ts n'est pas utilisé) ─────
+
+/** Toilette simple (utilisez `fixtures.ts:buildBathroomFixtures()` pour la haute qualité) */
+export function buildToiletSimple(): THREE.Group {
   const g = new THREE.Group();
-  g.name = "toilet";
+  g.name = "toilet-simple";
   const porcelain = matLib.get(0xf4f4f4, 0.28, 0.05);
   g.add(mesh(getGeo("cylinder", { r: 0.22, h: 0.38, seg: 12 }), porcelain, 0, 0.22, 0.04));
   g.add(mesh(getGeo("box", { w: 0.42, h: 0.42, d: 0.18 }), porcelain, 0, 0.62, -0.18));
@@ -266,9 +292,9 @@ export function buildToilet(): THREE.Group {
   return g;
 }
 
-export function buildBath(): THREE.Group {
+export function buildBathSimple(): THREE.Group {
   const g = new THREE.Group();
-  g.name = "batht";
+  g.name = "batht-simple";
   g.add(mesh(getGeo("box", { w: 1.72, h: 0.48, d: 0.78 }), matLib.get(0xeceff1, 0.3, 0.08), 0, 0.26, 0));
   g.add(mesh(getGeo("box", { w: 1.48, h: 0.08, d: 0.54 }), matLib.get(0x9ec9e8, 0.2, 0.05), 0, 0.42, 0));
   g.add(mesh(getGeo("cylinder", { r: 0.02, h: 0.18, seg: 8 }), matLib.get(CHROME, 0.2, 0.85), 0.62, 0.58, -0.22));
@@ -279,11 +305,22 @@ export function buildShower(): THREE.Group {
   const g = new THREE.Group();
   g.name = "showr";
   g.add(mesh(getGeo("box", { w: 1.02, h: 0.06, d: 1.02 }), tex.mat("marbre", 1, 1, 0.4, 0.05), 0, 0.03, 0));
-  g.add(mesh(getGeo("box", { w: 0.04, h: 2.1, d: 1.0 }), matLib.glass("#cce8f4", 0.35, 0.08, 0.1), -0.48, 1.08, 0));
-  g.add(mesh(getGeo("box", { w: 1.0, h: 2.1, d: 0.04 }), matLib.glass("#cce8f4", 0.35, 0.08, 0.1), 0, 1.08, -0.48));
+  g.add(mesh(getGeo("box", { w: 0.04, h: 2.1, d: 1.0 }), matLib.glass(0xcce8f4, 0.35), -0.48, 1.08, 0));
+  g.add(mesh(getGeo("box", { w: 1.0, h: 2.1, d: 0.04 }), matLib.glass(0xcce8f4, 0.35), 0, 1.08, -0.48));
   g.add(mesh(getGeo("cylinder", { r: 0.08, h: 0.04, seg: 10 }), matLib.get(CHROME, 0.2, 0.8), 0, 2.05, 0));
   return g;
 }
+
+export function buildBathSinkSimple(): THREE.Group {
+  const g = new THREE.Group();
+  g.name = "bsink-simple";
+  g.add(mesh(getGeo("cylinder", { r: 0.08, h: 0.72, seg: 8 }), matLib.get(CHROME, 0.25, 0.7), 0, 0.36, 0));
+  g.add(mesh(getGeo("cylinder", { r: 0.22, r2: 0.16, h: 0.12, seg: 12 }), matLib.get(0xf5f5f5, 0.28), 0, 0.78, 0));
+  g.add(mesh(getGeo("cylinder", { r: 0.015, h: 0.14, seg: 8 }), matLib.get(CHROME, 0.2, 0.85), 0, 0.9, -0.08));
+  return g;
+}
+
+// ─── §6 : TV, JEU, ÉLECTRONIQUE ─────────────────────────────────────────────
 
 export function buildTv(): THREE.Group {
   const g = new THREE.Group();
@@ -293,6 +330,37 @@ export function buildTv(): THREE.Group {
   g.add(mesh(getGeo("box", { w: 0.42, h: 0.08, d: 0.18 }), matLib.get(0x1a1a1e, 0.5), 0, 0.04, 0));
   return g;
 }
+
+export function buildLaptop(): THREE.Group {
+  const g = new THREE.Group();
+  g.name = "laptop";
+  g.add(mesh(getGeo("box", { w: 0.34, h: 0.02, d: 0.22 }), matLib.get(0x2a2a2e, 0.35, 0.5), 0, 0.01, 0));
+  const lid = mesh(getGeo("box", { w: 0.34, h: 0.22, d: 0.012 }), matLib.get(0x1a1a1e, 0.35, 0.5), 0, 0.12, -0.1);
+  lid.rotation.x = -0.15;
+  g.add(lid);
+  g.add(mesh(getGeo("box", { w: 0.3, h: 0.18, d: 0.005 }), matLib.getEmissive(0x3a6a88, 0x2244aa, 0.4), 0, 0.13, -0.094));
+  return g;
+}
+
+export function buildGamingPc(): THREE.Group {
+  const g = new THREE.Group();
+  g.name = "gamingpc";
+  g.add(mesh(getGeo("box", { w: 0.22, h: 0.48, d: 0.42 }), matLib.get(0x1a1a22, 0.4, 0.4), 0, 0.24, 0));
+  g.add(mesh(getGeo("box", { w: 0.02, h: 0.4, d: 0.36 }), matLib.glass(0x334466, 0.4), 0.12, 0.24, 0));
+  g.add(mesh(getGeo("box", { w: 0.04, h: 0.12, d: 0.04 }), matLib.getEmissive(0x7c3aed, 0x7c3aed, 0.8), 0, 0.08, 0.22));
+  return g;
+}
+
+export function buildSpeaker(): THREE.Group {
+  const g = new THREE.Group();
+  g.name = "speaker";
+  g.add(mesh(getGeo("box", { w: 0.2, h: 0.48, d: 0.22 }), matLib.get(0x1a1a1e, 0.55), 0, 0.24, 0));
+  g.add(mesh(getGeo("cylinder", { r: 0.07, h: 0.02, seg: 12 }), matLib.get(0x3a3a40, 0.5), 0, 0.32, 0.11));
+  g.add(mesh(getGeo("cylinder", { r: 0.045, h: 0.02, seg: 10 }), matLib.get(0x3a3a40, 0.5), 0, 0.14, 0.11));
+  return g;
+}
+
+// ─── §7 : FEU DE CAMP & FEUX DE CIRCULATION (Animés) ────────────────────────
 
 export function buildCampfire(): THREE.Group {
   const g = new THREE.Group();
@@ -330,6 +398,8 @@ export function buildTrafficLight(): THREE.Group {
   g.add(red, yel, grn);
   return g;
 }
+
+// ─── §8 : DÉCORATION & ACCESSOIRES ──────────────────────────────────────────
 
 export function buildPlant(): THREE.Group {
   const g = new THREE.Group();
@@ -384,6 +454,8 @@ export function buildMedkitBox(): THREE.Group {
   return g;
 }
 
+// ─── §9 : SOFAS, ÉLECTROMÉNAGERS COMPLÉMENTAIRES ────────────────────────────
+
 export function buildSofaL(): THREE.Group {
   const g = new THREE.Group();
   g.name = "sofaL";
@@ -401,7 +473,7 @@ export function buildWasher(): THREE.Group {
   g.name = "washmach";
   g.add(mesh(getGeo("box", { w: 0.64, h: 0.88, d: 0.62 }), matLib.get(0xd0d4d8, 0.35, 0.45), 0, 0.44, 0));
   g.add(mesh(getGeo("cylinder", { r: 0.18, h: 0.04, seg: 16 }), matLib.get(0x1a1a1e, 0.3, 0.4), 0, 0.48, 0.3));
-  g.add(mesh(getGeo("cylinder", { r: 0.12, h: 0.02, seg: 12 }), matLib.glass("#88cce8", 0.4, 0.1, 0.1), 0, 0.48, 0.32));
+  g.add(mesh(getGeo("cylinder", { r: 0.12, h: 0.02, seg: 12 }), matLib.glass(0x88cce8, 0.4), 0, 0.48, 0.32));
   g.add(mesh(getGeo("box", { w: 0.2, h: 0.06, d: 0.04 }), matLib.get(0x2a2c30, 0.4), 0.18, 0.78, 0.3));
   return g;
 }
@@ -410,7 +482,7 @@ export function buildMicrowave(): THREE.Group {
   const g = new THREE.Group();
   g.name = "micro";
   g.add(mesh(getGeo("box", { w: 0.5, h: 0.3, d: 0.38 }), matLib.get(0x2a2c30, 0.4, 0.45), 0, 0.16, 0));
-  g.add(mesh(getGeo("box", { w: 0.32, h: 0.18, d: 0.02 }), matLib.glass("#334455", 0.45, 0.15, 0.2), -0.04, 0.16, 0.2));
+  g.add(mesh(getGeo("box", { w: 0.32, h: 0.18, d: 0.02 }), matLib.glass(0x334455, 0.45), -0.04, 0.16, 0.2));
   g.add(mesh(getGeo("box", { w: 0.08, h: 0.18, d: 0.02 }), matLib.get(0x1a1a1e, 0.4), 0.18, 0.16, 0.2));
   return g;
 }
@@ -432,6 +504,8 @@ export function buildIsland(): THREE.Group {
   return g;
 }
 
+// ─── §10 : POUBELLES & CONTENEURS ───────────────────────────────────────────
+
 export function buildDumpster(): THREE.Group {
   const g = new THREE.Group();
   g.name = "dump";
@@ -452,19 +526,7 @@ export function buildTrashCan(): THREE.Group {
   return g;
 }
 
-export function buildFence(): THREE.Group {
-  const g = new THREE.Group();
-  g.name = "fence";
-  const wood = tex.mat("noyer", 0.4, 1.2, 0.75, 0.05);
-  g.add(mesh(getGeo("box", { w: 0.08, h: 1.15, d: 0.08 }), wood, -0.92, 0.58, 0));
-  g.add(mesh(getGeo("box", { w: 0.08, h: 1.15, d: 0.08 }), wood, 0.92, 0.58, 0));
-  g.add(mesh(getGeo("box", { w: 1.95, h: 0.08, d: 0.06 }), wood, 0, 0.42, 0));
-  g.add(mesh(getGeo("box", { w: 1.95, h: 0.08, d: 0.06 }), wood, 0, 0.88, 0));
-  for (let i = 0; i < 7; i++) {
-    g.add(mesh(getGeo("box", { w: 0.07, h: 1.05, d: 0.04 }), wood, -0.84 + i * 0.28, 0.55, 0));
-  }
-  return g;
-}
+// ─── §11 : SIGNALISATION ROUTIÈRE (MTQ / SAAQ) ──────────────────────────────
 
 export function buildStopSign(): THREE.Group {
   const g = new THREE.Group();
@@ -484,17 +546,7 @@ export function buildStreetSign(): THREE.Group {
   return g;
 }
 
-export function buildParkBench(): THREE.Group {
-  const g = new THREE.Group();
-  g.name = "bench";
-  g.userData.sit = true;
-  const wood = tex.mat("noyer", 1.4, 0.4, 0.7, 0.05);
-  g.add(mesh(getGeo("box", { w: 1.55, h: 0.07, d: 0.42 }), wood, 0, 0.46, 0));
-  g.add(mesh(getGeo("box", { w: 1.55, h: 0.42, d: 0.07 }), wood, 0, 0.72, -0.2));
-  g.add(mesh(getGeo("box", { w: 0.07, h: 0.46, d: 0.42 }), matLib.get(STEEL, 0.4, 0.55), -0.7, 0.23, 0));
-  g.add(mesh(getGeo("box", { w: 0.07, h: 0.46, d: 0.42 }), matLib.get(STEEL, 0.4, 0.55), 0.7, 0.23, 0));
-  return g;
-}
+// ─── §12 : LAMPES & ÉCLAIRAGE ──────────────────────────────────────────────
 
 export function buildFloorLamp(): THREE.Group {
   const g = new THREE.Group();
@@ -505,23 +557,6 @@ export function buildFloorLamp(): THREE.Group {
   const light = new THREE.PointLight(0xfff0d8, 0.9, 5, 2);
   light.position.y = 1.4;
   g.add(light);
-  return g;
-}
-
-export function buildRug(): THREE.Group {
-  const g = new THREE.Group();
-  g.name = "rug";
-  const m = mesh(getGeo("box", { w: 2.0, h: 0.03, d: 1.35 }), tex.mat("velours", 1.6, 1.1, 0.92), 0, 0.015, 0, false);
-  g.add(m);
-  return g;
-}
-
-export function buildClock(): THREE.Group {
-  const g = new THREE.Group();
-  g.name = "clock";
-  g.add(mesh(getGeo("cylinder", { r: 0.2, h: 0.05, seg: 16 }), matLib.get(0xe8e0d0, 0.4), 0, 0, 0));
-  g.children[0]!.rotation.x = Math.PI / 2;
-  g.add(mesh(getGeo("box", { w: 0.02, h: 0.12, d: 0.01 }), matLib.get(0x1a1a1e, 0.4), 0, 0.04, 0.03));
   return g;
 }
 
@@ -541,11 +576,13 @@ export function buildWallLamp(): THREE.Group {
   return g;
 }
 
+// ─── §13 : HÔTELS & RÉCEPTION ──────────────────────────────────────────────
+
 export function buildMinibar(): THREE.Group {
   const g = new THREE.Group();
   g.name = "minibar";
   g.add(mesh(getGeo("box", { w: 0.78, h: 0.88, d: 0.48 }), matLib.get(0x1a1a22, 0.4, 0.3), 0, 0.44, 0));
-  g.add(mesh(getGeo("box", { w: 0.62, h: 0.42, d: 0.04 }), matLib.glass("#88cce8", 0.35, 0.1, 0.12), 0, 0.55, 0.25));
+  g.add(mesh(getGeo("box", { w: 0.62, h: 0.42, d: 0.04 }), matLib.glass(0x88cce8, 0.35), 0, 0.55, 0.25));
   const bottles = [0xc8102e, 0xd4a017, 0x1a5a32];
   for (let i = 0; i < 3; i++) {
     g.add(mesh(getGeo("cylinder", { r: 0.035, h: 0.22, seg: 8 }), matLib.get(bottles[i]!, 0.3, 0.2), -0.16 + i * 0.16, 0.55, 0.08));
@@ -603,34 +640,7 @@ export function buildShopShelf(): THREE.Group {
   return g;
 }
 
-export function buildLaptop(): THREE.Group {
-  const g = new THREE.Group();
-  g.name = "laptop";
-  g.add(mesh(getGeo("box", { w: 0.34, h: 0.02, d: 0.22 }), matLib.get(0x2a2a2e, 0.35, 0.5), 0, 0.01, 0));
-  const lid = mesh(getGeo("box", { w: 0.34, h: 0.22, d: 0.012 }), matLib.get(0x1a1a1e, 0.35, 0.5), 0, 0.12, -0.1);
-  lid.rotation.x = -0.15;
-  g.add(lid);
-  g.add(mesh(getGeo("box", { w: 0.3, h: 0.18, d: 0.005 }), matLib.getEmissive(0x3a6a88, 0x2244aa, 0.4), 0, 0.13, -0.094));
-  return g;
-}
-
-export function buildGamingPc(): THREE.Group {
-  const g = new THREE.Group();
-  g.name = "gamingpc";
-  g.add(mesh(getGeo("box", { w: 0.22, h: 0.48, d: 0.42 }), matLib.get(0x1a1a22, 0.4, 0.4), 0, 0.24, 0));
-  g.add(mesh(getGeo("box", { w: 0.02, h: 0.4, d: 0.36 }), matLib.glass("#334466", 0.4, 0.1, 0.15), 0.12, 0.24, 0));
-  g.add(mesh(getGeo("box", { w: 0.04, h: 0.12, d: 0.04 }), matLib.getEmissive(0x7c3aed, 0x7c3aed, 0.8), 0, 0.08, 0.22));
-  return g;
-}
-
-export function buildSpeaker(): THREE.Group {
-  const g = new THREE.Group();
-  g.name = "speaker";
-  g.add(mesh(getGeo("box", { w: 0.2, h: 0.48, d: 0.22 }), matLib.get(0x1a1a1e, 0.55), 0, 0.24, 0));
-  g.add(mesh(getGeo("cylinder", { r: 0.07, h: 0.02, seg: 12 }), matLib.get(0x3a3a40, 0.5), 0, 0.32, 0.11));
-  g.add(mesh(getGeo("cylinder", { r: 0.045, h: 0.02, seg: 10 }), matLib.get(0x3a3a40, 0.5), 0, 0.14, 0.11));
-  return g;
-}
+// ─── §14 : PRISON / SÛRETÉ DU QUÉBEC ────────────────────────────────────────
 
 export function buildFlagCanada(): THREE.Group {
   const g = new THREE.Group();
@@ -680,14 +690,7 @@ export function buildWatchtower(): THREE.Group {
   return g;
 }
 
-export function buildBathSink(): THREE.Group {
-  const g = new THREE.Group();
-  g.name = "bsink";
-  g.add(mesh(getGeo("cylinder", { r: 0.08, h: 0.72, seg: 8 }), matLib.get(CHROME, 0.25, 0.7), 0, 0.36, 0));
-  g.add(mesh(getGeo("cylinder", { r: 0.22, r2: 0.16, h: 0.12, seg: 12 }), matLib.get(0xf5f5f5, 0.28), 0, 0.78, 0));
-  g.add(mesh(getGeo("cylinder", { r: 0.015, h: 0.14, seg: 8 }), matLib.get(CHROME, 0.2, 0.85), 0, 0.9, -0.08));
-  return g;
-}
+// ─── §15 : INFRASTRUCTURE URBAINE ──────────────────────────────────────────
 
 export function buildHydroPole(): THREE.Group {
   const g = new THREE.Group();
@@ -728,6 +731,8 @@ export function buildPitchedRoof(): THREE.Group {
   return g;
 }
 
+// ─── §16 : PORTES, FENÊTRES & PILIERS ──────────────────────────────────────
+
 export function buildWoodDoor(): THREE.Group {
   const g = new THREE.Group();
   g.name = "dwood";
@@ -751,7 +756,7 @@ export function buildWindow(): THREE.Group {
   const g = new THREE.Group();
   g.name = "wins";
   g.add(mesh(getGeo("box", { w: 1.22, h: 1.22, d: 0.06 }), tex.mat("noyer", 0.8, 0.8, 0.5, 0.08), 0, 0.61, 0));
-  g.add(mesh(getGeo("box", { w: 1.02, h: 1.02, d: 0.03 }), matLib.glass("#87ceeb", 0.32, 0.08, 0.12), 0, 0.61, 0.02));
+  g.add(mesh(getGeo("box", { w: 1.02, h: 1.02, d: 0.03 }), matLib.glass(0x87ceeb, 0.32), 0, 0.61, 0.02));
   g.add(mesh(getGeo("box", { w: 0.04, h: 1.02, d: 0.04 }), tex.mat("noyer", 0.3, 0.8, 0.5), 0, 0.61, 0.03));
   return g;
 }
@@ -769,14 +774,17 @@ export function buildBarbed(): THREE.Group {
   const g = new THREE.Group();
   g.name = "barbed";
   const steel = matLib.get(0x7a8088, 0.4, 0.55);
-  g.add(mesh(getGeo("cylinder", { r: 0.015, h: 3.0, seg: 6 }), steel, 0, 0.12, 0));
-  g.children[0]!.rotation.z = Math.PI / 2;
+  const wire = mesh(getGeo("cylinder", { r: 0.015, h: 3.0, seg: 6 }), steel, 0, 0.12, 0);
+  wire.rotation.z = Math.PI / 2;
+  g.add(wire);
   for (let i = 0; i < 8; i++) {
     const barb = mesh(getGeo("octa", { r: 0.04 }), steel, -1.3 + i * 0.38, 0.12, 0);
     g.add(barb);
   }
   return g;
 }
+
+// ─── §17 : ÉLÉMENTS ADMINISTRATIFS / SPÉCIAUX ──────────────────────────────
 
 export function buildTeleporter(): THREE.Group {
   const g = new THREE.Group();
@@ -803,8 +811,9 @@ export function buildSpawnPad(): THREE.Group {
   const g = new THREE.Group();
   g.name = "spawnpoint";
   g.add(mesh(getGeo("cylinder", { r: 0.55, h: 0.06, seg: 16 }), matLib.getEmissive(0x1a8a3a, 0x22c55e, 0.55), 0, 0.03, 0));
-  g.add(mesh(getGeo("ring", { r: 0.5, r2: 0.38, seg: 16 }), matLib.getEmissive(0x86efac, 0x22c55e, 0.8), 0, 0.07, 0));
-  g.children[1]!.rotation.x = -Math.PI / 2;
+  const ring = mesh(getGeo("ring", { r: 0.5, r2: 0.38, seg: 16 }), matLib.getEmissive(0x86efac, 0x22c55e, 0.8), 0, 0.07, 0);
+  ring.rotation.x = -Math.PI / 2;
+  g.add(ring);
   return g;
 }
 
@@ -819,40 +828,78 @@ export function buildChandelierProp(): THREE.Group {
   return lobbyChandelier(0, 0.35, 0);
 }
 
+export function buildParkBenchStreet(): THREE.Group {
+  const g = new THREE.Group();
+  g.name = "bench-street";
+  g.userData.sit = true;
+  const wood = tex.mat("noyer", 1.4, 0.4, 0.7, 0.05);
+  g.add(mesh(getGeo("box", { w: 1.55, h: 0.07, d: 0.42 }), wood, 0, 0.46, 0));
+  g.add(mesh(getGeo("box", { w: 1.55, h: 0.42, d: 0.07 }), wood, 0, 0.72, -0.2));
+  g.add(mesh(getGeo("box", { w: 0.07, h: 0.46, d: 0.42 }), matLib.get(STEEL, 0.4, 0.55), -0.7, 0.23, 0));
+  g.add(mesh(getGeo("box", { w: 0.07, h: 0.46, d: 0.42 }), matLib.get(STEEL, 0.4, 0.55), 0.7, 0.23, 0));
+  return g;
+}
+
+export function buildFenceStreet(): THREE.Group {
+  const g = new THREE.Group();
+  g.name = "fence-street";
+  const wood = tex.mat("noyer", 0.4, 1.2, 0.75, 0.05);
+  g.add(mesh(getGeo("box", { w: 0.08, h: 1.15, d: 0.08 }), wood, -0.92, 0.58, 0));
+  g.add(mesh(getGeo("box", { w: 0.08, h: 1.15, d: 0.08 }), wood, 0.92, 0.58, 0));
+  g.add(mesh(getGeo("box", { w: 1.95, h: 0.08, d: 0.06 }), wood, 0, 0.42, 0));
+  g.add(mesh(getGeo("box", { w: 1.95, h: 0.08, d: 0.06 }), wood, 0, 0.88, 0));
+  for (let i = 0; i < 7; i++) {
+    g.add(mesh(getGeo("box", { w: 0.07, h: 1.05, d: 0.04 }), wood, -0.84 + i * 0.28, 0.55, 0));
+  }
+  return g;
+}
+
+export function buildRug(): THREE.Group {
+  const g = new THREE.Group();
+  g.name = "rug";
+  g.add(mesh(getGeo("box", { w: 2.0, h: 0.03, d: 1.35 }), tex.mat("velours", 1.6, 1.1, 0.92), 0, 0.015, 0, false));
+  return g;
+}
+
+export function buildClock(): THREE.Group {
+  const g = new THREE.Group();
+  g.name = "clock";
+  const face = mesh(getGeo("cylinder", { r: 0.2, h: 0.05, seg: 16 }), matLib.get(0xe8e0d0, 0.4), 0, 0, 0);
+  face.rotation.x = Math.PI / 2;
+  g.add(face);
+  g.add(mesh(getGeo("box", { w: 0.02, h: 0.12, d: 0.01 }), matLib.get(0x1a1a1e, 0.4), 0, 0.04, 0.03));
+  return g;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// §18 — CONSTRUCTEUR PROPS DE RUE
+// ═══════════════════════════════════════════════════════════════════════════
+
 export function buildStreetProp(kind: string): THREE.Group {
   switch (kind) {
-    case "vending":
-      return buildVending();
-    case "bus":
-      return buildBusStop();
-    case "hydrant":
-      return buildHydrant();
-    case "mail":
-      return buildMailbox();
-    case "campfire":
-      return buildCampfire();
-    case "tlight":
-      return buildTrafficLight();
-    case "bench":
-      return buildParkBench();
-    case "dump":
-      return buildDumpster();
-    case "pump":
-      return buildGasPump();
-    case "trash":
-      return buildTrashCan();
-    case "stop":
-      return buildStopSign();
-    case "flag":
-      return buildFlagCanada();
-    default:
-      return buildHydrant();
+    case "vending": return buildVending();
+    case "bus": return buildBusStop();
+    case "hydrant": return buildHydrant();
+    case "mail": return buildMailboxPost();
+    case "campfire": return buildCampfire();
+    case "tlight": return buildTrafficLight();
+    case "bench": return buildParkBenchStreet();
+    case "dump": return buildDumpster();
+    case "pump": return buildGasPump();
+    case "trash": return buildTrashCan();
+    case "stop": return buildStopSign();
+    case "flag": return buildFlagCanada();
+    default: return buildHydrant();
   }
 }
 
-/** Feux + flamme — appelé chaque frame depuis le monde. */
+// ═══════════════════════════════════════════════════════════════════════════
+// §19 — MISE À JOUR ANIMÉE (Feux clignotants, flammes de camp, portails)
+// ═══════════════════════════════════════════════════════════════════════════
+
 export function tickProps3d(root: THREE.Object3D, elapsed: number): void {
   root.traverse((o) => {
+    // Feux de circulation cyclants (R > G > Y)
     if (o.userData.tlight && o instanceof THREE.Group) {
       const phase = Math.floor(elapsed / 3.2) % 3;
       o.traverse((c) => {
@@ -866,171 +913,201 @@ export function tickProps3d(root: THREE.Object3D, elapsed: number): void {
         mat.emissiveIntensity = on ? 1.5 : 0.05;
       });
     }
+
+    // Flamme de camp qui vacille
     if (o.userData.flame && o instanceof THREE.Mesh) {
       const s = 0.92 + Math.sin(elapsed * 9) * 0.08 + Math.sin(elapsed * 17) * 0.04;
       o.scale.set(s, 0.85 + Math.sin(elapsed * 11) * 0.18, s);
     }
+
+    // Lumière du feu de camp qui vacille
     if (o.userData.flameLight && o instanceof THREE.PointLight) {
       o.intensity = 1.5 + Math.sin(elapsed * 8) * 0.35;
     }
+
+    // Anneau de téléporteur qui tourne
     if (o.userData.portalRing && o instanceof THREE.Mesh) {
       o.rotation.y = elapsed * 0.8;
       o.rotation.x = Math.sin(elapsed * 0.6) * 0.15;
     }
+
+    // Disque intérieur du téléporteur qui pulse
     if (o.userData.portalDisc && o instanceof THREE.Mesh) {
       const mat = o.material as THREE.MeshStandardMaterial;
-      if (mat.emissiveIntensity !== undefined) mat.emissiveIntensity = 0.55 + Math.sin(elapsed * 4) * 0.25;
+      if (mat.emissiveIntensity !== undefined) {
+        mat.emissiveIntensity = 0.55 + Math.sin(elapsed * 4) * 0.25;
+      }
     }
   });
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// §20 — CATALOGUE COMPLET DE CONSTRUCTEURS
+// ═══════════════════════════════════════════════════════════════════════════
+
+const CATALOG_MAP: Record<string, () => THREE.Group | null> = {
+  // Mobilier résidentiel
+  armch: buildArmchair,
+  bed: () => buildBed("bed"),
+  beds: () => buildBed("beds"),
+  hotelbed: () => buildBed("hotelbed"),
+  dintbl: buildDiningTable,
+  ctbl: buildCoffeeTable,
+  desk: buildDesk,
+  ward: buildWardrobe,
+  book: buildBookshelf,
+
+  // Électroménagers
+  fridge: buildFridge,
+  stove: buildStove,
+  sink: buildKitchenSink,
+  piano: buildPiano,
+
+  // Services / Points de vente
+  atm: buildAtmDesjardins,
+  vending: buildVending,
+  gaspump: buildGasPump,
+  cashregister: buildCashRegister,
+
+  // Mobilier de rue
+  busstop: buildBusStop,
+  hydr: buildHydrant,
+  mailb: buildMailboxPost,
+  lpost: buildLampPost,
+  bench: buildParkBenchStreet,
+  fence: buildFenceStreet,
+
+  // Sanitaire (fallback simple)
+  toilet: buildToiletSimple,
+  batht: buildBathSimple,
+  showr: buildShower,
+  bsink: buildBathSinkSimple,
+
+  // TV & électronique
+  tv65: buildTv,
+  tvwall: buildTv,
+  laptop: buildLaptop,
+  gamingpc: buildGamingPc,
+  speaker: buildSpeaker,
+
+  // Animés
+  campfire: buildCampfire,
+  tlight: buildTrafficLight,
+
+  // Décoration
+  plant: buildPlant,
+  flower: buildPlant,
+  tent: buildTent,
+  toolbox: buildToolbox,
+  medkit: buildMedkitBox,
+  chandelier: buildChandelierProp,
+
+  // Sofas & électroménagers
+  sofaL: buildSofaL,
+  washmach: buildWasher,
+  micro: buildMicrowave,
+  kcnt: buildCounter,
+  kisland: buildIsland,
+
+  // Poubelles
+  dump: buildDumpster,
+  trash: buildTrashCan,
+
+  // Signalisation
+  stop: buildStopSign,
+  ssign: buildStreetSign,
+
+  // Lampes
+  lamp: buildFloorLamp,
+  ceillamp: buildCeilingLamp,
+  walllamp: buildWallLamp,
+
+  // Hôtels
+  minibar: buildMinibar,
+  reception: buildReception,
+  safebox: buildSafe,
+  bellhop: buildBellhop,
+  shopshelf: buildShopShelf,
+
+  // Prison
+  flagcanada: buildFlagCanada,
+  bunkprison: buildBunk,
+  celldoor: buildCellDoor,
+  watchtower: buildWatchtower,
+
+  // Infrastructure urbaine
+  utpole: buildHydroPole,
+  stsp: buildSpiralStairs,
+  rpitch: buildPitchedRoof,
+
+  // Portes & Fenêtres
+  dwood: buildWoodDoor,
+  ddouble: buildDoubleDoor,
+  wins: buildWindow,
+  pil: buildPillar,
+  barbed: buildBarbed,
+
+  // Admin & spéciaux
+  teleporter: buildTeleporter,
+  ledstrip: buildLedStrip,
+  spawnpoint: buildSpawnPad,
+  swalk: buildSidewalk,
+
+  // Divers
+  rug: buildRug,
+  clock: buildClock,
+};
+
+/**
+ * Constructeur par identifiant du catalogue.
+ * Retourne null si l'identifiant est inconnu.
+ */
 export function catalogBuilder(id: string): THREE.Group | null {
-  switch (id) {
-    case "armch":
-      return buildArmchair();
-    case "bed":
-    case "beds":
-    case "hotelbed":
-      return buildBed(id);
-    case "dintbl":
-      return buildDiningTable();
-    case "ctbl":
-      return buildCoffeeTable();
-    case "desk":
-      return buildDesk();
-    case "ward":
-      return buildWardrobe();
-    case "book":
-      return buildBookshelf();
-    case "fridge":
-      return buildFridge();
-    case "stove":
-      return buildStove();
-    case "sink":
-      return buildKitchenSink();
-    case "piano":
-      return buildPiano();
-    case "atm":
-      return buildAtmDesjardins();
-    case "vending":
-      return buildVending();
-    case "gaspump":
-      return buildGasPump();
-    case "busstop":
-      return buildBusStop();
-    case "hydr":
-      return buildHydrant();
-    case "mailb":
-      return buildMailbox();
-    case "lpost":
-      return buildLampPost();
-    case "toilet":
-      return buildToilet();
-    case "batht":
-      return buildBath();
-    case "showr":
-      return buildShower();
-    case "tv65":
-    case "tvwall":
-      return buildTv();
-    case "campfire":
-      return buildCampfire();
-    case "tlight":
-      return buildTrafficLight();
-    case "plant":
-    case "flower":
-      return buildPlant();
-    case "cashregister":
-      return buildCashRegister();
-    case "tent":
-      return buildTent();
-    case "toolbox":
-      return buildToolbox();
-    case "medkit":
-      return buildMedkitBox();
-    case "chandelier":
-      return buildChandelierProp();
-    case "sofaL":
-      return buildSofaL();
-    case "washmach":
-      return buildWasher();
-    case "micro":
-      return buildMicrowave();
-    case "kcnt":
-      return buildCounter();
-    case "kisland":
-      return buildIsland();
-    case "dump":
-      return buildDumpster();
-    case "trash":
-      return buildTrashCan();
-    case "fence":
-      return buildFence();
-    case "stop":
-      return buildStopSign();
-    case "ssign":
-      return buildStreetSign();
-    case "lamp":
-      return buildFloorLamp();
-    case "rug":
-      return buildRug();
-    case "clock":
-      return buildClock();
-    case "ceillamp":
-      return buildCeilingLamp();
-    case "walllamp":
-      return buildWallLamp();
-    case "minibar":
-      return buildMinibar();
-    case "reception":
-      return buildReception();
-    case "safebox":
-      return buildSafe();
-    case "bellhop":
-      return buildBellhop();
-    case "shopshelf":
-      return buildShopShelf();
-    case "laptop":
-      return buildLaptop();
-    case "gamingpc":
-      return buildGamingPc();
-    case "speaker":
-      return buildSpeaker();
-    case "flagcanada":
-      return buildFlagCanada();
-    case "bunkprison":
-      return buildBunk();
-    case "celldoor":
-      return buildCellDoor();
-    case "watchtower":
-      return buildWatchtower();
-    case "bsink":
-      return buildBathSink();
-    case "utpole":
-      return buildHydroPole();
-    case "stsp":
-      return buildSpiralStairs();
-    case "rpitch":
-      return buildPitchedRoof();
-    case "dwood":
-      return buildWoodDoor();
-    case "ddouble":
-      return buildDoubleDoor();
-    case "wins":
-      return buildWindow();
-    case "pil":
-      return buildPillar();
-    case "barbed":
-      return buildBarbed();
-    case "teleporter":
-      return buildTeleporter();
-    case "ledstrip":
-      return buildLedStrip();
-    case "spawnpoint":
-      return buildSpawnPad();
-    case "swalk":
-      return buildSidewalk();
-    default:
-      return null;
-  }
+  const builder = CATALOG_MAP[id];
+  return builder ? builder() : null;
+}
+
+/** Liste tous les identifiants disponibles */
+export function getCatalogIds(): string[] {
+  return Object.keys(CATALOG_MAP);
+}
+export function buildBathSink(): THREE.Group {
+  const g = new THREE.Group();
+  g.name = "prop_bath_sink";
+  const ceramicMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 });
+  const chromeMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.85, roughness: 0.15 });
+
+  const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 0.7, 16), ceramicMat);
+  stand.position.y = 0.35;
+  g.add(stand);
+
+  const basin = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.22, 0.5), ceramicMat);
+  basin.position.y = 0.75;
+  g.add(basin);
+
+  const faucet = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.15, 8), chromeMat);
+  faucet.position.set(0, 0.92, -0.15);
+  g.add(faucet);
+
+  return g;
+}
+
+export function buildToilet(): THREE.Group {
+  const g = new THREE.Group();
+  g.name = "prop_toilet";
+  const ceramicMat = new THREE.MeshStandardMaterial({ color: 0xf8f8f8, roughness: 0.15 });
+
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 0.4, 16), ceramicMat);
+  base.position.y = 0.2;
+  g.add(base);
+
+  const bowl = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.15, 0.5), ceramicMat);
+  bowl.position.set(0, 0.42, 0.05);
+  g.add(bowl);
+
+  const tank = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.45, 0.22), ceramicMat);
+  tank.position.set(0, 0.65, -0.2);
+  g.add(tank);
+
+  return g;
 }

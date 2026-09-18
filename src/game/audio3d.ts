@@ -234,3 +234,5 @@ class SpatialAudio {
 }
 
 export const spatialAudio = new SpatialAudio();
+
+export function playSound(name: string, ...args: any[]): void {}

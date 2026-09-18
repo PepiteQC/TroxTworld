@@ -221,13 +221,10 @@ export class Walker {
     this.group.position.set(this.x, this.y, this.z);
     this.group.rotation.y = this.yaw;
     this.group.rotation.x = Math.min(0.14, this.fill * 0.1) * (this.speed > 0.3 ? 1 : 0.4);
-        // Calcule la vitesse réelle au sol
-    const isMoving = this.speed > 0.1;
-    const animSpeed = isMoving ? Math.max(0.6, Math.min(1.8, this.speed / 2.8)) : 0;
-    tickMixer(this.group, dt, animSpeed);
+    tickMixer(this.group, dt);
     tickCarabine(this.group, dt);
     tickAk74(this.group, dt);
-    tickInjured(this.group, dt);
+    tickInjured(this.group, dt, performance.now() * 0.001);
     tickGuns(this.group);
     this.gestureAge += dt;
     if (this.gestureTtl > 0) {
@@ -287,5 +284,4 @@ export class Walker {
     playInjuredOn(this.group, clip, false);
   }
 }
-
 

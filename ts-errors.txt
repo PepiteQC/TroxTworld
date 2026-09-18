@@ -1,0 +1,205 @@
+npm notice run troxtworld@1.0.0 npx
+npm notice run tsc --noEmit
+server/lib/crypto.ts(37,14): error TS2769: No overload matches this call.
+  Overload 1 of 5, '(payload: string | object | Buffer<ArrayBufferLike>, secretOrPrivateKey: null, options?: (SignOptions & { algorithm: "none"; }) | undefined): string', gave the following error.
+    Argument of type 'string' is not assignable to parameter of type 'null'.
+  Overload 2 of 5, '(payload: string | object | Buffer<ArrayBufferLike>, secretOrPrivateKey: string | ArrayBuffer | SharedArrayBuffer | Int8Array<ArrayBufferLike> | ... 17 more ... | JsonWebKeyInput, options?: SignOptions | undefined): string', gave the following error.
+    Type 'string' is not assignable to type 'number | StringValue | undefined'.
+  Overload 3 of 5, '(payload: string | object | Buffer<ArrayBufferLike>, secretOrPrivateKey: string | ArrayBuffer | SharedArrayBuffer | Int8Array<ArrayBufferLike> | ... 17 more ... | JsonWebKeyInput, callback: SignCallback): void', gave the following error.
+    Object literal may only specify known properties, and 'expiresIn' does not exist in type 'SignCallback'.
+server/middleware/grok-pwa.ts(543,9): error TS2739: Type '{ title?: string | undefined; description?: string | undefined; type?: string | undefined; card?: string | undefined; image?: string | undefined; banner?: string | undefined; color?: string | undefined; }' is missing the following properties from type 'SiteIdentity': name, themeColor
+server/middleware/grok-pwa.ts(548,5): error TS2353: Object literal may only specify known properties, and 'device' does not exist in type 'GrokHeadContext'.
+server/middleware/grok-pwa.ts(678,11): error TS2739: Type '{ title?: string | undefined; description?: string | undefined; type?: string | undefined; card?: string | undefined; image?: string | undefined; banner?: string | undefined; color?: string | undefined; }' is missing the following properties from type 'SiteIdentity': name, themeColor
+server/middleware/grok-pwa.ts(748,9): error TS2353: Object literal may only specify known properties, and 'device' does not exist in type '{ host?: string | null | undefined; url?: string | null | undefined; }'.
+server/rooms/TroxTRoom.ts(71,41): error TS2339: Property 'emit' does not exist on type 'IntellectusCore'.
+server/rooms/TroxTRoom.ts(72,19): error TS2339: Property 'emit' does not exist on type 'IntellectusCore'.
+server/rooms/WorldEnvironmentRoom.ts(269,12): error TS2678: Type '"heavy_rain"' is not comparable to type 'WeatherCondition'.
+src/game/boutique.ts(366,40): error TS2322: Type '"nouveau"' is not assignable to type 'GarmentTrait'.
+src/game/boutique.ts(1400,36): error TS18048: 'boutique.openTime' is possibly 'undefined'.
+src/game/boutique.ts(1400,71): error TS18048: 'boutique.closeTime' is possibly 'undefined'.
+src/game/boutique.ts(1517,26): error TS18048: 'boutique.customers' is possibly 'undefined'.
+src/game/boutique.ts(1550,24): error TS18048: 'boutique.staff' is possibly 'undefined'.
+src/game/boutique.ts(1579,28): error TS18048: 'boutique.reputation' is possibly 'undefined'.
+src/game/boutique.ts(1623,51): error TS18048: 'boutique.reputation' is possibly 'undefined'.
+src/game/builder.ts(158,3): error TS2300: Duplicate identifier 'objective'.
+src/game/builder.ts(158,3): error TS2687: All declarations of 'objective' must have identical modifiers.
+src/game/builder.ts(159,3): error TS2300: Duplicate identifier 'progress'.
+src/game/builder.ts(159,3): error TS2687: All declarations of 'progress' must have identical modifiers.
+src/game/builder.ts(164,3): error TS2300: Duplicate identifier 'objective'.
+src/game/builder.ts(164,3): error TS2687: All declarations of 'objective' must have identical modifiers.
+src/game/builder.ts(164,3): error TS2717: Subsequent property declarations must have the same type.  Property 'objective' must be of type '{ type: string; target: string; count?: number | undefined; } | undefined', but here has type '{ type: "place" | "interact" | "repair" | "destroy"; target: string; count: number; }'.
+src/game/builder.ts(169,3): error TS2300: Duplicate identifier 'progress'.
+src/game/builder.ts(169,3): error TS2687: All declarations of 'progress' must have identical modifiers.
+src/game/builder.ts(169,3): error TS2717: Subsequent property declarations must have the same type.  Property 'progress' must be of type 'number | undefined', but here has type 'number'.
+src/game/builder.ts(206,18): error TS2322: Type '"neutre"' is not assignable to type 'PropTrait'.
+src/game/builder.ts(215,18): error TS2322: Type '"neutre"' is not assignable to type 'PropTrait'.
+src/game/builder.ts(224,18): error TS2322: Type '"neutre"' is not assignable to type 'PropTrait'.
+src/game/builder.ts(233,18): error TS2322: Type '"neutre"' is not assignable to type 'PropTrait'.
+src/game/builder.ts(323,13): error TS2353: Object literal may only specify known properties, and 'objective' does not exist in type '{ id: string; title: string; description: string; reward: { reputation?: number | undefined; resources?: Partial<Record<ResourceType, number>> | undefined; unlocks?: string[] | undefined; }; }'.
+src/game/builder.ts(489,13): error TS2353: Object literal may only specify known properties, and 'objective' does not exist in type '{ id: string; title: string; description: string; reward: { reputation?: number | undefined; resources?: Partial<Record<ResourceType, number>> | undefined; unlocks?: string[] | undefined; }; }'.
+src/game/builder.ts(595,18): error TS2322: Type '"neutre"' is not assignable to type 'PropTrait'.
+src/game/builder.ts(612,18): error TS2322: Type '"neutre"' is not assignable to type 'PropTrait'.
+src/game/builder.ts(624,18): error TS2322: Type '"neutre"' is not assignable to type 'PropTrait'.
+src/game/builder.ts(732,28): error TS2322: Type '"commerce"' is not assignable to type 'PropTrait'.
+src/game/builder.ts(748,28): error TS2322: Type '"commerce"' is not assignable to type 'PropTrait'.
+src/game/builder.ts(776,28): error TS2322: Type '"commerce"' is not assignable to type 'PropTrait'.
+src/game/builder.ts(1509,34): error TS2322: Type '"danger"' is not assignable to type 'PropTrait'.
+src/game/builder.ts(1522,18): error TS2322: Type '"myst├¿re"' is not assignable to type 'PropTrait'.
+src/game/builder.ts(1536,34): error TS2322: Type '"danger"' is not assignable to type 'PropTrait'.
+src/game/builder.ts(1573,57): error TS2322: Type '{ id: string; label: string; cat: string; description: string | undefined; cost: { money: number; }; buildTime: number; traits: string[]; compatibleTerrains: string[]; }[]' is not assignable to type 'PropDef[]'.
+  Type '{ id: string; label: string; cat: string; description: string | undefined; cost: { money: number; }; buildTime: number; traits: string[]; compatibleTerrains: string[]; }' is not assignable to type 'PropDef'.
+    Types of property 'traits' are incompatible.
+      Type 'string[]' is not assignable to type 'PropTrait[]'.
+        Type 'string' is not assignable to type 'PropTrait'.
+src/game/builder.ts(1796,18): error TS2739: Type 'MeshLambertMaterial' is missing the following properties from type 'MeshStandardMaterial': isMeshStandardMaterial, roughnessMap, metalnessMap, envMapIntensity
+src/game/builder.ts(1813,18): error TS2739: Type 'MeshLambertMaterial' is missing the following properties from type 'MeshStandardMaterial': isMeshStandardMaterial, roughnessMap, metalnessMap, envMapIntensity
+src/game/builder.ts(2019,18): error TS2739: Type 'MeshLambertMaterial' is missing the following properties from type 'MeshStandardMaterial': isMeshStandardMaterial, roughnessMap, metalnessMap, envMapIntensity
+src/game/builder.ts(2024,18): error TS2739: Type 'MeshLambertMaterial' is missing the following properties from type 'MeshStandardMaterial': isMeshStandardMaterial, roughnessMap, metalnessMap, envMapIntensity
+src/game/builder.ts(2032,18): error TS2739: Type 'MeshLambertMaterial' is missing the following properties from type 'MeshStandardMaterial': isMeshStandardMaterial, roughnessMap, metalnessMap, envMapIntensity
+src/game/builder.ts(2252,18): error TS2739: Type 'MeshLambertMaterial' is missing the following properties from type 'MeshStandardMaterial': isMeshStandardMaterial, roughnessMap, metalnessMap, envMapIntensity
+src/game/builder.ts(2311,35): error TS2345: Argument of type 'number | undefined' is not assignable to parameter of type 'number'.
+  Type 'undefined' is not assignable to type 'number'.
+src/game/builder.ts(2377,18): error TS2739: Type 'MeshLambertMaterial' is missing the following properties from type 'MeshStandardMaterial': isMeshStandardMaterial, roughnessMap, metalnessMap, envMapIntensity
+src/game/builder.ts(2404,7): error TS2322: Type 'QcMat' is not assignable to type 'MeshStandardMaterial'.
+  Type 'MeshLambertMaterial' is missing the following properties from type 'MeshStandardMaterial': isMeshStandardMaterial, roughnessMap, metalnessMap, envMapIntensity
+src/game/builder.ts(2420,18): error TS2739: Type 'MeshLambertMaterial' is missing the following properties from type 'MeshStandardMaterial': isMeshStandardMaterial, roughnessMap, metalnessMap, envMapIntensity
+src/game/builder.ts(3100,3): error TS2322: Type 'boolean | undefined' is not assignable to type 'boolean'.
+  Type 'undefined' is not assignable to type 'boolean'.
+src/game/buildui.tsx(99,9): error TS2741: Property 'stone' is missing in type '{ wood: number; money: number; }' but required in type 'PlayerResources'.
+src/game/buildui.tsx(109,9): error TS2741: Property 'wood' is missing in type '{ stone: number; money: number; }' but required in type 'PlayerResources'.
+src/game/buildui.tsx(533,46): error TS7006: Parameter 'prop' implicitly has an 'any' type.
+src/game/buildui.tsx(533,52): error TS7006: Parameter 'index' implicitly has an 'any' type.
+src/game/business.ts(268,46): error TS2322: Type '"organise"' is not assignable to type 'FirmTrait'.
+src/game/business.ts(280,35): error TS2322: Type '"organise"' is not assignable to type 'FirmTrait'.
+src/game/business.ts(280,47): error TS2322: Type '"bricoleur"' is not assignable to type 'FirmTrait'.
+src/game/business.ts(292,22): error TS2322: Type '"polyvalent"' is not assignable to type 'FirmTrait'.
+src/game/business.ts(292,36): error TS2322: Type '"organise"' is not assignable to type 'FirmTrait'.
+src/game/business.ts(316,33): error TS2322: Type '"organise"' is not assignable to type 'FirmTrait'.
+src/game/business.ts(316,45): error TS2322: Type '"polyvalent"' is not assignable to type 'FirmTrait'.
+src/game/business.ts(602,96): error TS2693: 'StaffSkill' only refers to a type, but is being used as a value here.
+src/game/business.ts(605,81): error TS2693: 'FirmTrait' only refers to a type, but is being used as a value here.
+src/game/city.ts(716,3): error TS2322: Type '"brique"' is not assignable to type 'ArchitecturalStyle'.
+src/game/city.ts(717,3): error TS2322: Type '"pierre"' is not assignable to type 'ArchitecturalStyle'.
+src/game/city.ts(718,3): error TS2322: Type '"stuc"' is not assignable to type 'ArchitecturalStyle'.
+src/game/city.ts(1003,3): error TS2322: Type '"brique"' is not assignable to type 'ArchitecturalStyle'.
+src/game/city.ts(1024,7): error TS2367: This comparison appears to be unintentional because the types 'ArchitecturalStyle' and '"pierre"' have no overlap.
+src/game/city.ts(1025,12): error TS2367: This comparison appears to be unintentional because the types 'ArchitecturalStyle' and '"clapboard"' have no overlap.
+src/game/city.ts(1026,12): error TS2367: This comparison appears to be unintentional because the types 'ArchitecturalStyle' and '"stuc"' have no overlap.
+src/game/city.ts(1062,23): error TS2367: This comparison appears to be unintentional because the types 'ArchitecturalStyle' and '"brique"' have no overlap.
+src/game/city.ts(1085,11): error TS2367: This comparison appears to be unintentional because the types 'ArchitecturalStyle' and '"clapboard"' have no overlap.
+src/game/city.ts(1158,3): error TS2322: Type '"brique"' is not assignable to type 'ArchitecturalStyle'.
+src/game/city.ts(1354,26): error TS2367: This comparison appears to be unintentional because the types 'ArchitecturalStyle' and '"brique"' have no overlap.
+src/game/city.ts(1364,5): error TS2345: Argument of type '"pierre" | ArchitecturalStyle' is not assignable to parameter of type 'ArchitecturalStyle | undefined'.
+  Type '"pierre"' is not assignable to type 'ArchitecturalStyle | undefined'.
+src/game/city.ts(1435,26): error TS2367: This comparison appears to be unintentional because the types 'ArchitecturalStyle' and '"clapboard"' have no overlap.
+src/game/city.ts(1445,5): error TS2345: Argument of type 'ArchitecturalStyle | "stuc"' is not assignable to parameter of type 'ArchitecturalStyle | undefined'.
+  Type '"stuc"' is not assignable to type 'ArchitecturalStyle | undefined'.
+src/game/city.ts(1915,43): error TS2322: Type '"ascenseur"' is not assignable to type 'PublicServiceType'.
+src/game/city.ts(1970,43): error TS2322: Type '"administration"' is not assignable to type 'PublicServiceType'.
+src/game/city.ts(1987,36): error TS2322: Type '"banque"' is not assignable to type 'PublicServiceType'.
+src/game/city.ts(2002,36): error TS2322: Type '"poste"' is not assignable to type 'PublicServiceType'.
+src/game/city.ts(2139,16): error TS2349: This expression is not callable.
+  Type 'CityBuilding' has no call signatures.
+src/game/city.ts(2139,16): error TS2448: Block-scoped variable 'building' used before its declaration.
+src/game/city.ts(2139,16): error TS2454: Variable 'building' is used before being assigned.
+src/game/city.ts(2228,60): error TS2304: Cannot find name 'floors'.
+src/game/city.ts(2229,9): error TS18004: No value exists in scope for the shorthand property 'floors'. Either declare one or provide an initializer.
+src/game/city.ts(2246,35): error TS2367: This comparison appears to be unintentional because the types 'number' and 'string' have no overlap.
+src/game/city.ts(2246,41): error TS2363: The right-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+src/game/city.ts(2255,55): error TS2367: This comparison appears to be unintentional because the types '"depanneur" | "parc" | "parking" | "commerce" | "quincaillerie" | "maison" | "caisse_populaire" | "hotel" | "boutique" | "casse_croute" | "cimetiere" | "duplex" | "triplex" | ... 4 more ... | "tour"' and '"mairie"' have no overlap.
+src/game/city.ts(2269,55): error TS2367: This comparison appears to be unintentional because the types '"public" | "institutionnel" | "loisirs"' and '"industriel"' have no overlap.
+src/game/city.ts(2277,26): error TS2367: This comparison appears to be unintentional because the types '"depanneur" | "parc" | "parking" | "commerce" | "quincaillerie" | "maison" | "caisse_populaire" | "hotel" | "boutique" | "eglise" | "casse_croute" | "cimetiere" | "duplex" | ... 5 more ... | "tour"' and '"usine"' have no overlap.
+src/game/city.ts(2277,54): error TS2367: This comparison appears to be unintentional because the types '"depanneur" | "parc" | "parking" | "commerce" | "quincaillerie" | "maison" | "caisse_populaire" | "hotel" | "boutique" | "eglise" | "casse_croute" | "cimetiere" | "duplex" | ... 5 more ... | "tour"' and '"scierie"' have no overlap.
+src/game/city.ts(2278,24): error TS2367: This comparison appears to be unintentional because the types '"depanneur" | "parc" | "parking" | "commerce" | "quincaillerie" | "maison" | "caisse_populaire" | "hotel" | "boutique" | "eglise" | "casse_croute" | "cimetiere" | "duplex" | ... 5 more ... | "tour"' and '"entrepot"' have no overlap.
+src/game/city.ts(2396,35): error TS2552: Cannot find name 'buildingType'. Did you mean 'building'?
+src/game/city.ts(2396,63): error TS2552: Cannot find name 'buildingType'. Did you mean 'building'?
+src/game/city.ts(2397,35): error TS2552: Cannot find name 'buildingType'. Did you mean 'building'?
+src/game/city.ts(2397,66): error TS2552: Cannot find name 'buildingType'. Did you mean 'building'?
+src/game/city.ts(2471,41): error TS2448: Block-scoped variable 'district' used before its declaration.
+src/game/city.ts(2471,41): error TS2454: Variable 'district' is used before being assigned.
+src/game/city.ts(2526,7): error TS18048: 'building.events' is possibly 'undefined'.
+src/game/city.ts(3528,7): error TS2322: Type '"repair" | "build" | "upgrade" | "reduce_crime"' is not assignable to type '"repair" | "buy" | "hire" | "build" | "rent" | "upgrade" | "sell" | "visit"'.
+  Type '"reduce_crime"' is not assignable to type '"repair" | "buy" | "hire" | "build" | "rent" | "upgrade" | "sell" | "visit"'.
+src/game/city.ts(3533,5): error TS2322: Type '{ money: number; reputation: number; unlocks: string[]; } | { money: number; reputation: number; } | { money: number; reputation: number; } | { money: number; reputation: number; }' is not assignable to type '{ money?: number | undefined; reputation?: number | undefined; unlocks?: BuildingType[] | undefined; items?: string[] | undefined; citizens?: number | undefined; }'.
+  Type '{ money: number; reputation: number; unlocks: string[]; }' is not assignable to type '{ money?: number | undefined; reputation?: number | undefined; unlocks?: BuildingType[] | undefined; items?: string[] | undefined; citizens?: number | undefined; }'.
+    Types of property 'unlocks' are incompatible.
+      Type 'string[]' is not assignable to type 'BuildingType[]'.
+        Type 'string' is not assignable to type 'BuildingType'.
+src/game/city.ts(3580,25): error TS18048: 'building.events' is possibly 'undefined'.
+src/game/city.ts(3587,49): error TS18048: 'event.effects.durabilityChange' is possibly 'undefined'.
+src/game/city.ts(3589,41): error TS18048: 'event.effects.reputationChange' is possibly 'undefined'.
+src/game/city.ts(3592,30): error TS18048: 'event.effects.valueChange' is possibly 'undefined'.
+src/game/city.ts(3605,27): error TS18048: 'building.events' is possibly 'undefined'.
+src/game/city.ts(3611,7): error TS18048: 'building.events' is possibly 'undefined'.
+src/game/city.ts(3634,39): error TS18048: 'event.effects.reputationChange' is possibly 'undefined'.
+src/game/city.ts(3635,41): error TS18048: 'event.effects.satisfactionChange' is possibly 'undefined'.
+src/game/city.ts(3636,38): error TS18048: 'event.effects.crimeRateChange' is possibly 'undefined'.
+src/game/city.ts(3637,38): error TS18048: 'event.effects.pollutionChange' is possibly 'undefined'.
+src/game/city.ts(3638,35): error TS18048: 'event.effects.wealthChange' is possibly 'undefined'.
+src/game/city.ts(3639,39): error TS18048: 'event.effects.populationChange' is possibly 'undefined'.
+src/game/city.ts(3725,28): error TS18048: 'citizen.dailyRoutine' is possibly 'undefined'.
+src/game/city.ts(3847,21): error TS18048: 'building.events' is possibly 'undefined'.
+src/game/city.ts(4104,21): error TS2322: Type 'BuildingEvent[] | undefined' is not assignable to type 'BuildingEvent[]'.
+  Type 'undefined' is not assignable to type 'BuildingEvent[]'.
+src/game/city.ts(4115,21): error TS2322: Type 'BuildingQuest[] | undefined' is not assignable to type 'BuildingQuest[]'.
+  Type 'undefined' is not assignable to type 'BuildingQuest[]'.
+src/game/city.ts(4131,5): error TS18048: 'building.quests' is possibly 'undefined'.
+src/game/city.ts(4150,19): error TS18048: 'building.quests' is possibly 'undefined'.
+src/game/commerce.ts(2158,16): error TS2349: This expression is not callable.
+  Type 'Record<string, { caliber: AmmoCaliber; ammoName: string; pricePerRound: number; boxSize: number; boxPrice: number; availability: "restreinte" | "courante" | "marche_noir" | "police_only"; }>' has no call signatures.
+src/game/engine.ts(439,76): error TS2554: Expected 1-2 arguments, but got 3.
+src/game/engine.ts(445,84): error TS2339: Property 'message' does not exist on type '{ ok: boolean; legal: boolean; reason?: string | undefined; }'.
+src/game/policeInvestigation.ts(58,16): error TS2339: Property 'match' does not exist on type 'boolean'.
+src/game/policeInvestigation.ts(62,28): error TS2339: Property 'match' does not exist on type 'boolean'.
+src/game/policeInvestigation.ts(62,50): error TS2339: Property 'report' does not exist on type 'boolean'.
+src/game/PortneufEngine.ts(132,29): error TS2339: Property 'Timer' does not exist on type 'typeof import("C:/TroxTWorld/node_modules/@types/three/build/three.module")'.
+src/game/PortneufEngine.ts(362,5): error TS2554: Expected 3 arguments, but got 2.
+src/game/PortneufEngine.ts(412,76): error TS2554: Expected 1-2 arguments, but got 3.
+src/game/PortneufEngine.ts(418,84): error TS2339: Property 'message' does not exist on type '{ ok: boolean; legal: boolean; reason?: string | undefined; }'.
+src/game/PortneufEngine.ts(1625,80): error TS2554: Expected 2 arguments, but got 3.
+src/game/PortneufEngine.ts(1872,30): error TS2345: Argument of type 'FieldPlot' is not assignable to parameter of type 'string'.
+src/game/PortneufEngine.ts(1913,49): error TS2554: Expected 2 arguments, but got 3.
+src/game/PortneufEngine.ts(2154,16): error TS2345: Argument of type 'FieldPlot' is not assignable to parameter of type 'string'.
+src/game/PortneufEngine.ts(3720,5): error TS2717: Subsequent property declarations must have the same type.  Property '__portneuf' must be of type 'PortneufEngine | undefined', but here has type 'PortneufEngine | undefined'.
+src/game/tools.ts(621,31): error TS2339: Property 'scale' does not exist on type '{ pos: [number, number, number]; rot: [number, number, number]; }'.
+src/game/weapons-qc.ts(75,9): error TS2741: Property 'isDefacedSerial' is missing in type '{ serialNumber: string; templateId: WeaponId; ownerPlayerId: string; durabilityCurrent: number; cleanlinessScore: number; isJammed: false; loadedRounds: number; hasRoundInChamber: false; selectedFireMode: "semi"; ballisticFingerprintId: string; attachments: { ...; }; }' but required in type 'WeaponInstance'.
+src/game/weapons-qc.ts(341,36): error TS2304: Cannot find name 'AMMO_CATALOG'.
+src/game/weapons-qc.ts(664,3): error TS2741: Property 'ok' is missing in type '{ legal: boolean; missingLicense?: LicenseId | undefined; message?: string | undefined; }' but required in type '{ ok: boolean; missingLicense?: LicenseId | undefined; message?: string | undefined; }'.
+src/game/weapons.ts(2738,17): error TS2323: Cannot redeclare exported variable 'weaponHarvestRange'.
+src/game/weapons.ts(2738,17): error TS2393: Duplicate function implementation.
+src/game/weapons.ts(2750,10): error TS2678: Type '"arc"' is not comparable to type 'WeaponCategory'.
+src/game/weapons.ts(2754,10): error TS2678: Type '"outil"' is not comparable to type 'WeaponCategory'.
+src/game/weapons.ts(2770,17): error TS2323: Cannot redeclare exported variable 'weaponHarvestRange'.
+src/game/weapons.ts(2770,17): error TS2393: Duplicate function implementation.
+src/game/world.ts(1605,9): error TS2322: Type 'string' is not assignable to type '"lac" | "riviere" | "etang" | "mer"'.
+src/game/world.ts(1889,25): error TS2552: Cannot find name 'marqueNoel'. Did you mean 'marcheNoel'?
+src/game/world.ts(2065,35): error TS2554: Expected 1 arguments, but got 2.
+src/game/world.ts(2199,13): error TS18048: 'objective.current' is possibly 'undefined'.
+src/game/world.ts(2563,7): error TS2322: Type 'string' is not assignable to type 'WeatherType'.
+src/game/world.ts(2567,7): error TS2322: Type 'string' is not assignable to type 'WeatherType'.
+src/game/world.ts(2571,7): error TS2322: Type 'string' is not assignable to type 'WeatherType'.
+src/game/world.ts(2575,7): error TS2322: Type 'string' is not assignable to type 'WeatherType'.
+src/game/worldconfig.ts(1463,21): error TS2339: Property 'altitude' does not exist on type 'VillageDef'.
+src/game/worldconfig.ts(1501,39): error TS2367: This comparison appears to be unintentional because the types 'Industry' and '"industrie"' have no overlap.
+src/game/worldconfig.ts(1560,27): error TS2339: Property 'foundingYear' does not exist on type 'VillageDef'.
+src/game/worldconfig.ts(1885,9): error TS2322: Type '("trafic" | "conduite_dangereuse")[] | ("accident" | "vol")[]' is not assignable to type 'CrimeType[] | undefined'.
+  Type '("accident" | "vol")[]' is not assignable to type 'CrimeType[]'.
+    Type '"accident" | "vol"' is not assignable to type 'CrimeType'.
+      Type '"accident"' is not assignable to type 'CrimeType'.
+src/game/worldconfig.ts(1998,59): error TS2554: Expected 3 arguments, but got 4.
+src/game/worldconfig.ts(2918,37): error TS18048: 'e.startHour' is possibly 'undefined'.
+src/game/worldconfig.ts(2918,59): error TS18048: 'e.endHour' is possibly 'undefined'.
+src/game/zones.ts(115,7): error TS2740: Type '{ village: { speedLimit: number; carryWeapons: false; harvest: false; huntingAllowed: false; wantedMul: number; isSafeZone: false; openAlcoholAllowed: false; noiseRestriction: "medium"; parkingAllowed: true; ... 5 more ...; jurisdiction: "municipal"; }; ... 7 more ...; campagne: { ...; }; }' is missing the following properties from type 'Record<RpZoneKind, ZoneRules>': parc_national, zone_agricole, zone_commerciale, zone_residentielle, and 3 more.
+src/systems/BuildingSystem.ts(261,5): error TS2322: Type 'Mesh<BufferGeometry<NormalBufferAttributes>, Material | Material[], Object3DEventMap> | undefined' is not assignable to type 'Mesh<BufferGeometry<NormalBufferAttributes>, Material | Material[], Object3DEventMap>'.
+  Type 'undefined' is not assignable to type 'Mesh<BufferGeometry<NormalBufferAttributes>, Material | Material[], Object3DEventMap>'.
+src/systems/index.ts(14,15): error TS1149: File name 'C:/TroxTWorld/src/systems/world.ts' differs from already included file name 'C:/TroxTWorld/src/systems/World.ts' only in casing.
+  The file is in the program because:
+    Matched by include pattern 'src' in 'C:/TroxTWorld/tsconfig.json'
+    Imported via "./World" from file 'C:/TroxTWorld/src/systems/index.ts'
+    Imported via "./world" from file 'C:/TroxTWorld/src/systems/index.ts'
+src/systems/World.ts(5,17): error TS2749: 'Game' refers to a value, but is being used as a type here. Did you mean 'typeof Game'?
+src/systems/World.ts(10,21): error TS2749: 'Game' refers to a value, but is being used as a type here. Did you mean 'typeof Game'?
+src/systems/world/worldGenerator.ts(78,9): error TS7034: Variable 'pois' implicitly has type 'any[]' in some locations where its type cannot be determined.
+src/systems/world/worldGenerator.ts(79,9): error TS7034: Variable 'activities' implicitly has type 'any[]' in some locations where its type cannot be determined.
+src/systems/world/worldGenerator.ts(106,5): error TS7005: Variable 'pois' implicitly has an 'any[]' type.
+src/systems/world/worldGenerator.ts(107,5): error TS7005: Variable 'activities' implicitly has an 'any[]' type.

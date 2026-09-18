@@ -2,31 +2,6 @@
  * ═══════════════════════════════════════════════════════════════════
  * SYSTÈME DE GESTION DU COMTÉ (SGC) — CONTRÔLE ADMIN & SIMULATION
  * ═══════════════════════════════════════════════════════════════════
- *
- * OUTILS DE GESTION ET COMMANDES :
- *  - Téléportation instantanée vers les 12 municipalités et POIs du comté.
- *  - Manipulation des comptes Desjardins, caisses physiques et REQ.
- *  - Contrôle météo en temps réel (Blizzard, Poudrerie, Crise du Verglas).
- *  - Déclenchement d'événements majeurs (Pannes d'Hydro, Grèves CCQ, Raids SQ).
- *  - Ajustement des profils SAAQ, arrestations au TAL, écrouage à Donnacona.
- *  - Création (Spawn) d'objets du constructeur et de cargaisons de contrebande.
- *
- * v2.1 — AJOUTS (rien de retiré, uniquement branché/ajouté) :
- *  - Anti-abus réel : /parseAdmin applique désormais checkRateLimit()
- *    et journalise chaque commande via logAudit() (les deux existaient
- *    dans adminPerms.ts mais n'étaient jamais appelés).
- *  - /kick, /ban, /warn, /mute, /arrest, /book alimentent maintenant
- *    réellement le système de sanctions et le casier judiciaire.
- *  - Centrale 911 / Dispatch : /911, /calls, /respond, /onscene, /clear911
- *  - Casier judiciaire : /record (rap sheet consultable)
- *  - Primes : /bounty, /bounties, /claimbounty
- *  - Fourrière MTQ : /impound, /impoundlot, /releasecar
- *  - Signalements joueurs : /report, /reports (claim/resolve)
- *  - Audit & transparence : /audit, /warns, /sanctions
- *  - Prise de service : /duty, /dutystatus
- *  - Télémétrie exposée en jeu : /diag, /perf, /alerts (AdminMetrics
- *    existait déjà mais n'était branché nulle part côté commandes)
- * ═══════════════════════════════════════════════════════════════════
  */
 
 import { FIRM_TYPES, MAPAQ_GRANTS, type FirmType } from "./business";
@@ -77,7 +52,6 @@ import {
   setUserJob,
   setUserRole,
   snapshotStaff,
-  // ── AJOUTS v2.1 : anti-abus, audit, sanctions, nouveaux systèmes RP ──
   checkRateLimit,
   logAudit,
   getAuditLog,
@@ -218,7 +192,7 @@ for (const p of POIS) {
 PRESETS.ether = { x: 1088, z: -312, name: "Boutique Éther" };
 PRESETS.boutique = PRESETS.ether;
 for (const f of countyFarmLayout()) {
-  PRESETS[f.id] = { x: f.x, z: f.z, name: f.name };
+  PRESETS[f.id] = { x: f.x, z: f.z, name: (f as any).name || f.id };
 }
 PRESETS.champs = PRESETS.rang_grondines_ouest!;
 PRESETS.ferme = PRESETS.rang_deschambault_ouest!;
@@ -232,9 +206,7 @@ PRESETS.sirop = PRESETS.erable_raymond!;
 for (const d of DEEDS) {
   PRESETS[d.id.toLowerCase()] = { x: d.x, z: d.z, name: d.name };
   PRESETS[d.town.toLowerCase().replace(/\s+/g, "")] = PRESETS[d.town.toLowerCase().replace(/\s+/g, "")] ?? {
-    x: d.x,
-    z: d.z,
-    name: d.name,
+    x: d.x, z: d.z, name: d.name,
   };
 }
 PRESETS.maison = { x: DEEDS[0]!.x, z: DEEDS[0]!.z, name: DEEDS[0]!.name };
@@ -280,92 +252,25 @@ function ensurePresets() {
 }
 
 const FLOORS: Record<string, FloorId> = {
-  lobby: "lobby",
-  reception: "lobby",
-  hotel: "hotel",
-  chambre: "hotel",
-  suite: "hotel",
-  "214": "hotel",
-  apartment: "apartment",
-  appart: "apartment",
-  penthouse: "apartment",
-  "301": "apartment",
-  corridor: "corridor",
-  couloir: "corridor",
-  hall: "corridor",
-  prison: "prison",
-  penitencier: "prison",
-  cellule: "prison",
-  don: "prison",
-  depanneur: "depanneur",
-  dep: "depanneur",
-  magasin: "depanneur",
-  caisse: "caisse",
-  banque: "caisse",
-  gab: "caisse",
-  casse: "casse",
-  tiguy: "casse",
-  resto: "casse",
-  sqdc: "sqdc",
-  cannabis: "sqdc",
+  lobby: "lobby", reception: "lobby", hotel: "hotel", chambre: "hotel", suite: "hotel", "214": "hotel",
+  apartment: "apartment", appart: "apartment", penthouse: "apartment", "301": "apartment",
+  corridor: "corridor", couloir: "corridor", hall: "corridor",
+  prison: "prison", penitencier: "prison", cellule: "prison", don: "prison",
+  depanneur: "depanneur", dep: "depanneur", magasin: "depanneur",
+  caisse: "caisse", banque: "caisse", gab: "caisse",
+  casse: "casse", tiguy: "casse", resto: "casse",
+  sqdc: "sqdc", cannabis: "sqdc",
 };
 
 export const ADMIN_CHIPS = [
-  "/help",
-  "/status",
-  "/kit",
-  "/tp hotel",
-  "/floor chambre",
-  "/tp depanneur",
-  "/floor depanneur",
-  "/tp sqdc",
-  "/floor sqdc",
-  "/tp caisse",
-  "/floor caisse",
-  "/floor casse",
-  "/intel",
-  "/loan mini",
-  "/mls",
-  "/unlock",
-  "/car sq",
-  "/siren",
-  "/car lambo",
-  "/car civic",
-  "/car divan",
-  "/tp prison",
-  "/job agent_sq",
-  "/ticket",
-  "/radar",
-  "/alcotest",
-  "/patrouille",
-  "/aura frost",
-  "/fx lightning",
-  "/weather snow",
-  "/blizzard",
-  "/season hiver",
-  "/plow",
-  "/event panne",
-  "/etherpulse",
-  "/announce",
-  "/stafflist",
-  "/setrole",
-  "/spawn teleporter",
-  "/help build",
-  "/spawn piano",
-  "/undo",
-  "/mapaq",
-  // AJOUTS v2.1
-  "/duty",
-  "/911 code_3",
-  "/calls",
-  "/record",
-  "/bounties",
-  "/impoundlot",
-  "/report",
-  "/audit",
-  "/warns",
-  "/sanctions",
-  "/diag",
+  "/help", "/status", "/kit", "/tp hotel", "/floor chambre", "/tp depanneur", "/floor depanneur",
+  "/tp sqdc", "/floor sqdc", "/tp caisse", "/floor caisse", "/floor casse", "/intel", "/loan mini",
+  "/mls", "/unlock", "/car sq", "/siren", "/car lambo", "/car civic", "/car divan", "/tp prison",
+  "/job agent_sq", "/ticket", "/radar", "/alcotest", "/patrouille", "/aura frost", "/fx lightning",
+  "/weather snow", "/blizzard", "/season hiver", "/plow", "/event panne", "/etherpulse", "/announce",
+  "/stafflist", "/setrole", "/spawn teleporter", "/help build", "/spawn piano", "/undo", "/mapaq",
+  "/duty", "/911 code_3", "/calls", "/record", "/bounties", "/impoundlot", "/report", "/audit",
+  "/warns", "/sanctions", "/diag",
 ];
 
 export function adminHelp(topic = ""): string {
@@ -481,11 +386,6 @@ export function listLieux(): string {
   return `Villages : ${villages}\nLieux : ${pois}`;
 }
 
-/**
- * Cœur historique du parseur de commandes. Renommé depuis `parseAdmin`
- * (v2.1) : la logique interne est inchangée, seule l'enveloppe publique
- * `parseAdmin` ci-dessous a été ajoutée pour brancher rate-limit + audit.
- */
 function executeAdminCommand(raw: string, ctx: AdminCtx): { ok: boolean; message: string } {
   const trimmed = raw.trim();
   if (!trimmed) return { ok: false, message: "Commande vide." };
@@ -506,9 +406,7 @@ function executeAdminCommand(raw: string, ctx: AdminCtx): { ok: boolean; message
     }
   }
 
-  if (cmd === "help" || cmd === "aide" || cmd === "h") {
-    return { ok: true, message: adminHelp(arg0) };
-  }
+  if (cmd === "help" || cmd === "aide" || cmd === "h") return { ok: true, message: adminHelp(arg0) };
   if (cmd === "lieux" || cmd === "list") return { ok: true, message: listLieux() };
   if (cmd === "pos" || cmd === "coords" || cmd === "gps") return { ok: true, message: ctx.pos() };
   if (cmd === "zone" || cmd === "secteur" || cmd === "sol") return { ok: true, message: ctx.zone() };
@@ -547,17 +445,15 @@ function executeAdminCommand(raw: string, ctx: AdminCtx): { ok: boolean; message
       return { ok: true, message: "Survie métabolique réinitialisée aux normes de santé." };
     }
     if (arg0 === "starve" || arg0 === "faim") {
-      ctx.setSurv({ hunger: 8, thirst: 10, energy: 20, alerts: ["famine", "deshydratation"] });
+      ctx.setSurv({ hunger: 8, thirst: 10, energy: 20, alerts: ["famine", "deshydratation"] } as any);
       return { ok: true, message: "Citoyen affamé et déshydraté." };
     }
     if (arg0 === "freeze" || arg0 === "froid") {
-      // CORRECTION: Utilisation de 'temp' au lieu de 'bodyTemp'
-      ctx.setSurv({ bodyTemp: 33.4, shiver: 1, alerts: ["hypothermie_moderee"] } as any); // Type cast implicite
+      ctx.setSurv({ bodyTemp: 33.4, shiver: 1, alerts: ["hypothermie_moderee"] } as any);
       return { ok: true, message: "État d'hypothermie provoqué." };
     }
     if (arg0 === "heat" || arg0 === "chaleur") {
-      // CORRECTION: Utilisation de 'temp' au lieu de 'bodyTemp'
-      ctx.setSurv({ bodyTemp: 39.6, thirst: 12, alerts: ["coup_de_chaleur"] } as any); // Type cast implicite
+      ctx.setSurv({ bodyTemp: 39.6, thirst: 12, alerts: ["coup_de_chaleur"] } as any);
       return { ok: true, message: "Choc thermique appliqué." };
     }
     return { ok: false, message: "Usage : /surv reset|starve|freeze|heat" };
@@ -735,15 +631,7 @@ function executeAdminCommand(raw: string, ctx: AdminCtx): { ok: boolean; message
   }
   if (cmd === "camera" || cmd === "cam") {
     const alias: Record<string, CameraMode> = {
-      chase: "chase",
-      hood: "hood",
-      capot: "hood",
-      far: "far",
-      loin: "far",
-      fps: "fps",
-      first: "fps",
-      top: "top",
-      air: "top",
+      chase: "chase", hood: "hood", capot: "hood", far: "far", loin: "far", fps: "fps", first: "fps", top: "top", air: "top",
     };
     const mode = alias[arg0];
     if (!mode || !CAMERA_CYCLE.includes(mode)) {
@@ -800,63 +688,17 @@ function executeAdminCommand(raw: string, ctx: AdminCtx): { ok: boolean; message
     if (!args[0]) return { ok: false, message: "Usage : /tp spawn|champs|ferme|illicite|erabliere|depanneur|portneuf|x z" };
     const key = args[0].toLowerCase().replace(/\s+/g, "");
     const aliases: Record<string, string> = {
-      hotel: "pont_hotel",
-      ether: "ether",
-      boutique: "ether",
-      pontrouge: "pont_rouge",
-      saintalban: "saint_alban",
-      alban: "saint_alban",
-      casimir: "saint_casimir",
-      raymond: "saint_raymond",
-      eboulis: "alban_eboulis",
-      plage: "alban_plage",
-      marmites: "casimir_marmites",
-      faune: "faune_laurentides",
-      sq: "portneuf_sq",
-      jail: "portneuf_sq",
-      prison: "donnacona_prison",
-      penitencier: "donnacona_prison",
-      donnacona_prison: "donnacona_prison",
-      poste: "portneuf_sq",
-      capsante: "cap_sante",
-      "cap-sante": "cap_sante",
-      donnacona: "donnacona",
-      papeterie: "donnacona_papeterie",
-      usine: "donnacona_papeterie",
-      mill: "donnacona_papeterie",
-      neuville: "neuville",
-      grondines: "grondines",
-      basile: "saint_basile",
-      saintbasile: "saint_basile",
-      deschambault: "deschambault",
-      marc: "saint_marc",
-      saintmarc: "saint_marc",
-      champs: "rang_grondines_ouest",
-      ferme: "rang_deschambault_ouest",
-      rang: "rang_grondines_ouest",
-      vaches: "rang_grondines_ouest",
-      lait: "rang_grondines_ouest",
-      poules: "rang_grondines_ouest",
-      illicite: "farm_illicite_alban",
-      cannabis: "farm_illicite_alban",
-      erabliere: "erable_alban",
-      cabane: "erable_alban",
-      sirop: "erable_raymond",
-      erable: "erable_alban",
-      coulee: "erable_alban",
-      depanneur: "depanneur",
-      dep: "depanneur",
-      beausoir: "depanneur",
-      a40: "a40_261",
-      echangeur: "a40_261",
-      sortie250: "a40_250",
-      sortie254: "a40_254",
-      sortie257: "a40_257",
-      sortie261: "a40_261",
-      sortie269: "a40_269",
-      sortie274: "a40_274",
-      sortie281: "a40_281",
-      sortie285: "a40_285",
+      hotel: "pont_hotel", ether: "ether", boutique: "ether", pontrouge: "pont_rouge", saintalban: "saint_alban", alban: "saint_alban",
+      casimir: "saint_casimir", raymond: "saint_raymond", eboulis: "alban_eboulis", plage: "alban_plage", marmites: "casimir_marmites",
+      faune: "faune_laurentides", sq: "portneuf_sq", jail: "portneuf_sq", prison: "donnacona_prison", penitencier: "donnacona_prison",
+      donnacona_prison: "donnacona_prison", poste: "portneuf_sq", capsante: "cap_sante", "cap-sante": "cap_sante", donnacona: "donnacona",
+      papeterie: "donnacona_papeterie", usine: "donnacona_papeterie", mill: "donnacona_papeterie", neuville: "neuville", grondines: "grondines",
+      basile: "saint_basile", saintbasile: "saint_basile", deschambault: "deschambault", marc: "saint_marc", saintmarc: "saint_marc",
+      champs: "rang_grondines_ouest", ferme: "rang_deschambault_ouest", rang: "rang_grondines_ouest", vaches: "rang_grondines_ouest",
+      lait: "rang_grondines_ouest", poules: "rang_grondines_ouest", illicite: "farm_illicite_alban", cannabis: "farm_illicite_alban",
+      erabliere: "erable_alban", cabane: "erable_alban", sirop: "erable_raymond", erable: "erable_alban", coulee: "erable_alban",
+      depanneur: "depanneur", dep: "depanneur", beausoir: "depanneur", a40: "a40_261", echangeur: "a40_261", sortie250: "a40_250",
+      sortie254: "a40_254", sortie257: "a40_257", sortie261: "a40_261", sortie269: "a40_269", sortie274: "a40_274", sortie281: "a40_281", sortie285: "a40_285",
     };
     const dest = PRESETS[key] ?? PRESETS[aliases[key] ?? ""];
     if (dest) {
@@ -891,9 +733,7 @@ function executeAdminCommand(raw: string, ctx: AdminCtx): { ok: boolean; message
     return { ok: true, message: "Soins intensifs prodigués. Métabolisme restauré." };
   }
   if (cmd === "hurt" || cmd === "blesse" || cmd === "injured") {
-    if (!arg0 || arg0 === "list") {
-      return { ok: true, message: INJURED_CLIPS.join("\n") };
-    }
+    if (!arg0 || arg0 === "list") return { ok: true, message: INJURED_CLIPS.join("\n") };
     if (arg0 === "clear" || arg0 === "off") {
       ctx.hurt("clear");
       return { ok: true, message: "Traumatismes physiques résolus." };
@@ -952,15 +792,11 @@ function executeAdminCommand(raw: string, ctx: AdminCtx): { ok: boolean; message
   }
   if (cmd === "mute") {
     ctx.mute(true);
-    // AJOUT v2.1 — trace la sanction si une cible explicite est fournie
     if (args[0]) {
       const targetId = resolveStaffId(args[0]);
       issueSanction({
-        type: "mute",
-        targetId,
-        targetName: args[0],
-        moderatorId: LOCAL_PLAYER_ID,
-        moderatorName: getDisplayName(LOCAL_PLAYER_ID),
+        type: "mute", targetId, targetName: args[0],
+        moderatorId: LOCAL_PLAYER_ID, moderatorName: getDisplayName(LOCAL_PLAYER_ID),
         reason: args.slice(1).join(" ") || "Non spécifié",
       });
     }
@@ -973,28 +809,18 @@ function executeAdminCommand(raw: string, ctx: AdminCtx): { ok: boolean; message
   if (cmd === "kick") {
     const who = args[0] || useGameStore.getState().appearance.name;
     const reason = args.slice(1).join(" ") || "Non spécifié";
-    // AJOUT v2.1 — sanction réellement enregistrée (auparavant non tracée)
     issueSanction({
-      type: "kick",
-      targetId: resolveStaffId(who),
-      targetName: who,
-      moderatorId: LOCAL_PLAYER_ID,
-      moderatorName: getDisplayName(LOCAL_PLAYER_ID),
-      reason,
+      type: "kick", targetId: resolveStaffId(who), targetName: who,
+      moderatorId: LOCAL_PLAYER_ID, moderatorName: getDisplayName(LOCAL_PLAYER_ID), reason,
     });
     return { ok: true, message: ctx.kickPeer(who) };
   }
   if (cmd === "ban") {
     const who = args[0] || useGameStore.getState().appearance.name;
     const reason = args.slice(1).join(" ") || "Violation grave des règles";
-    // AJOUT v2.1 — sanction réellement enregistrée (auparavant non tracée)
     issueSanction({
-      type: "ban",
-      targetId: resolveStaffId(who),
-      targetName: who,
-      moderatorId: LOCAL_PLAYER_ID,
-      moderatorName: getDisplayName(LOCAL_PLAYER_ID),
-      reason,
+      type: "ban", targetId: resolveStaffId(who), targetName: who,
+      moderatorId: LOCAL_PLAYER_ID, moderatorName: getDisplayName(LOCAL_PLAYER_ID), reason,
     });
     const msg = ctx.kickPeer(who);
     ctx.announce(`BANNISSEMENT PERMANENT : ${who} a été banni du comté. Motif : ${reason}`);
@@ -1002,7 +828,6 @@ function executeAdminCommand(raw: string, ctx: AdminCtx): { ok: boolean; message
   }
   if (cmd === "unban") {
     const who = args[0] || "joueur";
-    // AJOUT v2.1 — lève réellement la sanction active si elle existe
     const targetId = resolveStaffId(who);
     const active = isBanned(targetId);
     if (active) revokeSanction(active.id, LOCAL_PLAYER_ID, "Grâce administrative");
@@ -1012,15 +837,10 @@ function executeAdminCommand(raw: string, ctx: AdminCtx): { ok: boolean; message
   if (cmd === "warn") {
     const who = args[0] || useGameStore.getState().appearance.name;
     const reason = args.slice(1).join(" ") || "manquement aux règles civiques";
-    // AJOUT v2.1 — sanction tracée + compteur 3 avertissements → ban auto
     const targetId = resolveStaffId(who);
     issueSanction({
-      type: "warn",
-      targetId,
-      targetName: who,
-      moderatorId: LOCAL_PLAYER_ID,
-      moderatorName: getDisplayName(LOCAL_PLAYER_ID),
-      reason,
+      type: "warn", targetId, targetName: who,
+      moderatorId: LOCAL_PLAYER_ID, moderatorName: getDisplayName(LOCAL_PLAYER_ID), reason,
     });
     const warnCount = getActiveWarns(targetId).length;
     ctx.announce(`⚠️ AVERTISSEMENT OFFICIEL : ${who} pour ${reason} (${warnCount}/3)`);
@@ -1167,39 +987,22 @@ function executeAdminCommand(raw: string, ctx: AdminCtx): { ok: boolean; message
     ctx.teleport(x, z);
     return { ok: true, message: `TP aux coordonnées : (${x.toFixed(0)}, ${z.toFixed(0)})` };
   }
-  if (cmd === "gethere") {
-    return { ok: true, message: "Réseau local actif." };
-  }
-  if (cmd === "kickall") {
-    return { ok: true, message: "Tous les invités ont été déconnectés." };
-  }
+  if (cmd === "gethere") return { ok: true, message: "Réseau local actif." };
+  if (cmd === "kickall") return { ok: true, message: "Tous les invités ont été déconnectés." };
   if (cmd === "weather" || cmd === "meteo" || cmd === "météo") {
     const raw = arg0 || "clear";
     const condMap: Record<string, WeatherCondition> = {
-      clear: "ensoleille",
-      ensoleille: "ensoleille",
-      rain: "pluie_fine",
-      pluie: "pluie_fine",
-      snow: "poudrerie",
-      neige: "poudrerie",
-      poudrerie: "poudrerie",
-      fog: "nuageux",
-      nuageux: "nuageux",
-      storm: "orage_ete",
-      orage: "orage_ete",
-      blizzard: "tempete_neige",
-      tempete: "tempete_neige",
-      verglas: "verglas",
-      polaire: "froid_polaire",
+      clear: "ensoleille", ensoleille: "ensoleille", rain: "pluie_fine", pluie: "pluie_fine",
+      snow: "poudrerie", neige: "poudrerie", poudrerie: "poudrerie", fog: "nuageux", nuageux: "nuageux",
+      storm: "orage_ete", orage: "orage_ete", blizzard: "tempete_neige", tempete: "tempete_neige",
+      verglas: "verglas", polaire: "froid_polaire",
     };
     const cond = condMap[raw];
     if (!cond) return { ok: false, message: "Usage : /weather clear|rain|snow|fog|storm|poudrerie|blizzard|verglas|polaire" };
     if (cond === "tempete_neige") ctx.triggerBlizzard();
     else {
       quebecSeasons.setCondition(cond);
-      ctx.setWeather(
-        cond === "ensoleille" ? "clear" : cond === "pluie_fine" ? "rain" : cond === "nuageux" ? "fog" : cond === "orage_ete" ? "storm" : cond === "verglas" ? "storm" : "snow",
-      );
+      ctx.setWeather(cond === "ensoleille" ? "clear" : cond === "pluie_fine" ? "rain" : cond === "nuageux" ? "fog" : cond === "orage_ete" ? "storm" : cond === "verglas" ? "storm" : "snow");
     }
     const wx = quebecSeasons.getState();
     return { ok: true, message: `Météo globale forcée : ${CONDITION_LABEL[wx.condition]} · ${wx.temperatureCelsius} °C` };
@@ -1253,17 +1056,13 @@ function executeAdminCommand(raw: string, ctx: AdminCtx): { ok: boolean; message
     return { ok: true, message: text };
   }
   if (cmd === "mat" || cmd === "material" || cmd === "mats") {
-    if (!arg0 || arg0 === "list") {
-      return { ok: true, message: `${ETHER_MAT_STATS.total} matériaux au registre.` };
-    }
+    if (!arg0 || arg0 === "list") return { ok: true, message: `${ETHER_MAT_STATS.total} matériaux au registre.` };
     const hits = searchEtherMats(args.join(" ")).slice(0, 12);
     if (!hits.length) return { ok: false, message: "Aucun élément trouvé." };
     const d = getEtherDef(hits[0].id);
     return { ok: true, message: hits.map((h) => `${h.id} · ${h.name}`).join("\n") + `\n→ ${d.id}` };
   }
-  if (cmd === "geo" || cmd === "geom") {
-    return { ok: true, message: ctx.geoStats() };
-  }
+  if (cmd === "geo" || cmd === "geom") return { ok: true, message: ctx.geoStats() };
   if (cmd === "gltf" || cmd === "glb" || cmd === "meshopt") {
     if (arg0) {
       const hit = GLTF_LIBRARY.find((a) => a.id === arg0 || a.url.includes(arg0));
@@ -1334,20 +1133,23 @@ function executeAdminCommand(raw: string, ctx: AdminCtx): { ok: boolean; message
     ctx.prison();
     return { ok: true, message: "Transfert carcéral : Pénitencier de Donnacona." };
   }
+  
+  // ✅ CORRECTION : Cible un joueur spécifique au lieu de l'admin par défaut
   if (cmd === "book" || cmd === "ecrouer") {
-    // AJOUT v2.1 — l'écrouage ajoute désormais un chef au casier judiciaire
-    const name = useGameStore.getState().appearance.name || "Citoyen";
+    const targetName = args[0] || useGameStore.getState().appearance.name || "Citoyen";
+    const targetId = resolveStaffId(targetName);
     addCriminalCharge({
-      identifier: LOCAL_PLAYER_ID,
-      displayName: name,
+      identifier: targetId,
+      displayName: targetName,
       article: "Écrou C-38",
       description: "Écrouage carcéral",
       fine: 0,
       jailMonths: 1,
       officerId: LOCAL_PLAYER_ID,
     });
-    return { ok: true, message: ctx.book() };
+    return { ok: true, message: `${targetName} a été écroué au registre.` };
   }
+  
   if (cmd === "lockdown" || cmd === "confinement") {
     ctx.lockdown();
     return { ok: true, message: "Lockdown appliqué sur la structure carcérale." };
@@ -1356,74 +1158,90 @@ function executeAdminCommand(raw: string, ctx: AdminCtx): { ok: boolean; message
     ctx.release();
     return { ok: true, message: "Libération et levée d'écrou." };
   }
+  
+  // ✅ CORRECTION : Cible un joueur spécifique pour l'arrestation
   if (cmd === "arrest" || cmd === "arrestation") {
+    const targetName = args[0] || useGameStore.getState().appearance.name || "Citoyen";
+    const targetId = resolveStaffId(targetName);
     ctx.setWanted(5);
     ctx.prison();
-    ctx.book();
-    // AJOUT v2.1 — l'arrestation lourde ajoute un chef d'accusation formel
-    const name = useGameStore.getState().appearance.name || "Citoyen";
     addCriminalCharge({
-      identifier: LOCAL_PLAYER_ID,
-      displayName: name,
+      identifier: targetId,
+      displayName: targetName,
       article: "Art. 145 C.cr.",
       description: "Interpellation lourde",
       fine: 500,
       jailMonths: 6,
       officerId: LOCAL_PLAYER_ID,
     });
-    return { ok: true, message: "Interpolation lourde. Code criminel art. 145." };
+    return { ok: true, message: `Interpellation lourde de ${targetName}. Code criminel art. 145.` };
   }
+  
+  // ✅ CORRECTION : Récupération dynamique des données de contravention
   if (cmd === "ticket" || cmd === "constat" || cmd === "contraven") {
-    const code = args[0] || "CSR-328-1";
-    if (code === "list" || code === "csr") {
+    const code = (args[0] || "CSR-328-1").toUpperCase();
+    if (code === "LIST" || code === "CSR") {
       return { ok: true, message: CSR_CITATIONS.map((c) => `${c.code} · ${c.article} · ${c.fineAmount}$ · ${c.demeritPoints} pts`).join("\n") };
     }
-    if (code !== "csr-328-1" && !citationByCode(code)) {
-      return { ok: false, message: "Usage : /ticket <code_csr> (ex: CSR-329-GEV, CSR-202)" };
+    const citationData = citationByCode(code);
+    if (!citationData) {
+      return { ok: false, message: "Usage : /ticket <code_csr> (ex: CSR-329-GEV, CSR-202). Tapez /ticket list pour voir les codes." };
     }
-    const name = useGameStore.getState().appearance.name || "Citoyen";
-    // CORRECTION: notice est une string, pas un objet
-    const noticeStr = police.issueTicket(code, name);
-    useGameStore.getState().openCitation({ message: noticeStr, article: code, description: noticeStr, fine: 100, points: 0, kind: "ticket" });
-    useGameStore.setState({ demeritPoints: police.demeritTotal, licenseSuspendedUntil: police.licenseSuspendedUntil });
-    return { ok: true, message: noticeStr };
+    const targetName = args[1] || useGameStore.getState().appearance.name || "Citoyen";
+    const noticeStr = police.issueTicket(code, targetName);
+    useGameStore.getState().openCitation({ 
+      message: noticeStr, 
+      article: citationData.article, 
+      description: citationData.description, 
+      fine: citationData.fineAmount, 
+      points: citationData.demeritPoints, 
+      kind: "ticket" 
+    });
+    useGameStore.setState({ 
+      demeritPoints: police.demeritTotal, 
+      licenseSuspendedUntil: police.licenseSuspendedUntil 
+    });
+    return { ok: true, message: `Constat émis à ${targetName} : ${noticeStr}` };
   }
+  
+  // ✅ CORRECTION : Typage sécurisé et ciblage d'un joueur
   if (cmd === "alcotest" || cmd === "ethylotest" || cmd === "éthylotest" || cmd === "breathalyzer") {
     const mg = args[0] !== undefined ? Number(args[0]) : undefined;
-    const name = useGameStore.getState().appearance.name || "Citoyen";
-    const test = police.breathalyzer(name, Number.isFinite(mg as number) ? mg : undefined);
-    // CORRECTION: Utilisation des propriétés correctes (bac au lieu de bloodAlcoholMgPercent, violation au lieu de isOverLegalLimit)
+    const targetName = args[1] || useGameStore.getState().appearance.name || "Citoyen";
+    const test = police.breathalyzer(targetName, Number.isFinite(mg as number) ? mg : undefined);
+    
     useGameStore.setState({
       bloodAlcohol: test.bac,
       licenseSuspendedUntil: police.licenseSuspendedUntil,
       demeritPoints: police.demeritTotal,
       notice: test.violation
-        ? `Éthylotest ${test.bac} mg · ALCOOLÉMIE EXCESSIVE · permis suspendu`
-        : `Éthylotest ${test.bac} mg · sous la limite légale`,
+        ? `Éthylotest ${targetName} : ${test.bac} mg · ALCOOLÉMIE EXCESSIVE · permis suspendu`
+        : `Éthylotest ${targetName} : ${test.bac} mg · sous la limite légale`,
     });
+
     if (test.violation) {
-      const last = police.tickets[0];
-      if (last) {
+      const lastTicket = police.tickets[0];
+      if (lastTicket) {
         useGameStore.getState().openCitation({
           kind: "ticket",
-          article: last.article,
-          description: last.description,
-          fine: last.fine,
-          points: last.demeritPoints ?? 4,
-          message: `Art. 202 CSR · Éthylotest : ${test.bac} mg`,
-          ticketNumber: last.ticketNumber,
-          // CORRECTION: Utilisation de 'badge' au lieu de 'issuingOfficerBadge'
-          badge: (last as any).issuingOfficerBadge || (last as any).badge,
+          article: lastTicket.article,
+          description: lastTicket.description,
+          fine: lastTicket.fine,
+          points: lastTicket.demeritPoints ?? 4,
+          message: `Art. 202 CSR · Éthylotest ${targetName} : ${test.bac} mg`,
+          ticketNumber: lastTicket.ticketNumber,
+          badge: (lastTicket as unknown as { badge?: string }).badge || "SQ-Inconnu",
         });
       }
     }
     return {
       ok: true,
       message: test.violation
-        ? `Échantillon positif #${test.testId} · ${test.bac} mg · Saisie SAAQ immédiate`
-        : `Échantillon négatif #${test.testId} · ${test.bac} mg`,
+        ? `Échantillon positif #${test.testId} · ${test.bac} mg · Saisie SAAQ immédiate pour ${targetName}`
+        : `Échantillon négatif #${test.testId} · ${test.bac} mg pour ${targetName}`,
     };
   }
+  
   if (cmd === "radar") {
     const msg = police.toggleRadar(args[0]);
     useGameStore.setState({ radarActive: police.units.some((u) => u.radarActive), notice: msg });
@@ -1495,9 +1313,7 @@ function executeAdminCommand(raw: string, ctx: AdminCtx): { ok: boolean; message
     if (!logs.length) return { ok: true, message: "Aucune entrée d'audit." };
     return {
       ok: true,
-      message: logs
-        .map((l) => `[${new Date(l.timestamp).toLocaleTimeString("fr-CA")}] ${l.actorName} · /${l.command} ${l.args} · ${l.success ? "✓" : "✗"}`)
-        .join("\n"),
+      message: logs.map((l) => `[${new Date(l.timestamp).toLocaleTimeString("fr-CA")}] ${l.actorName} · /${l.command} ${l.args} · ${l.success ? "✓" : "✗"}`).join("\n"),
     };
   }
   if (cmd === "warns") {
@@ -1516,10 +1332,7 @@ function executeAdminCommand(raw: string, ctx: AdminCtx): { ok: boolean; message
     return {
       ok: true,
       message: history.length
-        ? history
-            .slice(0, 10)
-            .map((s) => `${s.type.toUpperCase()} · ${s.reason} · ${s.active ? "actif" : "levé"} · ${new Date(s.createdAt).toLocaleDateString("fr-CA")}`)
-            .join("\n")
+        ? history.slice(0, 10).map((s) => `${s.type.toUpperCase()} · ${s.reason} · ${s.active ? "actif" : "levé"} · ${new Date(s.createdAt).toLocaleDateString("fr-CA")}`).join("\n")
         : "Historique vierge.",
     };
   }
@@ -1539,13 +1352,8 @@ function executeAdminCommand(raw: string, ctx: AdminCtx): { ok: boolean; message
     if (!arg0) return { ok: true, message: `Codes disponibles : ${listDispatchCodes().join(", ")}` };
     const name = useGameStore.getState().appearance.name || "Citoyen";
     const call = createDispatchCall({
-      code: arg0,
-      callerId: LOCAL_PLAYER_ID,
-      callerName: name,
-      locationName: ctx.pos(),
-      x: 0,
-      z: 0,
-      notes: args.slice(1).join(" "),
+      code: arg0, callerId: LOCAL_PLAYER_ID, callerName: name,
+      locationName: ctx.pos(), x: 0, z: 0, notes: args.slice(1).join(" "),
     });
     return { ok: true, message: `Appel transmis à la centrale · ${call.label} · unités en route.` };
   }
@@ -1600,14 +1408,15 @@ function executeAdminCommand(raw: string, ctx: AdminCtx): { ok: boolean; message
   }
 
   // ═══════════════════════════════════════════════════════
-  // AJOUTS v2.1 — FOURRIÈRE MUNICIPALE MTQ
+  // AJOUTS v2.1 — FOURRIÈRE MUNICIPALE MTQ (Ciblage corrigé)
   // ═══════════════════════════════════════════════════════
   if (cmd === "impound" || cmd === "fourriere" || cmd === "fourrière") {
     const veh = args[0] || "vehicule_inconnu";
-    const reason = args.slice(1).join(" ") || "Infraction au stationnement";
-    const name = useGameStore.getState().appearance.name || "Citoyen";
-    const rec = impoundVehicle({ vehicleId: veh, ownerId: LOCAL_PLAYER_ID, ownerName: name, reason });
-    return { ok: true, message: `Véhicule remorqué à la fourrière MTQ · frais initiaux : ${rec.feeAmount}$` };
+    const targetName = args[1] || useGameStore.getState().appearance.name || "Citoyen";
+    const targetId = resolveStaffId(targetName);
+    const reason = args.slice(2).join(" ") || "Infraction au stationnement";
+    const rec = impoundVehicle({ vehicleId: veh, ownerId: targetId, ownerName: targetName, reason });
+    return { ok: true, message: `Véhicule [${veh}] de ${targetName} remorqué à la fourrière MTQ · frais initiaux : ${rec.feeAmount}$` };
   }
   if (cmd === "impoundlot" || cmd === "fourrierelot") {
     const list = listImpoundedVehicles(arg0 ? resolveStaffId(arg0) : undefined);
@@ -1638,12 +1447,6 @@ function executeAdminCommand(raw: string, ctx: AdminCtx): { ok: boolean; message
   return { ok: false, message: `Inconnue : /${cmd}. Taper /help ou /aide pour l'index.` };
 }
 
-/**
- * AJOUT v2.1 — Point d'entrée public conservé sous le même nom pour ne
- * rien casser côté appelants (AdminBar.tsx etc.). Ajoute la limitation
- * de fréquence et la journalisation d'audit qui existaient déjà comme
- * fonctions dans adminPerms.ts mais n'étaient jamais invoquées.
- */
 export function parseAdmin(raw: string, ctx: AdminCtx): { ok: boolean; message: string } {
   ensurePresets();
   const trimmed = raw.trim();
@@ -1674,4 +1477,3 @@ export function parseAdmin(raw: string, ctx: AdminCtx): { ok: boolean; message: 
 
   return result;
 }
-

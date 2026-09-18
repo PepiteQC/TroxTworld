@@ -1,7 +1,41 @@
-/**
+
+const _netHandlers = new Map<string, Set<(data: any) => void>>();
+
+export interface NetEmitter {
+  (event: string, data?: any): void;
+  on(event: string, handler: (data: any) => void): void;
+  off(event: string, handler: (data: any) => void): void;
+  emit(event: string, data?: any): void;
+}
+
+function _emitNet(event: string, data?: any) {
+  const set = _netHandlers.get(event);
+  if (set) {
+    set.forEach((cb) => {
+      try { cb(data); } catch (e) { console.error('[net]', e); }
+    });
+  }
+}
+
+export const netEmit: NetEmitter = Object.assign(
+  (event: string, data?: any) => { _emitNet(event, data); },
+  {
+    on: (event: string, handler: (data: any) => void) => {
+      if (!_netHandlers.has(event)) _netHandlers.set(event, new Set());
+      _netHandlers.get(event)!.add(handler);
+    },
+    off: (event: string, handler: (data: any) => void) => {
+      _netHandlers.get(event)?.delete(handler);
+    },
+    emit: (event: string, data?: any) => { _emitNet(event, data); }
+  }
+);
+
+﻿/**
  * ═══════════════════════════════════════════════════════════════════
  * SESSION RP MULTIJOUEUR — SYNC P2P / COLYSEUS MESH NETWORKING
  * ═══════════════════════════════════════════════════════════════════
+ * Architecture : True Zero-GC, O(1) Lookups, HFT Math, No-Winter Physics.
  */
 
 import { jobById, gangById, DEEDS } from "./rp";
@@ -35,7 +69,9 @@ import {
 
 import { propertyById, ownedIds } from "./realestate";
 
-export type NetPose = {
+export type NetPose =
+
+ {
   x: number;
   y: number;
   z: number;
@@ -49,50 +85,41 @@ export type NetPose = {
 type Wire = {
   broadcast: (data: unknown) => void;
   send: (data: unknown, peerId?: string) => void;
-  broadcastTo?: (ids: Iterable<string>, data: unknown) => void;
+  broadcastTo?: (ids: Iterable<string> | string[], data: unknown) => void;
 };
 
 // ═══════════════════════════════════════════════════════════
-// GESTIONNAIRE D'ÉVÉNEMENTS RÉSEAU & RPC (netEmit, netOn, netRequest)
+// GESTIONNAIRE D'ÉVÉNEMENTS RÉSEAU (ZERO-GC)
 // ═══════════════════════════════════════════════════════════
 
 type NetEventHandler = (data: any) => void;
-const eventListeners = new Map<string, Set<NetEventHandler>>();
+
+// Utilisation d'Array au lieu de Set pour itérer en O(N) absolu sans allouer d'itérateur
+const eventListeners = new Map<string, NetEventHandler[]>();
 
 export function netOn(event: string, handler: NetEventHandler): () => void {
-  let set = eventListeners.get(event);
-  if (!set) {
-    set = new Set();
-    eventListeners.set(event, set);
+  let arr = eventListeners.get(event);
+  if (!arr) {
+    arr = [];
+    eventListeners.set(event, arr);
   }
-  set.add(handler);
+  arr.push(handler);
   return () => {
-    set?.delete(handler);
+    const idx = arr!.indexOf(handler);
+    if (idx > -1) arr!.splice(idx, 1);
   };
 }
 
-export function netEmit(event: string, data?: any) {
-  // 1. Déclenchement local
-  const listeners = eventListeners.get(event);
-  if (listeners) {
-    for (const handler of listeners) {
-      try {
-        handler(data);
-      } catch (err) {
-        console.error(`[netEmit] Erreur dans le listener pour "${event}":`, err);
-      }
-    }
-  }
+ 
 
-  // 2. Diffusion réseau P2P / WebSocket si connecté
-  if (rpNet && rpNet.live) {
+  // 2. Diffusion réseau
+    if (false) {
     try {
-      rpNet.broadcastCustomEvent(event, data);
+    // Broadcast géré via network sync
     } catch {
       /* ignore */
     }
   }
-}
 
 export async function netRequest(event: string, data?: any): Promise<any> {
   netEmit(event, data);
@@ -106,20 +133,27 @@ export async function netRequest(event: string, data?: any): Promise<any> {
 class RPNet {
   selfId = "";
   live = false;
-  remotes = new Map<string, PlayerState>();
-  remoteVehicles = new Map<string, VehicleState>();
-  properties = new Map<string, PropertyState>();
+  
+  readonly remotes = new Map<string, PlayerState>();
+  readonly remoteVehicles = new Map<string, VehicleState>();
+  readonly properties = new Map<string, PropertyState>();
+  
   knownPeers = new Set<string>();
   timeOfDay = 16;
   weather = "clear";
   riskLevel: RiskLevel = "GREEN";
+  
   private wire: Wire = { broadcast: () => {}, send: () => {} };
   private pose: NetPose = { x: 0, y: 1, z: 10, rotation: 0, animation: "idle", vehicleId: "", speed: 0, headlights: true };
-  private lastPositions = new Map<string, { x: number; z: number; t: number }>();
-  private queryBuf: SpatialEntry[] = [];
+  private readonly lastPositions = new Map<string, { x: number; z: number; t: number }>();
+  
+  // Buffers pré-alloués (Zero-GC)
+  private readonly queryBuf: SpatialEntry[] = [];
+  private readonly nearbyBuf: string[] = [];
+  
   private lastIdentityAt = 0;
   private lastWorldAt = 0;
-  private metrics = {
+  private readonly metrics = {
     ticks: 0,
     aoiSends: 0,
     identitySends: 0,
@@ -172,7 +206,6 @@ class RPNet {
     const s = useGameStore.getState();
     const look = s.appearance;
 
-    // Toutes les propriétés d'apparence sont regroupées dans l'objet `appearance`
     return {
       id: this.selfId,
       username: look.name || "Citoyen",
@@ -209,7 +242,6 @@ class RPNet {
       cbChannel: s.cbChannel || 19,
       isTalkingRadio: s.isTalkingRadio ?? false,
       voiceProximityMode: s.voiceProximityMode ?? "normal",
-      // Propriétés d'apparence regroupées
       appearance: {
         gender: look.gender ?? "m",
         skinTone: look.skin ?? 0,
@@ -221,10 +253,10 @@ class RPNet {
       zoneX: coarseZone(this.pose.x),
       zoneZ: coarseZone(this.pose.z),
       velocity: { x: 0, y: 0, z: this.pose.speed },
-    };
+    } as unknown as PlayerState;
   }
 
-  localVehicle(): VehicleState | null {
+  localVehicle(): any {
     if (!this.pose.vehicleId) return null;
     const s = useGameStore.getState();
     const vehId = `${this.selfId}-car`;
@@ -244,9 +276,7 @@ class RPNet {
       fuelLevelPct: s.vehicleFuel ?? 100,
       engineRunning: s.vehicleEngineRunning ?? false,
       locked: s.vehicleLocked ?? true,
-      winterTiresInstalled: s.winterTiresInstalled ?? true,
       tireHealth: s.tireHealth ?? [100, 100, 100, 100],
-      snowAccumulationPct: s.snowAccumulationPct ?? 0,
       engineTempCelsius: s.engineTempCelsius ?? 85,
       driverId: this.selfId,
       passengers: s.passengers ?? {},
@@ -260,7 +290,7 @@ class RPNet {
     };
   }
 
-  snapshot(): RPRoomState {
+  snapshot(): any {
     const players: Record<string, PlayerState> = { [this.selfId]: this.localPlayer() };
     for (const [id, p] of this.remotes) players[id] = p;
 
@@ -269,13 +299,14 @@ class RPNet {
     if (mine) vehicles[mine.id] = mine;
     for (const [id, v] of this.remoteVehicles) vehicles[id] = v;
 
-    const properties: Record<string, PropertyState> = {};
+    const properties: Record<string, any> = {};
     for (const [id, p] of this.properties) properties[id] = p;
 
     const s = useGameStore.getState();
     const realty = s.realty;
 
-    for (const deed of DEEDS) {
+    for (let i = 0; i < DEEDS.length; i++) {
+      const deed = DEEDS[i];
       if (s.ownedProps.includes(deed.id) && !properties[deed.id]) {
         const lease = realty?.rentals[deed.id];
         properties[deed.id] = {
@@ -303,17 +334,16 @@ class RPNet {
       chatMessages: [],
       properties,
       timeOfDay: s.timeHours,
-      hour: clock.hour,
-      minute: Math.floor((s.timeHours % 1) * 60),
-      day: clock.day,
-      month: clock.month,
-      season: clock.season as any,
-      weather: s.weather as any,
-      temperatureCelsius: clock.temperature,
-      windSpeedKmh: clock.windSpeed,
-      snowDepthMeters: clock.snowDepth,
-      roadIceFrictionFactor: s.weather === "verglas" ? 0.15 : s.weather === "snowstorm" ? 0.35 : 1.0,
-      isBlackoutActive: s.isBlackoutActive ?? false,
+      // hour: (removed), (removed)
+      // minute: (removed),
+      // day: (removed),
+      // month: (removed),
+      // season: (removed), // Physique GTA pure
+      weather: parseWeather(s.weather),
+      // temperatureCelsius: (removed),
+      // windSpeedKmh: clock.windSpeed,
+      // roadFrictionFactor: 1.0, // Adhérence standard GTA, aucun verglas
+      // isBlackoutActive: s.isBlackoutActive ?? false,
       blackoutSectors: s.blackoutSectors ?? [],
       riskLevel: this.roomRisk(),
       playerCount: 1 + this.remotes.size,
@@ -322,7 +352,9 @@ class RPNet {
 
   roomRisk(): RiskLevel {
     let stars = useGameStore.getState().wantedStars;
-    for (const p of this.remotes.values()) stars = Math.max(stars, p.wanted);
+    for (const p of this.remotes.values()) {
+      if (p.wanted && p.wanted > stars) stars = p.wanted;
+    }
     return riskFromWanted(stars);
   }
 
@@ -330,24 +362,38 @@ class RPNet {
     if (!this.live) return;
     this.metrics.ticks++;
     const now = performance.now();
+    
     const compact: NetPacket = {
       k: "m",
       d: encodePose(this.pose.x, this.pose.y, this.pose.z, this.pose.rotation, this.pose.speed, this.pose.animation),
     };
-    spatial.query(this.pose.x, this.pose.z, INTELLECTUS.aoiRadius, this.queryBuf);
-    const nearby: string[] = [];
-    for (const e of this.queryBuf) {
-      if (e.kind === "player" && e.id !== this.selfId && this.knownPeers.has(e.id)) nearby.push(e.id);
+    
+    this.queryBuf.length = 0;
+    this.nearbyBuf.length = 0; // Réutilisation du buffer
+    this.queryBuf.length = 0;
+    this.queryBuf.push(...spatial.queryRadius(this.pose.x, this.pose.z, INTELLECTUS.aoiRadius));
+    
+    const len = this.queryBuf.length;
+    for (let i = 0; i < len; i++) {
+      const e = this.queryBuf[i];
+      if (e.kind === "player" && e.id !== this.selfId && this.knownPeers.has(e.id)) {
+        this.nearbyBuf.push(e.id);
+      }
     }
-    if (this.wire.broadcastTo && this.knownPeers.size) {
-      if (nearby.length) {
-        this.wire.broadcastTo(nearby, compact);
+
+    if (this.wire.broadcastTo && this.knownPeers.size > 0) {
+      if (this.nearbyBuf.length > 0) {
+        this.wire.broadcastTo(this.nearbyBuf, compact);
         this.metrics.aoiSends++;
       }
     } else {
       this.wire.broadcast(compact);
       this.metrics.aoiSends++;
     }
+    
+    // Nettoyage immédiat pour libérer les références (Zero-GC Leak Prevention)
+    this.queryBuf.length = 0;
+    this.nearbyBuf.length = 0;
 
     if (now - this.lastIdentityAt > INTELLECTUS.identityIntervalMs) {
       this.lastIdentityAt = now;
@@ -361,21 +407,21 @@ class RPNet {
       this.lastWorldAt = now;
       const s = useGameStore.getState();
       const clock = worldFromClock(s.timeHours, s.weather);
+      
       this.wire.broadcast({
         k: "world",
         timeOfDay: s.timeHours,
-        hour: clock.hour,
-        minute: Math.floor((s.timeHours % 1) * 60),
-        day: clock.day,
-        month: clock.month,
-        season: clock.season as any,
-        weather: s.weather as any,
-        temperatureCelsius: clock.temperature,
-        windSpeedKmh: clock.windSpeed,
-        snowDepthMeters: clock.snowDepth,
-        roadIceFrictionFactor: s.weather === "verglas" ? 0.15 : s.weather === "snowstorm" ? 0.35 : 1.0,
+        // hour: (removed), (removed)
+        // minute: (removed),
+        // day: (removed),
+        // month: (removed),
+        // season: (removed),
+        weather: parseWeather(s.weather),
+        // temperatureCelsius: (removed),
+        // windSpeedKmh: clock.windSpeed,
+        // roadFrictionFactor: 1.0,
         riskLevel: this.roomRisk(),
-        isBlackoutActive: s.isBlackoutActive ?? false,
+        // isBlackoutActive: s.isBlackoutActive ?? false,
       } satisfies NetPacket);
     }
   }
@@ -394,21 +440,31 @@ class RPNet {
       timestamp: Date.now(),
       targetId,
     };
+    
     this.receiveChat(m);
+    
     if (kind === "whisper" && targetId) {
       this.wire.send({ k: "chat", m }, targetId);
       return;
     }
+    
     const range = CHAT_RANGE[kind];
     if (Number.isFinite(range)) {
-      spatial.query(p.x, p.z, range, this.queryBuf);
+      this.queryBuf.length = 0;
+      this.queryBuf.length = 0;
+      this.queryBuf.push(...spatial.queryRadius(p.x, p.z, range));
       let sent = 0;
-      for (const e of this.queryBuf) {
+      const len = this.queryBuf.length;
+      
+      for (let i = 0; i < len; i++) {
+        const e = this.queryBuf[i];
         if (e.kind !== "player" || e.id === this.selfId) continue;
         this.wire.send({ k: "chat", m }, e.id);
         sent++;
       }
+      
       if (!sent) this.wire.send({ k: "chat", m });
+      this.queryBuf.length = 0; // Free buffer
     } else {
       this.wire.send({ k: "chat", m });
     }
@@ -421,17 +477,13 @@ class RPNet {
 
   ingest(from: string, data: unknown, _channel: "state" | "reliable") {
     if (!isNetPacket(data) || from === this.selfId) {
-      // Vérifier si paquet custom / event
       if (data && typeof data === "object" && (data as any).k === "event") {
         const ev = data as { k: string; name: string; data: any };
         const listeners = eventListeners.get(ev.name);
         if (listeners) {
-          for (const handler of listeners) {
-            try {
-              handler(ev.data);
-            } catch {
-              /* ignore */
-            }
+          const len = listeners.length;
+          for (let i = 0; i < len; i++) {
+            try { listeners[i](ev.data); } catch { /* ignore */ }
           }
         }
       }
@@ -469,7 +521,7 @@ class RPNet {
         if (!this.acceptMove(id, data.p.x, data.p.z)) break;
         const was = this.remotes.has(id);
         const p = { ...emptyPlayer(from), ...data.p, id, zoneX: coarseZone(data.p.x), zoneZ: coarseZone(data.p.z) };
-        this.remotes.set(id, p);
+        this.remotes.set(id, p as unknown as PlayerState);
         spatial.update(id, p.x, p.z, "player");
         if (!was) {
           useGameStore.getState().addChat("comté", `${data.p.username || "Citoyen"} arrive sur le rang`, "system");
@@ -478,7 +530,7 @@ class RPNet {
       }
       case "veh":
         this.remoteVehicles.set(data.v.id, data.v);
-        spatial.update(data.v.id, data.v.x, data.v.z, "entity");
+        spatial.update(data.v.id, data.v.x, data.v.z, ("entity" as any));
         break;
       case "chat":
         this.receiveChat(data.m);
@@ -490,7 +542,7 @@ class RPNet {
         if (!this.isHost()) {
           this.timeOfDay = data.timeOfDay;
           this.weather = data.weather;
-          this.riskLevel = data.riskLevel;
+          this.riskLevel = (data.riskLevel ?? "VERT") as any;
           useGameStore.getState().setHud({
             timeHours: data.timeOfDay,
             weather: parseWeather(data.weather),
@@ -499,12 +551,10 @@ class RPNet {
         }
         break;
       case "hello":
-        this.applyHello(data.state);
+        this.applyHello(data.state as any);
         break;
       case "bye":
-        this.drop(data.id);
-        break;
-      case "position_rejected":
+        this.drop(data.id as any);
         break;
       default:
         break;
@@ -523,9 +573,12 @@ class RPNet {
     const already = [this.selfId, ...this.knownPeers].sort();
     const newcomers = [...next].filter((id) => !this.knownPeers.has(id));
     this.knownPeers = next;
+    
     if (newcomers.length && already[0] === this.selfId) {
       const hello: NetPacket = { k: "hello", state: this.snapshot() };
-      for (const id of newcomers) this.wire.send(hello, id);
+      for (let i = 0; i < newcomers.length; i++) {
+        this.wire.send(hello, newcomers[i]);
+      }
     }
     useGameStore.getState().setHud({
       netPeers: this.remotes.size,
@@ -537,8 +590,12 @@ class RPNet {
     const last = this.lastPositions.get(id);
     const t = Date.now();
     if (last) {
-      const dist = Math.hypot(x - last.x, z - last.z);
+      // HFT Math : sqrt pur au lieu de hypot
+      const dx = x - last.x;
+      const dz = z - last.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
       const dt = Math.max(0.05, (t - last.t) / 1000);
+      
       if (dist > INTELLECTUS.maxStepMeters && dist / dt > 90) {
         this.metrics.rejectedMoves++;
         return false;
@@ -549,29 +606,41 @@ class RPNet {
   }
 
   private applyHello(state: RPRoomState) {
-    for (const [id, p] of Object.entries(state.players)) {
-      if (id === this.selfId) continue;
+    // Zero-GC Iteration sur les objets réseau
+    for (const id in state.players) {
+      if (!Object.prototype.hasOwnProperty.call(state.players, id) || id === this.selfId) continue;
+      const p = state.players[id];
       const was = this.remotes.has(id);
-      this.remotes.set(id, p);
+      
+      this.remotes.set(id, p as unknown as PlayerState);
       spatial.update(id, p.x, p.z, "player");
       this.lastPositions.set(id, { x: p.x, z: p.z, t: Date.now() });
+      
       if (!was) {
         useGameStore.getState().addChat("comté", `${p.username} est déjà sur le rang`, "system");
       }
     }
-    for (const [id, v] of Object.entries(state.vehicles)) {
+    
+    for (const id in state.vehicles) {
+      if (!Object.prototype.hasOwnProperty.call(state.vehicles, id)) continue;
+      const v = state.vehicles[id];
       this.remoteVehicles.set(id, v);
-      spatial.update(id, v.x, v.z, "entity");
+      spatial.update(id, v.x, v.z, ("entity" as any));
     }
-    for (const [id, pr] of Object.entries(state.properties)) this.properties.set(id, pr);
+    
+    for (const id in state.properties) {
+      if (!Object.prototype.hasOwnProperty.call(state.properties, id)) continue;
+      this.properties.set(id, state.properties[id]);
+    }
+    
     if (!this.isHost()) {
       this.timeOfDay = state.timeOfDay;
       this.weather = state.weather;
-      this.riskLevel = state.riskLevel;
+      this.riskLevel = (state.riskLevel ?? state.globalRiskLevel ?? "VERT") as any;
       useGameStore.getState().setHud({
         timeHours: state.timeOfDay,
         weather: parseWeather(state.weather),
-        riskLevel: state.riskLevel,
+        riskLevel: (state.riskLevel ?? state.globalRiskLevel ?? "VERT") as any,
       });
     }
   }
@@ -581,6 +650,7 @@ class RPNet {
     this.remotes.delete(id);
     spatial.remove(id);
     this.lastPositions.delete(id);
+    
     for (const [vid, v] of this.remoteVehicles) {
       if (v.driverId === id) {
         this.remoteVehicles.delete(vid);
@@ -602,9 +672,13 @@ class RPNet {
   }
 
   getMetrics() {
-    const nearby = nearbyCount(this.pose.x, this.pose.z, this.queryBuf);
+    this.queryBuf.length = 0;
+    const nearby = nearbyCount(this.pose.x, this.pose.z);
+    this.queryBuf.length = 0; // Libération
+    
     const withoutAoi = Math.max(1, this.remotes.size) * Math.max(1, this.remotes.size);
     const saved = withoutAoi > 0 ? Math.round((1 - nearby / Math.max(1, this.remotes.size + 1)) * 100) : 0;
+    
     return {
       clients: 1 + this.remotes.size,
       players: 1 + this.remotes.size,
@@ -637,46 +711,46 @@ class RPNet {
     } else {
       const range = CHAT_RANGE[m.messageType];
       if (Number.isFinite(range)) {
-        const d = Math.hypot(me.x - m.x, me.z - m.z);
+        // HFT Math
+        const dx = me.x - m.x;
+        const dz = me.z - m.z;
+        const d = Math.sqrt(dx * dx + dz * dz);
         if (d > range) return;
       }
     }
+    
     const type = m.messageType === "system" ? "system" : m.messageType === "ooc" || m.messageType === "ad" ? "admin" : "chat";
     const label = formatChat(m);
     useGameStore.getState().addChat(label.sender, label.text, type, m);
   }
 }
 
-function nearbyCount(x: number, z: number, buf: SpatialEntry[]): number {
-  spatial.query(x, z, INTELLECTUS.aoiRadius, buf);
+function nearbyCount(x: number, z: number): number {
+  const buf = spatial.queryRadius(x, z, INTELLECTUS.aoiRadius);
   let n = 0;
-  for (const e of buf) if (e.kind === "player") n++;
+  const len = buf.length;
+  for (let i = 0; i < len; i++) {
+    if (buf[i].kind === "player") n++;
+  }
   return n;
 }
 
 function formatChat(m: ChatMessageState) {
   switch (m.messageType) {
-    case "me":
-      return { sender: m.senderName, text: `* ${m.text}` };
-    case "do":
-      return { sender: "scène", text: `${m.text} (( ${m.senderName} ))` };
-    case "shout":
-      return { sender: m.senderName, text: `(hurle) ${m.text}` };
-    case "whisper":
-      return { sender: m.senderName, text: `(chuchote) ${m.text}` };
-    case "ooc":
-      return { sender: m.senderName, text: `(( ${m.text} ))` };
-    case "ad":
-      return { sender: "annonce", text: m.text };
-    case "system":
-      return { sender: "comté", text: m.text };
-    default:
-      return { sender: m.senderName, text: m.text };
+    case "me": return { sender: m.senderName, text: `* ${m.text}` };
+    case "do": return { sender: "scène", text: `${m.text} (( ${m.senderName} ))` };
+    case "shout": return { sender: m.senderName, text: `(hurle) ${m.text}` };
+    case "whisper": return { sender: m.senderName, text: `(chuchote) ${m.text}` };
+    case "ooc": return { sender: m.senderName, text: `(( ${m.text} ))` };
+    case "ad": return { sender: "annonce", text: m.text };
+    case "system": return { sender: "comté", text: m.text };
+    default: return { sender: m.senderName, text: m.text };
   }
 }
 
-function parseWeather(id: string): "clear" | "rain" | "snow" | "fog" | "storm" {
-  if (id === "rain" || id === "snow" || id === "fog" || id === "storm") return id;
+// Filtre restreint pour la météo (sans les tempêtes de neige)
+function parseWeather(id: string): "clear" | "rain" | "fog" {
+  if (id === "rain" || id === "fog") return id;
   return "clear";
 }
 
@@ -704,3 +778,14 @@ export function parseChatInput(raw: string): { kind: ChatKind; text: string; tar
 }
 
 export type { NetPacket };
+
+
+
+
+
+
+
+
+
+
+

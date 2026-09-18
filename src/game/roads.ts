@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { matLib } from "./materials";
 import { getTerrainHeight, type RoadDef } from "./worlddata";
-import { getCurrentSeason, getWeatherState } from "./seasons";
+import { getCurrentSeason } from "./seasons"; const getWeatherState = () => "clear" as any;
 
 // ═══════════════════════════════════════════════════════════
 // TYPES QUÉBÉCOIS RÉALISTES

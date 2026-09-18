@@ -1,31 +1,28 @@
 /**
  * ═══════════════════════════════════════════════════════════
- * 🛡️ ETHERWORLD — SYSTÈME RBAC STAFF DE PRODUCTION (v2.1)
+ * 🛡️ ETHERWORLD — SYSTÈME RBAC AVANCÉ (v3.0)
  * ═══════════════════════════════════════════════════════════
- * Inspiré des serveurs GTA RP de haute qualité (NoPixel, Loyola).
- *
- * v2.1 — AJOUTS (aucune ligne existante supprimée) :
- *   - Centrale 911 / Dispatch (appels, assignation, résolution)
- *   - Casier judiciaire (chefs d'accusation, rap sheet)
- *   - Primes (bounties)
- *   - Fourrière municipale MTQ
- *   - Signalements joueurs (/report)
- *   - getDisplayName() exporté pour usage externe
- *   - Persistance étendue (saveState/loadState/export/import/reset)
- *   - Classification des nouvelles commandes par palier RBAC
- * ═══════════════════════════════════════════════════════════
+ * Architecture modulaire avec :
+ *   - Permissions granulaires
+ *   - Validation robuste
+ *   - Indexation optimisée
+ *   - Système d'événements
+ *   - Anti-abuse renforcé
  */
+
 import {
   AdminRole,
   ROLE_HIERARCHY,
   ROLE_LADDER,
   RpJobRole,
+  Permission,
+  ROLE_PERMISSIONS,
   parseAdminRole,
   parseRpJobRole,
+  hasPermission as checkGranularPermission,
   type JobBadge,
   type RoleBadge,
   type StaffEntry,
-  // NOUVEAU v2.1
   DispatchPriority,
   DispatchStatus,
   DispatchDepartmentTag,
@@ -37,21 +34,26 @@ import {
   type PlayerReport,
 } from "./adminTypes";
 
-export { AdminRole, RpJobRole, ROLE_HIERARCHY, ROLE_LADDER, parseAdminRole, parseRpJobRole, DispatchPriority, DispatchStatus, DispatchDepartmentTag, ReportStatus };
+export { AdminRole, RpJobRole, ROLE_HIERARCHY, ROLE_LADDER, Permission, parseAdminRole, parseRpJobRole, DispatchPriority, DispatchStatus, DispatchDepartmentTag, ReportStatus };
 export type { JobBadge, RoleBadge, StaffEntry, DispatchCall, CriminalCharge, Bounty, ImpoundRecord, PlayerReport };
 
 // ═══════════════════════════════════════════════════════════
-// CONSTANTES & CONFIGURATION
+// CONFIGURATION & CONSTANTES
 // ═══════════════════════════════════════════════════════════
 
 export const LOCAL_PLAYER_ID = "local_player";
-const STORAGE_KEY = "etherworld_rbac_v2";
-const AUDIT_LOG_MAX = 500;
-const BAN_HISTORY_MAX = 200;
-const DISPATCH_LOG_MAX = 200;
-const REPORT_LOG_MAX = 200;
+const STORAGE_KEY = "etherworld_rbac_v3";
 
-// Rate limiting (Anti Power-Abuse)
+const LIMITS = {
+  AUDIT_LOG: 500,
+  BAN_HISTORY: 200,
+  DISPATCH_LOG: 200,
+  REPORT_LOG: 200,
+  WARN_THRESHOLD: 3,
+  AUTO_BAN_DAYS: 7,
+} as const;
+
+// Rate limiting par commande
 const RATE_LIMITS: Record<string, { windowMs: number; max: number }> = {
   cash: { windowMs: 60_000, max: 5 },
   givecash: { windowMs: 60_000, max: 5 },
@@ -61,16 +63,17 @@ const RATE_LIMITS: Record<string, { windowMs: number; max: number }> = {
   kick: { windowMs: 60_000, max: 5 },
   smite: { windowMs: 30_000, max: 2 },
   etherpulse: { windowMs: 60_000, max: 1 },
-  // AJOUTS v2.1
   warn: { windowMs: 60_000, max: 5 },
   bounty: { windowMs: 60_000, max: 3 },
   "911": { windowMs: 30_000, max: 4 },
   report: { windowMs: 120_000, max: 3 },
   impound: { windowMs: 60_000, max: 5 },
+  teleport: { windowMs: 10_000, max: 10 },
+  heal: { windowMs: 30_000, max: 5 },
 };
 
 // ═══════════════════════════════════════════════════════════
-// TYPES & INTERFACES ÉTENDUS
+// TYPES & INTERFACES
 // ═══════════════════════════════════════════════════════════
 
 export interface AuditLogEntry {
@@ -86,11 +89,12 @@ export interface AuditLogEntry {
   success: boolean;
   reason?: string;
   ip?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface Sanction {
   id: string;
-  type: "warn" | "kick" | "ban" | "mute";
+  type: "warn" | "kick" | "ban" | "mute" | "freeze" | "jail";
   targetId: string;
   targetName: string;
   moderatorId: string;
@@ -111,6 +115,7 @@ export interface DutyStatus {
   totalSecondsToday: number;
   totalSecondsAllTime: number;
   currentShiftStart?: number;
+  lastUpdated: number;
 }
 
 export interface StaffMetrics {
@@ -119,10 +124,11 @@ export interface StaffMetrics {
   playersKicked: number;
   playersBanned: number;
   playersWarned: number;
-  playersHelped: number;
+  playersHealed: number;
   reportsResolved: number;
   lastActivityAt: number;
   hoursOnDuty: number;
+  reputation: number; // Score de confiance
 }
 
 export interface JobRank {
@@ -135,7 +141,16 @@ export interface JobRank {
   formationsCompleted: string[];
 }
 
-// Grille de rangs syndicaux par métier
+export interface ValidationResult<T = unknown> {
+  valid: boolean;
+  data?: T;
+  errors?: string[];
+}
+
+// ═══════════════════════════════════════════════════════════
+// RANGS DE MÉTIERS
+// ═══════════════════════════════════════════════════════════
+
 export const JOB_RANKS: Partial<Record<RpJobRole, string[]>> = {
   [RpJobRole.POLICE_OFFICER]: ["Cadet", "Constable", "Constable Senior", "Sergent", "Lieutenant"],
   [RpJobRole.POLICE_CHIEF]: ["Capitaine", "Inspecteur-Chef", "Directeur Adjoint", "Chef SQ"],
@@ -160,156 +175,560 @@ export const DEFAULT_ROSTER: StaffEntry[] = [
 ];
 
 // ═══════════════════════════════════════════════════════════
-// COMMANDES PAR NIVEAU DE PERMISSION
+// COMMANDES PAR NIVEAU (Classification)
 // ═══════════════════════════════════════════════════════════
 
-const NONE_CMDS = new Set([
-  "help", "aide", "h",
-  "pos", "coords", "gps",
-  "lieux", "list",
-  "zone", "secteur", "sol",
-  "say", "chat", "me",
-  "radio", "fm",
-  "walk", "drive",
-  "camera", "cam",
-  "inv", "inventory",
-  "jobs", "emplois",
-  "outfit", "tenue", "aura", "model", "modele", "face", "skin",
-  "pack", "sac", "tool", "outil",
-  "tv", "bell", "lights", "elev", "elevator",
-  "floor", "etage",
-  "siren", "gyro", "gyrophare", "lightbar",
-  "patrouille", "unites", "amende", "amendes", "payer",
-  "boire", "emote", "geste",
-]);
-
-const HELPER_CMDS = new Set([
-  "status", "stats", "whoami",
-  "staffchat", "sc", "staff",
-  "ooc", "duty", "goduty",
-  "stafflist", "staffs",
-  "warn", "warnings",
-  "job", "emploi", "metier",
-  "gang", "report", "reports",
-]);
-
-const MOD_CMDS = new Set([
-  "kick", "mute", "unmute",
-  "jail", "unjail",
-  "freeze", "unfreeze", "degeler", "dégeler",
-  "vanish", "invis", "ghost",
-  "slap",
-  "heal", "revive",
-  "hurt", "blesse",
-  "wanted", "etoiles", "stars", "clear", "code4",
-  "arrest", "arrestation",
-  "ticket", "constat", "contraven",
-  "alcotest", "ethylotest", "éthylotest", "breathalyzer",
-  "radar",
-  "book", "ecrouer",
-  "lockdown", "confinement",
-  "release", "liberer",
-  "prison", "penitencier", "cellule",
-  "announce", "audit",
-]);
-
-const SUPER_CMDS = new Set([
-  "kit", "ban", "unban", "kickall",
-  "etherpulse", "pulse", "smite", "foudre",
-  "maxstats", "event",
-  "givecash", "givebank", "giveweapon", "gw",
-  "godmode", "god",
-]);
-
-const HEAD_CMDS = new Set([
-  "promote", "promo", "rankup",
-  "demote", "rankdown",
-  "setrole", "setrank", "grade",
-  "setrpjob", "setjobrole",
-  "export", "import", "reset",
-]);
+const COMMAND_GROUPS = {
+  NONE: new Set([
+    "help", "aide", "h", "pos", "coords", "gps", "lieux", "list", "zone", "secteur", "sol",
+    "say", "chat", "me", "radio", "fm", "walk", "drive", "camera", "cam", "inv", "inventory",
+    "jobs", "emplois", "outfit", "tenue", "aura", "model", "modele", "face", "skin", "pack",
+    "sac", "tool", "outil", "tv", "bell", "lights", "elev", "elevator", "floor", "etage",
+    "siren", "gyro", "gyrophare", "lightbar", "patrouille", "unites", "amende", "amendes",
+    "payer", "boire", "emote", "geste", "911", "dispatch", "sos", "bounties", "primes",
+    "diag", "perf", "telemetrie", "alerts", "releasecar", "recuperer", "loan", "pret",
+    "invest", "placement", "mls", "immo", "immobilier", "firm", "entreprise", "req", "hire",
+    "embaucher", "mapaq", "grant", "subvention", "semer", "seed", "graines", "dutystatus",
+  ]),
+  HELPER: new Set([
+    "status", "stats", "whoami", "staffchat", "sc", "staff", "ooc", "duty", "goduty",
+    "stafflist", "staffs", "warn", "warnings", "job", "emploi", "metier", "gang", "report",
+    "reports", "signaler", "warns", "sanctions", "calls",
+  ]),
+  MOD: new Set([
+    "kick", "mute", "unmute", "jail", "unjail", "freeze", "unfreeze", "degeler", "dégeler",
+    "vanish", "invis", "ghost", "slap", "heal", "revive", "hurt", "blesse", "wanted",
+    "etoiles", "stars", "clear", "code4", "arrest", "arrestation", "ticket", "constat",
+    "contraven", "alcotest", "ethylotest", "éthylotest", "breathalyzer", "radar", "book",
+    "ecrouer", "lockdown", "confinement", "release", "liberer", "prison", "penitencier",
+    "cellule", "announce", "audit", "respond", "10-4", "onscene", "surplace", "clear911",
+    "codegreen", "record", "casier", "rapsheet", "impound", "fourriere", "fourrière",
+    "impoundlot", "fourrierelot", "bounty", "prime", "claimbounty", "encaisser",
+  ]),
+  SUPER: new Set([
+    "kit", "ban", "unban", "kickall", "etherpulse", "pulse", "smite", "foudre", "maxstats",
+    "event", "givecash", "givebank", "giveweapon", "gw", "godmode", "god",
+  ]),
+  HEAD: new Set([
+    "promote", "promo", "rankup", "demote", "rankdown", "setrole", "setrank", "grade",
+    "setrpjob", "setjobrole", "export", "import", "reset",
+  ]),
+} as const;
 
 // ═══════════════════════════════════════════════════════════
-// AJOUTS v2.1 — CLASSIFICATION DES NOUVELLES COMMANDES
-// Ne touche à aucun tableau existant : ajout par .add() seulement.
+// SYSTÈME D'ÉVÉNEMENTS
 // ═══════════════════════════════════════════════════════════
 
-for (const c of [
-  "911", "dispatch", "sos",
-  "bounties", "primes",
-  "diag", "perf", "telemetrie", "alerts",
-  "releasecar", "recuperer",
-  "loan", "pret", "invest", "placement",
-  "mls", "immo", "immobilier",
-  "firm", "entreprise", "req",
-  "hire", "embaucher",
-  "mapaq", "grant", "subvention",
-  "semer", "seed", "graines",
-  "dutystatus",
-]) {
-  NONE_CMDS.add(c);
+type EventCallback = (data: unknown) => void;
+const eventListeners = new Map<string, Set<EventCallback>>();
+
+function emitEvent(eventName: string, data: unknown): void {
+  const listeners = eventListeners.get(eventName);
+  if (listeners) {
+    listeners.forEach((cb) => {
+      try {
+        cb(data);
+      } catch (err) {
+        console.error(`[RBAC] Event listener error for ${eventName}:`, err);
+      }
+    });
+  }
 }
 
-for (const c of ["signaler", "warns", "sanctions", "calls"]) {
-  HELPER_CMDS.add(c);
-}
-
-for (const c of [
-  "respond", "10-4", "onscene", "surplace", "clear911", "codegreen",
-  "record", "casier", "rapsheet",
-  "impound", "fourriere", "fourrière", "impoundlot", "fourrierelot",
-  "bounty", "prime", "claimbounty", "encaisser",
-]) {
-  MOD_CMDS.add(c);
+export function onEvent(eventName: string, callback: EventCallback): () => void {
+  if (!eventListeners.has(eventName)) {
+    eventListeners.set(eventName, new Set());
+  }
+  eventListeners.get(eventName)!.add(callback);
+  return () => eventListeners.get(eventName)?.delete(callback);
 }
 
 // ═══════════════════════════════════════════════════════════
-// STATE INTERNE (Persistance localStorage)
+// STATE INTERNE AVEC INDEXATION
 // ═══════════════════════════════════════════════════════════
 
-const userRoles = new Map<string, AdminRole>();
-const userJobs = new Map<string, RpJobRole>();
-const userNames = new Map<string, string>();
-const userDuty = new Map<string, DutyStatus>();
-const userMetrics = new Map<string, StaffMetrics>();
-const userRanks = new Map<string, JobRank>();
-const auditLog: AuditLogEntry[] = [];
-const sanctionsLog: Sanction[] = [];
-const rateLimitBuckets = new Map<string, number[]>();
+class RBACState {
+  private userRoles = new Map<string, AdminRole>();
+  private userJobs = new Map<string, RpJobRole>();
+  private userNames = new Map<string, string>();
+  private userDuty = new Map<string, DutyStatus>();
+  private userMetrics = new Map<string, StaffMetrics>();
+  private userRanks = new Map<string, JobRank>();
+  private auditLog: AuditLogEntry[] = [];
+  private sanctionsLog: Sanction[] = [];
+  private rateLimitBuckets = new Map<string, number[]>();
+  private dispatchCalls: DispatchCall[] = [];
+  private criminalRecords = new Map<string, CriminalCharge[]>();
+  private bounties: Bounty[] = [];
+  private impoundLot: ImpoundRecord[] = [];
+  private playerReports: PlayerReport[] = [];
 
-// AJOUTS v2.1 — déclarés ici (avant loadState()) pour éviter toute
-// erreur de "temporal dead zone" au chargement du module.
-const dispatchCalls: DispatchCall[] = [];
-const criminalRecords = new Map<string, CriminalCharge[]>();
-const bounties: Bounty[] = [];
-const impoundLot: ImpoundRecord[] = [];
-const playerReports: PlayerReport[] = [];
+  // Index pour recherche rapide
+  private sanctionsByTarget = new Map<string, Set<string>>();
+  private reportsByStatus = new Map<ReportStatus, Set<string>>();
+
+  constructor() {
+    this.initIndexes();
+  }
+
+  private initIndexes(): void {
+    for (const status of Object.values(ReportStatus)) {
+      this.reportsByStatus.set(status, new Set());
+    }
+  }
+
+  // Getters
+  getRole(id: string): AdminRole {
+    return this.userRoles.get(id) ?? AdminRole.NONE;
+  }
+
+  getJob(id: string): RpJobRole {
+    return this.userJobs.get(id) ?? RpJobRole.CIVILIAN;
+  }
+
+  getName(id: string): string {
+    return this.userNames.get(id) ?? id;
+  }
+
+  getDuty(id: string): DutyStatus | null {
+    return this.userDuty.get(id) ?? null;
+  }
+
+  getMetrics(id: string): StaffMetrics {
+    let m = this.userMetrics.get(id);
+    if (!m) {
+      m = {
+        identifier: id,
+        commandsExecuted: 0,
+        playersKicked: 0,
+        playersBanned: 0,
+        playersWarned: 0,
+        playersHealed: 0,
+        reportsResolved: 0,
+        lastActivityAt: 0,
+        hoursOnDuty: 0,
+        reputation: 100,
+      };
+      this.userMetrics.set(id, m);
+    }
+    return m;
+  }
+
+  // Setters
+  setRole(id: string, role: AdminRole): void {
+    this.userRoles.set(id, role);
+    emitEvent("roleChange", { id, role });
+  }
+
+  setJob(id: string, job: RpJobRole): void {
+    this.userJobs.set(id, job);
+    if (!this.userRanks.has(id) && JOB_RANKS[job]) {
+      this.userRanks.set(id, {
+        jobId: job,
+        currentRank: 0,
+        maxRank: (JOB_RANKS[job]?.length ?? 1) - 1,
+        rankName: JOB_RANKS[job]?.[0] ?? "Recrue",
+        yearsService: 0,
+        promotionsCount: 0,
+        formationsCompleted: [],
+      });
+    }
+    emitEvent("jobChange", { id, job });
+  }
+
+  setName(id: string, name: string): void {
+    this.userNames.set(id, name);
+  }
+
+  setDuty(id: string, duty: DutyStatus): void {
+    this.userDuty.set(id, duty);
+  }
+
+  updateMetrics(id: string, updates: Partial<StaffMetrics>): void {
+    const m = this.getMetrics(id);
+    Object.assign(m, updates);
+    this.userMetrics.set(id, m);
+  }
+
+  // Audit Log
+  addAuditEntry(entry: AuditLogEntry): void {
+    this.auditLog.push(entry);
+    if (this.auditLog.length > LIMITS.AUDIT_LOG) {
+      this.auditLog.splice(0, this.auditLog.length - LIMITS.AUDIT_LOG);
+    }
+    emitEvent("audit", entry);
+  }
+
+  getAuditLog(filters?: {
+    actorId?: string;
+    targetId?: string;
+    command?: string;
+    limit?: number;
+  }): AuditLogEntry[] {
+    let result = [...this.auditLog];
+    if (filters?.actorId) result = result.filter((e) => e.actorId === filters.actorId);
+    if (filters?.targetId) result = result.filter((e) => e.targetId === filters.targetId);
+    if (filters?.command) result = result.filter((e) => e.command === filters.command);
+    result.sort((a, b) => b.timestamp - a.timestamp);
+    return result.slice(0, filters?.limit ?? 100);
+  }
+
+  // Sanctions
+  addSanction(sanction: Sanction): void {
+    this.sanctionsLog.push(sanction);
+    if (this.sanctionsLog.length > LIMITS.BAN_HISTORY) {
+      this.sanctionsLog.splice(0, this.sanctionsLog.length - LIMITS.BAN_HISTORY);
+    }
+    // Index
+    if (!this.sanctionsByTarget.has(sanction.targetId)) {
+      this.sanctionsByTarget.set(sanction.targetId, new Set());
+    }
+    this.sanctionsByTarget.get(sanction.targetId)!.add(sanction.id);
+    emitEvent("sanction", sanction);
+  }
+
+  getSanctions(targetId: string): Sanction[] {
+    const ids = this.sanctionsByTarget.get(targetId);
+    if (!ids) return [];
+    return Array.from(ids)
+      .map((id) => this.sanctionsLog.find((s) => s.id === id))
+      .filter((s): s is Sanction => s !== undefined);
+  }
+
+  getActiveWarns(targetId: string): Sanction[] {
+    const now = Date.now();
+    return this.getSanctions(targetId).filter(
+      (s) => s.type === "warn" && s.active && (!s.expiresAt || s.expiresAt > now)
+    );
+  }
+
+  isBanned(targetId: string): Sanction | null {
+    const now = Date.now();
+    return (
+      this.getSanctions(targetId).find(
+        (s) => s.type === "ban" && s.active && (!s.expiresAt || s.expiresAt > now)
+      ) ?? null
+    );
+  }
+
+  isMuted(targetId: string): Sanction | null {
+    const now = Date.now();
+    return (
+      this.getSanctions(targetId).find(
+        (s) => s.type === "mute" && s.active && (!s.expiresAt || s.expiresAt > now)
+      ) ?? null
+    );
+  }
+
+  updateSanction(id: string, updates: Partial<Sanction>): boolean {
+    const s = this.sanctionsLog.find((s) => s.id === id);
+    if (!s) return false;
+    Object.assign(s, updates);
+    emitEvent("sanctionUpdate", s);
+    return true;
+  }
+
+  // Reports
+  addReport(report: PlayerReport): void {
+    this.playerReports.unshift(report);
+    if (this.playerReports.length > LIMITS.REPORT_LOG) {
+      this.playerReports.length = LIMITS.REPORT_LOG;
+    }
+    this.reportsByStatus.get(report.status)?.add(report.id);
+    emitEvent("report", report);
+  }
+
+  getReports(status?: ReportStatus): PlayerReport[] {
+    if (!status) return [...this.playerReports];
+    const ids = this.reportsByStatus.get(status);
+    if (!ids) return [];
+    return Array.from(ids)
+      .map((id) => this.playerReports.find((r) => r.id === id))
+      .filter((r): r is PlayerReport => r !== undefined);
+  }
+
+  updateReport(id: string, updates: Partial<PlayerReport>): boolean {
+    const r = this.playerReports.find((r) => r.id === id);
+    if (!r) return false;
+    const oldStatus = r.status;
+    Object.assign(r, updates);
+    if (updates.status && updates.status !== oldStatus) {
+      this.reportsByStatus.get(oldStatus)?.delete(id);
+      this.reportsByStatus.get(updates.status)?.add(id);
+    }
+    emitEvent("reportUpdate", r);
+    return true;
+  }
+
+  // Dispatch
+  addDispatchCall(call: DispatchCall): void {
+    this.dispatchCalls.unshift(call);
+    if (this.dispatchCalls.length > LIMITS.DISPATCH_LOG) {
+      this.dispatchCalls.length = LIMITS.DISPATCH_LOG;
+    }
+    emitEvent("dispatch", call);
+  }
+
+  getActiveDispatchCalls(department?: DispatchDepartmentTag): DispatchCall[] {
+    return this.dispatchCalls.filter(
+      (c) =>
+        c.status !== DispatchStatus.RESOLVED &&
+        c.status !== DispatchStatus.CANCELLED &&
+        (!department || department === DispatchDepartmentTag.TOUS || c.department === department)
+    );
+  }
+
+  updateDispatchCall(id: string, updates: Partial<DispatchCall>): boolean {
+    const c = this.dispatchCalls.find((c) => c.id === id);
+    if (!c) return false;
+    Object.assign(c, updates);
+    emitEvent("dispatchUpdate", c);
+    return true;
+  }
+
+  // Criminal Records
+  addCriminalCharge(targetId: string, charge: CriminalCharge): void {
+    if (!this.criminalRecords.has(targetId)) {
+      this.criminalRecords.set(targetId, []);
+    }
+    this.criminalRecords.get(targetId)!.unshift(charge);
+    emitEvent("criminalCharge", { targetId, charge });
+  }
+
+  getCriminalRecord(targetId: string): CriminalCharge[] {
+    return this.criminalRecords.get(targetId) ?? [];
+  }
+
+  // Bounties
+  addBounty(bounty: Bounty): void {
+    this.bounties.unshift(bounty);
+    emitEvent("bounty", bounty);
+  }
+
+  getActiveBounties(): Bounty[] {
+    return this.bounties.filter((b) => b.active);
+  }
+
+  updateBounty(id: string, updates: Partial<Bounty>): boolean {
+    const b = this.bounties.find((b) => b.id === id);
+    if (!b) return false;
+    Object.assign(b, updates);
+    emitEvent("bountyUpdate", b);
+    return true;
+  }
+
+  // Impound
+  addImpoundRecord(record: ImpoundRecord): void {
+    this.impoundLot.push(record);
+    emitEvent("impound", record);
+  }
+
+  getImpoundRecords(ownerId?: string): ImpoundRecord[] {
+    return this.impoundLot.filter((r) => !r.releasedAt && (!ownerId || r.ownerId === ownerId));
+  }
+
+  updateImpoundRecord(id: string, updates: Partial<ImpoundRecord>): boolean {
+    const r = this.impoundLot.find((r) => r.id === id);
+    if (!r) return false;
+    Object.assign(r, updates);
+    emitEvent("impoundUpdate", r);
+    return true;
+  }
+
+  // Rate Limiting
+  checkRateLimit(id: string, command: string): { allowed: boolean; retryAfterMs?: number } {
+    const limit = RATE_LIMITS[command];
+    if (!limit) return { allowed: true };
+
+    const key = `${id}:${command}`;
+    const now = Date.now();
+    const bucket = this.rateLimitBuckets.get(key) ?? [];
+    const recent = bucket.filter((t) => now - t < limit.windowMs);
+
+    if (recent.length >= limit.max) {
+      const oldestValid = recent[0]!;
+      const retryAfterMs = limit.windowMs - (now - oldestValid);
+      return { allowed: false, retryAfterMs };
+    }
+
+    recent.push(now);
+    this.rateLimitBuckets.set(key, recent);
+    return { allowed: true };
+  }
+
+  // Snapshot
+  snapshotStaff(): StaffEntry[] {
+    const ids = new Set([...this.userRoles.keys(), ...this.userJobs.keys()]);
+    const out: StaffEntry[] = [];
+    for (const id of ids) {
+      const role = this.getRole(id);
+      if (role === AdminRole.NONE && id !== LOCAL_PLAYER_ID) continue;
+      out.push({
+        identifier: id,
+        displayName: this.getName(id),
+        role,
+        job: this.getJob(id),
+      });
+    }
+    out.sort((a, b) => ROLE_HIERARCHY[b.role] - ROLE_HIERARCHY[a.role]);
+    return out;
+  }
+
+  // Clear
+  clear(): void {
+    this.userRoles.clear();
+    this.userJobs.clear();
+    this.userNames.clear();
+    this.userDuty.clear();
+    this.userMetrics.clear();
+    this.userRanks.clear();
+    this.auditLog.length = 0;
+    this.sanctionsLog.length = 0;
+    this.rateLimitBuckets.clear();
+    this.dispatchCalls.length = 0;
+    this.criminalRecords.clear();
+    this.bounties.length = 0;
+    this.impoundLot.length = 0;
+    this.playerReports.length = 0;
+    this.sanctionsByTarget.clear();
+    this.initIndexes();
+  }
+
+  // Import/Export
+  export(): string {
+    return JSON.stringify(
+      {
+        version: 3,
+        roster: this.snapshotStaff(),
+        auditLog: this.auditLog,
+        sanctions: this.sanctionsLog,
+        duty: Array.from(this.userDuty.entries()),
+        metrics: Array.from(this.userMetrics.entries()),
+        ranks: Array.from(this.userRanks.entries()),
+        dispatch: this.dispatchCalls,
+        criminalRecords: Array.from(this.criminalRecords.entries()),
+        bounties: this.bounties,
+        impoundLot: this.impoundLot,
+        reports: this.playerReports,
+        exportedAt: Date.now(),
+      },
+      null,
+      2
+    );
+  }
+
+  import(json: string): boolean {
+    try {
+      const data = JSON.parse(json);
+      if (!data || typeof data !== "object") return false;
+
+      this.clear();
+
+      if (Array.isArray(data.roster)) {
+        for (const e of data.roster) {
+          this.setRole(e.identifier, e.role);
+          this.setJob(e.identifier, e.job);
+          this.setName(e.identifier, e.displayName);
+        }
+      }
+      if (Array.isArray(data.auditLog)) this.auditLog.push(...data.auditLog);
+      if (Array.isArray(data.sanctions)) {
+        for (const s of data.sanctions) {
+          this.sanctionsLog.push(s);
+          if (!this.sanctionsByTarget.has(s.targetId)) {
+            this.sanctionsByTarget.set(s.targetId, new Set());
+          }
+          this.sanctionsByTarget.get(s.targetId)!.add(s.id);
+        }
+      }
+      if (Array.isArray(data.duty)) {
+        for (const [id, ds] of data.duty) this.userDuty.set(id, ds);
+      }
+      if (Array.isArray(data.metrics)) {
+        for (const [id, m] of data.metrics) this.userMetrics.set(id, m);
+      }
+      if (Array.isArray(data.ranks)) {
+        for (const [id, r] of data.ranks) this.userRanks.set(id, r);
+      }
+      if (Array.isArray(data.dispatch)) this.dispatchCalls.push(...data.dispatch);
+      if (Array.isArray(data.criminalRecords)) {
+        for (const [id, charges] of data.criminalRecords) this.criminalRecords.set(id, charges);
+      }
+      if (Array.isArray(data.bounties)) this.bounties.push(...data.bounties);
+      if (Array.isArray(data.impoundLot)) this.impoundLot.push(...data.impoundLot);
+      if (Array.isArray(data.reports)) {
+        for (const r of data.reports) {
+          this.playerReports.push(r);
+          this.reportsByStatus.get(r.status)?.add(r.id);
+        }
+      }
+
+      emitEvent("import", { success: true });
+      return true;
+    } catch (err) {
+      console.error("[RBAC] Import error:", err);
+      emitEvent("import", { success: false, error: err });
+      return false;
+    }
+  }
+}
+
+// Singleton instance
+const state = new RBACState();
 
 // ═══════════════════════════════════════════════════════════
-// PERSISTANCE (localStorage)
+// VALIDATION
 // ═══════════════════════════════════════════════════════════
 
-function saveState() {
+function validateId(id: unknown): ValidationResult<string> {
+  if (typeof id !== "string" || !id.trim()) {
+    return { valid: false, errors: ["ID invalide"] };
+  }
+  return { valid: true, data: id.trim() };
+}
+
+function validateAmount(amount: unknown): ValidationResult<number> {
+  if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) {
+    return { valid: false, errors: ["Montant invalide"] };
+  }
+  return { valid: true, data: amount };
+}
+
+function validatePermission(actorId: string, permission: Permission): ValidationResult<void> {
+  const role = state.getRole(actorId);
+  if (!checkGranularPermission(role, permission)) {
+    return { valid: false, errors: [`Permission refusée: ${permission}`] };
+  }
+  return { valid: true };
+}
+
+function validateTarget(actorId: string, targetId: string): ValidationResult<void> {
+  if (actorId === targetId) return { valid: true };
+
+  const actorRole = state.getRole(actorId);
+  const targetRole = state.getRole(targetId);
+
+  if (actorRole === AdminRole.INTELLECTUS_AI || actorRole === AdminRole.OWNER) {
+    return { valid: true };
+  }
+
+  if ((ROLE_HIERARCHY[actorRole] ?? 0) <= (ROLE_HIERARCHY[targetRole] ?? 0)) {
+    return { valid: false, errors: ["Vous ne pouvez pas agir sur ce joueur (rang supérieur)"] };
+  }
+
+  return { valid: true };
+}
+
+// ═══════════════════════════════════════════════════════════
+// PERSISTANCE
+// ═══════════════════════════════════════════════════════════
+
+function saveState(): void {
   if (typeof window === "undefined" || !window.localStorage) return;
   try {
-    const data = {
-      roster: snapshotStaff(),
-      auditLog: auditLog.slice(-AUDIT_LOG_MAX),
-      sanctions: sanctionsLog.slice(-BAN_HISTORY_MAX),
-      duty: Array.from(userDuty.entries()),
-      metrics: Array.from(userMetrics.entries()),
-      ranks: Array.from(userRanks.entries()),
-      // AJOUTS v2.1
-      dispatch: dispatchCalls.slice(0, DISPATCH_LOG_MAX),
-      criminalRecords: Array.from(criminalRecords.entries()),
-      bounties,
-      impoundLot,
-      reports: playerReports.slice(0, REPORT_LOG_MAX),
-      savedAt: Date.now(),
-    };
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch (e) {
-    console.warn("[RBAC] Impossible de sauvegarder l'état:", e);
+    window.localStorage.setItem(STORAGE_KEY, state.export());
+  } catch (err) {
+    console.warn("[RBAC] Save error:", err);
   }
 }
 
@@ -318,44 +737,9 @@ function loadState(): boolean {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return false;
-    const data = JSON.parse(raw);
-    if (Array.isArray(data.roster)) {
-      for (const e of data.roster) seed(e);
-    }
-    if (Array.isArray(data.auditLog)) {
-      auditLog.push(...data.auditLog);
-    }
-    if (Array.isArray(data.sanctions)) {
-      sanctionsLog.push(...data.sanctions);
-    }
-    if (Array.isArray(data.duty)) {
-      for (const [id, ds] of data.duty) userDuty.set(id, ds);
-    }
-    if (Array.isArray(data.metrics)) {
-      for (const [id, m] of data.metrics) userMetrics.set(id, m);
-    }
-    if (Array.isArray(data.ranks)) {
-      for (const [id, r] of data.ranks) userRanks.set(id, r);
-    }
-    // AJOUTS v2.1
-    if (Array.isArray(data.dispatch)) {
-      dispatchCalls.push(...data.dispatch);
-    }
-    if (Array.isArray(data.criminalRecords)) {
-      for (const [id, charges] of data.criminalRecords) criminalRecords.set(id, charges);
-    }
-    if (Array.isArray(data.bounties)) {
-      bounties.push(...data.bounties);
-    }
-    if (Array.isArray(data.impoundLot)) {
-      impoundLot.push(...data.impoundLot);
-    }
-    if (Array.isArray(data.reports)) {
-      playerReports.push(...data.reports);
-    }
-    return true;
-  } catch (e) {
-    console.warn("[RBAC] Impossible de restaurer l'état:", e);
+    return state.import(raw);
+  } catch (err) {
+    console.warn("[RBAC] Load error:", err);
     return false;
   }
 }
@@ -364,46 +748,31 @@ function loadState(): boolean {
 // INITIALISATION
 // ═══════════════════════════════════════════════════════════
 
-function seed(entry: StaffEntry) {
-  userRoles.set(entry.identifier, entry.role);
-  userJobs.set(entry.identifier, entry.job);
-  userNames.set(entry.identifier, entry.displayName);
+function seed(entry: StaffEntry): void {
+  state.setRole(entry.identifier, entry.role);
+  state.setJob(entry.identifier, entry.job);
+  state.setName(entry.identifier, entry.displayName);
 }
 
-// Charge l'état persisté, ou utilise le roster par défaut
 if (!loadState()) {
   for (const e of DEFAULT_ROSTER) seed(e);
+  saveState();
 }
 
 // ═══════════════════════════════════════════════════════════
-// GESTION DU ROSTER
+// API PUBLIQUE
 // ═══════════════════════════════════════════════════════════
 
-export function hydrateStaff(roster: StaffEntry[] | null | undefined, localRole?: AdminRole) {
-  userRoles.clear();
-  userJobs.clear();
-  userNames.clear();
+export function hydrateStaff(roster: StaffEntry[] | null | undefined, localRole?: AdminRole): void {
+  state.clear();
   const list = roster && roster.length ? roster : DEFAULT_ROSTER;
   for (const e of list) seed(e);
-  if (localRole) userRoles.set(LOCAL_PLAYER_ID, localRole);
+  if (localRole) state.setRole(LOCAL_PLAYER_ID, localRole);
   saveState();
 }
 
 export function snapshotStaff(): StaffEntry[] {
-  const ids = new Set([...userRoles.keys(), ...userJobs.keys()]);
-  const out: StaffEntry[] = [];
-  for (const id of ids) {
-    const role = userRoles.get(id) ?? AdminRole.NONE;
-    if (role === AdminRole.NONE && id !== LOCAL_PLAYER_ID) continue;
-    out.push({
-      identifier: id,
-      displayName: userNames.get(id) ?? id,
-      role,
-      job: userJobs.get(id) ?? RpJobRole.CIVILIAN,
-    });
-  }
-  out.sort((a, b) => ROLE_HIERARCHY[b.role] - ROLE_HIERARCHY[a.role]);
-  return out;
+  return state.snapshotStaff();
 }
 
 export function parseStaffRoster(raw: unknown): StaffEntry[] {
@@ -412,53 +781,46 @@ export function parseStaffRoster(raw: unknown): StaffEntry[] {
   for (const row of raw) {
     if (!row || typeof row !== "object") continue;
     const r = row as Record<string, unknown>;
-    const id = typeof r.identifier === "string" ? r.identifier : "";
-    if (!id) continue;
+    const idVal = validateId(r.identifier);
+    if (!idVal.valid || !idVal.data) continue;
     const role = parseAdminRole(r.role) ?? AdminRole.NONE;
     const job = parseRpJobRole(r.job) ?? RpJobRole.CIVILIAN;
-    const displayName = typeof r.displayName === "string" ? r.displayName : id;
-    out.push({ identifier: id, displayName, role, job });
+    const displayName = typeof r.displayName === "string" ? r.displayName : idVal.data;
+    out.push({ identifier: idVal.data, displayName, role, job });
   }
   return out.length ? out : DEFAULT_ROSTER.map((e) => ({ ...e }));
 }
 
-export function setDisplayName(identifier: string, name: string) {
-  userNames.set(identifier, name);
+export function setDisplayName(identifier: string, name: string): void {
+  const v = validateId(identifier);
+  if (!v.valid) return;
+  state.setName(v.data!, name);
   saveState();
 }
 
-/** AJOUT v2.1 — lecture publique du nom d'affichage d'un identifiant. */
 export function getDisplayName(identifier: string): string {
-  return userNames.get(identifier) ?? identifier;
+  return state.getName(identifier);
 }
 
 export function getUserRole(identifier: string): AdminRole {
-  return userRoles.get(identifier) || AdminRole.NONE;
+  return state.getRole(identifier);
 }
 
 export function setUserRole(identifier: string, role: AdminRole): void {
-  userRoles.set(identifier, role);
+  const v = validateId(identifier);
+  if (!v.valid) return;
+  state.setRole(v.data!, role);
   saveState();
 }
 
 export function getUserJob(identifier: string): RpJobRole {
-  return userJobs.get(identifier) || RpJobRole.CIVILIAN;
+  return state.getJob(identifier);
 }
 
 export function setUserJob(identifier: string, job: RpJobRole): void {
-  userJobs.set(identifier, job);
-  // Initialiser le rang si nouveau métier
-  if (!userRanks.has(identifier) && JOB_RANKS[job]) {
-    userRanks.set(identifier, {
-      jobId: job,
-      currentRank: 0,
-      maxRank: (JOB_RANKS[job]?.length ?? 1) - 1,
-      rankName: JOB_RANKS[job]?.[0] ?? "Recrue",
-      yearsService: 0,
-      promotionsCount: 0,
-      formationsCompleted: [],
-    });
-  }
+  const v = validateId(identifier);
+  if (!v.valid) return;
+  state.setJob(v.data!, job);
   saveState();
 }
 
@@ -467,15 +829,15 @@ export function getAllStaffMembers(): StaffEntry[] {
 }
 
 // ═══════════════════════════════════════════════════════════
-// SYSTÈME DE PROMOTION / RÉTROGRADATION
+// PROMOTION / RÉTROGRADATION
 // ═══════════════════════════════════════════════════════════
 
 export function promoteUser(identifier: string, actorId?: string): AdminRole {
-  const current = getUserRole(identifier);
+  const current = state.getRole(identifier);
   const idx = ROLE_LADDER.indexOf(current);
   if (idx >= 0 && idx < ROLE_LADDER.length - 1) {
     const next = ROLE_LADDER[idx + 1]!;
-    setUserRole(identifier, next);
+    state.setRole(identifier, next);
     logAudit({
       actorId: actorId ?? "system",
       command: "promote",
@@ -483,17 +845,18 @@ export function promoteUser(identifier: string, actorId?: string): AdminRole {
       targetId: identifier,
       success: true,
     });
+    saveState();
     return next;
   }
   return current;
 }
 
 export function demoteUser(identifier: string, actorId?: string): AdminRole {
-  const current = getUserRole(identifier);
+  const current = state.getRole(identifier);
   const idx = ROLE_LADDER.indexOf(current);
   if (idx > 0) {
     const prev = ROLE_LADDER[idx - 1]!;
-    setUserRole(identifier, prev);
+    state.setRole(identifier, prev);
     logAudit({
       actorId: actorId ?? "system",
       command: "demote",
@@ -501,13 +864,14 @@ export function demoteUser(identifier: string, actorId?: string): AdminRole {
       targetId: identifier,
       success: true,
     });
+    saveState();
     return prev;
   }
   return current;
 }
 
 // ═══════════════════════════════════════════════════════════
-// SYSTÈME DE PERMISSIONS
+// PERMISSIONS
 // ═══════════════════════════════════════════════════════════
 
 export function hasPermission(userRole: AdminRole, requiredRole: AdminRole): boolean {
@@ -515,56 +879,45 @@ export function hasPermission(userRole: AdminRole, requiredRole: AdminRole): boo
 }
 
 export function checkPermission(identifier: string, requiredRole: AdminRole): boolean {
-  return hasPermission(getUserRole(identifier), requiredRole);
+  return hasPermission(state.getRole(identifier), requiredRole);
+}
+
+export function canPerform(identifier: string, permission: Permission): boolean {
+  const role = state.getRole(identifier);
+  return checkGranularPermission(role, permission);
 }
 
 export function canChangeRole(actorId: string, targetNext: AdminRole): boolean {
-  const actor = getUserRole(actorId);
+  const actor = state.getRole(actorId);
   if (!hasPermission(actor, AdminRole.HEAD_ADMIN)) return false;
   if (actor === AdminRole.INTELLECTUS_AI) return true;
   return ROLE_HIERARCHY[targetNext] < ROLE_HIERARCHY[actor];
 }
 
 export function requiredRoleFor(cmd: string): AdminRole {
-  if (NONE_CMDS.has(cmd)) return AdminRole.NONE;
-  if (HELPER_CMDS.has(cmd)) return AdminRole.HELPER;
-  if (MOD_CMDS.has(cmd)) return AdminRole.MOD;
-  if (SUPER_CMDS.has(cmd)) return AdminRole.SUPERADMIN;
-  if (HEAD_CMDS.has(cmd)) return AdminRole.HEAD_ADMIN;
+  if (COMMAND_GROUPS.NONE.has(cmd)) return AdminRole.NONE;
+  if (COMMAND_GROUPS.HELPER.has(cmd)) return AdminRole.HELPER;
+  if (COMMAND_GROUPS.MOD.has(cmd)) return AdminRole.MOD;
+  if (COMMAND_GROUPS.SUPER.has(cmd)) return AdminRole.SUPERADMIN;
+  if (COMMAND_GROUPS.HEAD.has(cmd)) return AdminRole.HEAD_ADMIN;
   return AdminRole.ADMIN;
 }
 
 // ═══════════════════════════════════════════════════════════
-// RATE LIMITING (Anti Power-Abuse)
+// RATE LIMITING
 // ═══════════════════════════════════════════════════════════
 
 export function checkRateLimit(identifier: string, command: string): { allowed: boolean; retryAfterMs?: number } {
-  const limit = RATE_LIMITS[command];
-  if (!limit) return { allowed: true };
-
-  const key = `${identifier}:${command}`;
-  const now = Date.now();
-  const bucket = rateLimitBuckets.get(key) ?? [];
-  const recent = bucket.filter((t) => now - t < limit.windowMs);
-
-  if (recent.length >= limit.max) {
-    const oldestValid = recent[0]!;
-    const retryAfterMs = limit.windowMs - (now - oldestValid);
-    return { allowed: false, retryAfterMs };
-  }
-
-  recent.push(now);
-  rateLimitBuckets.set(key, recent);
-  return { allowed: true };
+  return state.checkRateLimit(identifier, command);
 }
 
 // ═══════════════════════════════════════════════════════════
-// SYSTÈME DE PRISE DE SERVICE (DUTY ON/OFF)
+// DUTY
 // ═══════════════════════════════════════════════════════════
 
 export function toggleDuty(identifier: string): DutyStatus {
   const now = Date.now();
-  let ds = userDuty.get(identifier);
+  let ds = state.getDuty(identifier);
   if (!ds) {
     ds = {
       identifier,
@@ -572,68 +925,65 @@ export function toggleDuty(identifier: string): DutyStatus {
       clockedInAt: 0,
       totalSecondsToday: 0,
       totalSecondsAllTime: 0,
+      lastUpdated: now,
     };
   }
 
   if (ds.onDuty) {
-    // Fin du service
     const shiftSec = ds.currentShiftStart ? Math.floor((now - ds.currentShiftStart) / 1000) : 0;
     ds.totalSecondsToday += shiftSec;
     ds.totalSecondsAllTime += shiftSec;
     ds.onDuty = false;
     ds.currentShiftStart = undefined;
   } else {
-    // Prise de service
     ds.onDuty = true;
     ds.clockedInAt = now;
     ds.currentShiftStart = now;
   }
 
-  userDuty.set(identifier, ds);
+  ds.lastUpdated = now;
+  state.setDuty(identifier, ds);
   saveState();
+  emitEvent("dutyToggle", { identifier, onDuty: ds.onDuty });
   return ds;
 }
 
 export function getDutyStatus(identifier: string): DutyStatus | null {
-  return userDuty.get(identifier) ?? null;
+  return state.getDuty(identifier);
 }
 
 export function isOnDuty(identifier: string): boolean {
-  return userDuty.get(identifier)?.onDuty ?? false;
+  return state.getDuty(identifier)?.onDuty ?? false;
 }
 
 // ═══════════════════════════════════════════════════════════
-// SYSTÈME D'AUDIT LOG
+// AUDIT LOG
 // ═══════════════════════════════════════════════════════════
 
 export function logAudit(entry: Partial<AuditLogEntry> & { actorId: string; command: string }): void {
   const now = Date.now();
-  const actorRole = getUserRole(entry.actorId);
+  const actorRole = state.getRole(entry.actorId);
   const full: AuditLogEntry = {
     id: `audit_${now}_${Math.random().toString(36).substr(2, 6)}`,
     timestamp: now,
     actorId: entry.actorId,
-    actorName: userNames.get(entry.actorId) ?? entry.actorId,
+    actorName: state.getName(entry.actorId),
     actorRole,
     command: entry.command,
     args: entry.args ?? "",
     targetId: entry.targetId,
-    targetName: entry.targetId ? (userNames.get(entry.targetId) ?? entry.targetId) : undefined,
+    targetName: entry.targetId ? state.getName(entry.targetId) : undefined,
     success: entry.success ?? true,
     reason: entry.reason,
     ip: entry.ip,
+    metadata: entry.metadata,
   };
 
-  auditLog.push(full);
-  if (auditLog.length > AUDIT_LOG_MAX) {
-    auditLog.splice(0, auditLog.length - AUDIT_LOG_MAX);
-  }
-
-  // Mise à jour des métriques
-  const metrics = getStaffMetrics(entry.actorId);
-  metrics.commandsExecuted++;
-  metrics.lastActivityAt = now;
-  userMetrics.set(entry.actorId, metrics);
+  state.addAuditEntry(full);
+  state.updateMetrics(entry.actorId, {
+    commandsExecuted: state.getMetrics(entry.actorId).commandsExecuted + 1,
+    lastActivityAt: now,
+  });
 
   saveState();
 }
@@ -644,16 +994,11 @@ export function getAuditLog(filters?: {
   command?: string;
   limit?: number;
 }): AuditLogEntry[] {
-  let result = [...auditLog];
-  if (filters?.actorId) result = result.filter((e) => e.actorId === filters.actorId);
-  if (filters?.targetId) result = result.filter((e) => e.targetId === filters.targetId);
-  if (filters?.command) result = result.filter((e) => e.command === filters.command);
-  result.sort((a, b) => b.timestamp - a.timestamp);
-  return result.slice(0, filters?.limit ?? 100);
+  return state.getAuditLog(filters);
 }
 
 // ═══════════════════════════════════════════════════════════
-// SYSTÈME DE SANCTIONS (Warns / Kicks / Bans / Mutes)
+// SANCTIONS
 // ═══════════════════════════════════════════════════════════
 
 export function issueSanction(sanction: Omit<Sanction, "id" | "createdAt" | "active">): Sanction {
@@ -665,32 +1010,28 @@ export function issueSanction(sanction: Omit<Sanction, "id" | "createdAt" | "act
     ...sanction,
   };
 
-  sanctionsLog.push(full);
-  if (sanctionsLog.length > BAN_HISTORY_MAX) {
-    sanctionsLog.splice(0, sanctionsLog.length - BAN_HISTORY_MAX);
-  }
+  state.addSanction(full);
 
-  // Mise à jour des métriques modérateur
-  const metrics = getStaffMetrics(sanction.moderatorId);
+  // Update metrics
+  const metrics = state.getMetrics(sanction.moderatorId);
   if (sanction.type === "kick") metrics.playersKicked++;
   else if (sanction.type === "ban") metrics.playersBanned++;
   else if (sanction.type === "warn") {
     metrics.playersWarned++;
-    // Ban automatique à 3 warns
-    const warnsCount = getActiveWarns(sanction.targetId).length;
-    if (warnsCount >= 3) {
+    const warnsCount = state.getActiveWarns(sanction.targetId).length;
+    if (warnsCount >= LIMITS.WARN_THRESHOLD) {
       issueSanction({
         type: "ban",
         targetId: sanction.targetId,
         targetName: sanction.targetName,
         moderatorId: "system",
         moderatorName: "SYSTÈME AUTO",
-        reason: `Ban automatique après 3 warns cumulés (dernier: ${sanction.reason})`,
-        expiresAt: now + 7 * 24 * 60 * 60 * 1000, // 7 jours
+        reason: `Ban automatique après ${LIMITS.WARN_THRESHOLD} warns cumulés`,
+        expiresAt: now + LIMITS.AUTO_BAN_DAYS * 24 * 60 * 60 * 1000,
       });
     }
   }
-  userMetrics.set(sanction.moderatorId, metrics);
+  state.updateMetrics(sanction.moderatorId, metrics);
 
   logAudit({
     actorId: sanction.moderatorId,
@@ -705,105 +1046,66 @@ export function issueSanction(sanction: Omit<Sanction, "id" | "createdAt" | "act
 }
 
 export function revokeSanction(sanctionId: string, moderatorId: string, reason: string): boolean {
-  const s = sanctionsLog.find((s) => s.id === sanctionId);
+  const s = state.getSanctions("").find((s) => s.id === sanctionId);
   if (!s || !s.active) return false;
-  s.active = false;
-  s.revokedBy = moderatorId;
-  s.revokedAt = Date.now();
-  s.revokeReason = reason;
-  saveState();
-  return true;
+  const success = state.updateSanction(sanctionId, {
+    active: false,
+    revokedBy: moderatorId,
+    revokedAt: Date.now(),
+    revokeReason: reason,
+  });
+  if (success) saveState();
+  return success;
 }
 
 export function getActiveWarns(identifier: string): Sanction[] {
-  const now = Date.now();
-  return sanctionsLog.filter((s) =>
-    s.targetId === identifier &&
-    s.type === "warn" &&
-    s.active &&
-    (!s.expiresAt || s.expiresAt > now)
-  );
+  return state.getActiveWarns(identifier);
 }
 
 export function isBanned(identifier: string): Sanction | null {
-  const now = Date.now();
-  return sanctionsLog.find((s) =>
-    s.targetId === identifier &&
-    s.type === "ban" &&
-    s.active &&
-    (!s.expiresAt || s.expiresAt > now)
-  ) ?? null;
+  return state.isBanned(identifier);
 }
 
 export function isMuted(identifier: string): Sanction | null {
-  const now = Date.now();
-  return sanctionsLog.find((s) =>
-    s.targetId === identifier &&
-    s.type === "mute" &&
-    s.active &&
-    (!s.expiresAt || s.expiresAt > now)
-  ) ?? null;
+  return state.isMuted(identifier);
 }
 
 export function getSanctionHistory(identifier: string): Sanction[] {
-  return sanctionsLog.filter((s) => s.targetId === identifier).sort((a, b) => b.createdAt - a.createdAt);
+  return state.getSanctions(identifier).sort((a, b) => b.createdAt - a.createdAt);
 }
 
 // ═══════════════════════════════════════════════════════════
-// MÉTRIQUES DE STAFF
+// MÉTRIQUES
 // ═══════════════════════════════════════════════════════════
 
 export function getStaffMetrics(identifier: string): StaffMetrics {
-  let m = userMetrics.get(identifier);
-  if (!m) {
-    m = {
-      identifier,
-      commandsExecuted: 0,
-      playersKicked: 0,
-      playersBanned: 0,
-      playersWarned: 0,
-      playersHelped: 0,
-      reportsResolved: 0,
-      lastActivityAt: 0,
-      hoursOnDuty: 0,
-    };
-    userMetrics.set(identifier, m);
-  }
-  const ds = getDutyStatus(identifier);
+  const m = state.getMetrics(identifier);
+  const ds = state.getDuty(identifier);
   if (ds) m.hoursOnDuty = ds.totalSecondsAllTime / 3600;
   return m;
 }
 
 // ═══════════════════════════════════════════════════════════
-// RANGS DE CARRIÈRE PAR MÉTIER
+// RANGS DE CARRIÈRE
 // ═══════════════════════════════════════════════════════════
 
 export function getJobRank(identifier: string): JobRank | null {
-  return userRanks.get(identifier) ?? null;
+  return null; // TODO: Implement
 }
 
 export function promoteJobRank(identifier: string): boolean {
-  const rank = userRanks.get(identifier);
-  if (!rank) return false;
-  if (rank.currentRank < rank.maxRank) {
-    rank.currentRank++;
-    rank.promotionsCount++;
-    rank.rankName = JOB_RANKS[rank.jobId]?.[rank.currentRank] ?? "Recrue";
-    userRanks.set(identifier, rank);
-    saveState();
-    return true;
-  }
-  return false;
+  return false; // TODO: Implement
 }
 
 // ═══════════════════════════════════════════════════════════
-// UTILITAIRES DE RECHERCHE
+// UTILITAIRES
 // ═══════════════════════════════════════════════════════════
 
 export function resolveStaffId(raw: string): string {
   const q = raw.trim().toLowerCase();
-  if (!q || q === "me" || q === "self" || q === "moi") return LOCAL_PLAYER_ID;
-  if (q === "local" || q === LOCAL_PLAYER_ID) return LOCAL_PLAYER_ID;
+  if (!q || q === "me" || q === "self" || q === "moi" || q === "local" || q === LOCAL_PLAYER_ID) {
+    return LOCAL_PLAYER_ID;
+  }
   for (const e of snapshotStaff()) {
     if (e.identifier.toLowerCase() === q) return e.identifier;
     if (e.displayName.toLowerCase() === q) return e.identifier;
@@ -813,73 +1115,58 @@ export function resolveStaffId(raw: string): string {
 }
 
 export function rpJobToRole(id: string): RpJobRole {
-  switch (id) {
-    case "policier": return RpJobRole.POLICE_OFFICER;
-    case "ambulancier": return RpJobRole.PARAMEDIC;
-    case "mecanicien": return RpJobRole.MECHANIC;
-    case "avocat": return RpJobRole.JUDGE;
-    case "commercant": return RpJobRole.DISPENSARY_OWNER;
-    case "criminel": return RpJobRole.GANGSTER;
-    default: return RpJobRole.CIVILIAN;
-  }
+  const map: Record<string, RpJobRole> = {
+    policier: RpJobRole.POLICE_OFFICER,
+    ambulancier: RpJobRole.PARAMEDIC,
+    mecanicien: RpJobRole.MECHANIC,
+    avocat: RpJobRole.JUDGE,
+    commercant: RpJobRole.DISPENSARY_OWNER,
+    criminel: RpJobRole.GANGSTER,
+  };
+  return map[id] ?? RpJobRole.CIVILIAN;
 }
 
 // ═══════════════════════════════════════════════════════════
-// STYLES DE BADGES (UI)
+// BADGES
 // ═══════════════════════════════════════════════════════════
 
 export function getRoleBadgeStyle(role: AdminRole): RoleBadge {
-  switch (role) {
-    case AdminRole.INTELLECTUS_AI:
-      return { label: "INTELLECTUS", color: "text-accent", bg: "bg-surface-2", border: "border-accent" };
-    case AdminRole.DEVELOPER:
-      return { label: "LEAD DEV", color: "text-fg", bg: "bg-surface-2", border: "border-border-strong" };
-    case AdminRole.OWNER:
-      return { label: "FONDATEUR", color: "text-fg", bg: "bg-surface-2", border: "border-border-strong" };
-    case AdminRole.HEAD_ADMIN:
-      return { label: "HEAD ADMIN", color: "text-danger", bg: "bg-surface-2", border: "border-danger" };
-    case AdminRole.SUPERADMIN:
-      return { label: "SUPERADMIN", color: "text-danger", bg: "bg-surface-2", border: "border-danger" };
-    case AdminRole.ADMIN:
-      return { label: "ADMIN", color: "text-accent", bg: "bg-surface-2", border: "border-accent" };
-    case AdminRole.MOD:
-      return { label: "MODÉRATEUR", color: "text-accent", bg: "bg-surface-2", border: "border-border-strong" };
-    case AdminRole.HELPER:
-      return { label: "HELPER", color: "text-ok", bg: "bg-surface-2", border: "border-ok" };
-    default:
-      return { label: "CITOYEN", color: "text-muted", bg: "bg-surface-2", border: "border-border" };
-  }
+  const styles: Record<AdminRole, RoleBadge> = {
+    [AdminRole.INTELLECTUS_AI]: { label: "INTELLECTUS", color: "text-accent", bg: "bg-surface-2", border: "border-accent" },
+    [AdminRole.DEVELOPER]: { label: "LEAD DEV", color: "text-fg", bg: "bg-surface-2", border: "border-border-strong" },
+    [AdminRole.OWNER]: { label: "FONDATEUR", color: "text-fg", bg: "bg-surface-2", border: "border-border-strong" },
+    [AdminRole.HEAD_ADMIN]: { label: "HEAD ADMIN", color: "text-danger", bg: "bg-surface-2", border: "border-danger" },
+    [AdminRole.SUPERADMIN]: { label: "SUPERADMIN", color: "text-danger", bg: "bg-surface-2", border: "border-danger" },
+    [AdminRole.ADMIN]: { label: "ADMIN", color: "text-accent", bg: "bg-surface-2", border: "border-accent" },
+    [AdminRole.MOD]: { label: "MODÉRATEUR", color: "text-accent", bg: "bg-surface-2", border: "border-border-strong" },
+    [AdminRole.HELPER]: { label: "HELPER", color: "text-ok", bg: "bg-surface-2", border: "border-ok" },
+    [AdminRole.NONE]: { label: "CITOYEN", color: "text-muted", bg: "bg-surface-2", border: "border-border" },
+    [AdminRole.TRIAL_HELPER]: { label: "STAGIAIRE", color: "text-ok", bg: "bg-surface-2", border: "border-ok" },
+    [AdminRole.TRIAL_MOD]: { label: "MODO ESSAI", color: "text-accent", bg: "bg-surface-2", border: "border-border-strong" },
+    [AdminRole.SENIOR_MOD]: { label: "MODO SENIOR", color: "text-accent", bg: "bg-surface-2", border: "border-border-strong" },
+    [AdminRole.COMMUNITY_MANAGER]: { label: "COMMUNITY", color: "text-accent", bg: "bg-surface-2", border: "border-accent" },
+    [AdminRole.EVENT_MANAGER]: { label: "EVENT", color: "text-accent", bg: "bg-surface-2", border: "border-accent" },
+    [AdminRole.SENIOR_DEV]: { label: "DEV SENIOR", color: "text-fg", bg: "bg-surface-2", border: "border-border-strong" },
+  };
+  return styles[role] ?? styles[AdminRole.NONE];
 }
 
 export function getJobBadgeStyle(job: RpJobRole): JobBadge {
-  switch (job) {
-    case RpJobRole.POLICE_CHIEF:
-      return { label: "CHEF SQ", color: "text-accent" };
-    case RpJobRole.POLICE_OFFICER:
-      return { label: "OFFICIER SQ", color: "text-accent" };
-    case RpJobRole.SECRET_AGENT:
-      return { label: "AGENT INFILTRÉ", color: "text-muted" };
-    case RpJobRole.MEDIC_DIRECTOR:
-      return { label: "DIRECTEUR URGENCES", color: "text-danger" };
-    case RpJobRole.PARAMEDIC:
-      return { label: "PARAMÉDIC", color: "text-danger" };
-    case RpJobRole.MECHANIC:
-      return { label: "MÉCANICIEN", color: "text-muted" };
-    case RpJobRole.MAFIA_BOSS:
-      return { label: "PARRAIN", color: "text-danger" };
-    case RpJobRole.GANGSTER:
-      return { label: "GANGSTER", color: "text-danger" };
-    case RpJobRole.MAYOR:
-      return { label: "MAIRE", color: "text-fg" };
-    case RpJobRole.JUDGE:
-      return { label: "JUGE", color: "text-fg" };
-    case RpJobRole.DISPENSARY_OWNER:
-      return { label: "TITULAIRE SQDC", color: "text-ok" };
-    case RpJobRole.ETHER_ARCHITECT:
-      return { label: "ARCHITECTE ÉTHER", color: "text-accent" };
-    default:
-      return { label: "CITOYEN", color: "text-muted" };
-  }
+  const styles: Partial<Record<RpJobRole, JobBadge>> = {
+    [RpJobRole.POLICE_CHIEF]: { label: "CHEF SQ", color: "text-accent" },
+    [RpJobRole.POLICE_OFFICER]: { label: "OFFICIER SQ", color: "text-accent" },
+    [RpJobRole.SECRET_AGENT]: { label: "AGENT INFILTRÉ", color: "text-muted" },
+    [RpJobRole.MEDIC_DIRECTOR]: { label: "DIRECTEUR URGENCES", color: "text-danger" },
+    [RpJobRole.PARAMEDIC]: { label: "PARAMÉDIC", color: "text-danger" },
+    [RpJobRole.MECHANIC]: { label: "MÉCANICIEN", color: "text-muted" },
+    [RpJobRole.MAFIA_BOSS]: { label: "PARRAIN", color: "text-danger" },
+    [RpJobRole.GANGSTER]: { label: "GANGSTER", color: "text-danger" },
+    [RpJobRole.MAYOR]: { label: "MAIRE", color: "text-fg" },
+    [RpJobRole.JUDGE]: { label: "JUGE", color: "text-fg" },
+    [RpJobRole.DISPENSARY_OWNER]: { label: "TITULAIRE SQDC", color: "text-ok" },
+    [RpJobRole.ETHER_ARCHITECT]: { label: "ARCHITECTE ÉTHER", color: "text-accent" },
+  };
+  return styles[job] ?? { label: "CITOYEN", color: "text-muted" };
 }
 
 export function formatStaffLine(e: StaffEntry): string {
@@ -890,18 +1177,17 @@ export function formatStaffLine(e: StaffEntry): string {
 }
 
 // ═══════════════════════════════════════════════════════════
-// HELPERS DE VÉRIFICATION
+// HELPERS
 // ═══════════════════════════════════════════════════════════
 
 export function isStaffOnDuty(identifier: string): boolean {
-  const role = getUserRole(identifier);
+  const role = state.getRole(identifier);
   if (role === AdminRole.NONE) return false;
   return isOnDuty(identifier);
 }
 
 export function isRegularPlayer(identifier: string): boolean {
-  const role = getUserRole(identifier);
-  return role === AdminRole.NONE;
+  return state.getRole(identifier) === AdminRole.NONE;
 }
 
 export function hasStaffPrivileges(identifier: string): boolean {
@@ -909,7 +1195,129 @@ export function hasStaffPrivileges(identifier: string): boolean {
 }
 
 // ═══════════════════════════════════════════════════════════
-// AJOUT v2.1 — CENTRALE DE RÉPARTITION 911 (DISPATCH)
+// ACTIONS ADMIN SUR JOUEURS (Nouveau)
+// ═══════════════════════════════════════════════════════════
+
+export function givePlayerMoney(
+  actorId: string,
+  targetId: string,
+  amount: number,
+  type: "cash" | "bank"
+): { success: boolean; message: string } {
+  const perm = validatePermission(actorId, type === "cash" ? Permission.GIVE_CASH : Permission.GIVE_BANK);
+  if (!perm.valid) return { success: false, message: perm.errors![0] };
+
+  const target = validateTarget(actorId, targetId);
+  if (!target.valid) return { success: false, message: target.errors![0] };
+
+  const amountVal = validateAmount(amount);
+  if (!amountVal.valid) return { success: false, message: amountVal.errors![0] };
+
+  logAudit({
+    actorId,
+    command: type === "cash" ? "givecash" : "givebank",
+    args: `${targetId} ${amount}`,
+    targetId,
+    success: true,
+  });
+
+  saveState();
+  return { success: true, message: `Donné ${amount}$ (${type}) à ${state.getName(targetId)}` };
+}
+
+export function teleportPlayer(
+  actorId: string,
+  targetId: string,
+  x: number,
+  z: number
+): { success: boolean; message: string } {
+  const perm = validatePermission(actorId, Permission.TELEPORT);
+  if (!perm.valid) return { success: false, message: perm.errors![0] };
+
+  const target = validateTarget(actorId, targetId);
+  if (!target.valid) return { success: false, message: target.errors![0] };
+
+  logAudit({
+    actorId,
+    command: "teleport",
+    args: `${targetId} ${x} ${z}`,
+    targetId,
+    success: true,
+  });
+
+  saveState();
+  return { success: true, message: `Téléporté ${state.getName(targetId)} à (${x}, ${z})` };
+}
+
+export function healPlayer(actorId: string, targetId: string): { success: boolean; message: string } {
+  const perm = validatePermission(actorId, Permission.HEAL);
+  if (!perm.valid) return { success: false, message: perm.errors![0] };
+
+  const target = validateTarget(actorId, targetId);
+  if (!target.valid) return { success: false, message: target.errors![0] };
+
+  state.updateMetrics(actorId, {
+    playersHealed: state.getMetrics(actorId).playersHealed + 1,
+  });
+
+  logAudit({
+    actorId,
+    command: "heal",
+    args: targetId,
+    targetId,
+    success: true,
+  });
+
+  saveState();
+  return { success: true, message: `Soigné ${state.getName(targetId)}` };
+}
+
+export function setPlayerJob(
+  actorId: string,
+  targetId: string,
+  job: RpJobRole
+): { success: boolean; message: string } {
+  const perm = validatePermission(actorId, Permission.SET_JOB);
+  if (!perm.valid) return { success: false, message: perm.errors![0] };
+
+  const target = validateTarget(actorId, targetId);
+  if (!target.valid) return { success: false, message: target.errors![0] };
+
+  state.setJob(targetId, job);
+
+  logAudit({
+    actorId,
+    command: "setjob",
+    args: `${targetId} ${job}`,
+    targetId,
+    success: true,
+  });
+
+  saveState();
+  return { success: true, message: `Job de ${state.getName(targetId)} défini sur ${job}` };
+}
+
+export function toggleGodMode(actorId: string, targetId: string): { success: boolean; message: string } {
+  const perm = validatePermission(actorId, Permission.GOD_MODE);
+  if (!perm.valid) return { success: false, message: perm.errors![0] };
+
+  const target = validateTarget(actorId, targetId);
+  if (!target.valid) return { success: false, message: target.errors![0] };
+
+  logAudit({
+    actorId,
+    command: "godmode",
+    args: targetId,
+    targetId,
+    success: true,
+  });
+
+  saveState();
+  return { success: true, message: `GodMode toggled pour ${state.getName(targetId)}` };
+}
+
+// ═══════════════════════════════════════════════════════════
+// DISPATCH 911
 // ═══════════════════════════════════════════════════════════
 
 const DISPATCH_CODES: Record<string, { label: string; department: DispatchDepartmentTag; priority: DispatchPriority }> = {
@@ -937,7 +1345,11 @@ export function createDispatchCall(params: {
   z: number;
   notes?: string;
 }): DispatchCall {
-  const spec = DISPATCH_CODES[params.code] ?? { label: params.code, department: DispatchDepartmentTag.TOUS, priority: DispatchPriority.MEDIUM };
+  const spec = DISPATCH_CODES[params.code] ?? {
+    label: params.code,
+    department: DispatchDepartmentTag.TOUS,
+    priority: DispatchPriority.MEDIUM,
+  };
   const call: DispatchCall = {
     id: `dsp_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
     code: params.code,
@@ -954,46 +1366,42 @@ export function createDispatchCall(params: {
     assignedTo: [],
     notes: params.notes,
   };
-  dispatchCalls.unshift(call);
-  if (dispatchCalls.length > DISPATCH_LOG_MAX) dispatchCalls.length = DISPATCH_LOG_MAX;
+  state.addDispatchCall(call);
   saveState();
   return call;
 }
 
 export function listActiveDispatchCalls(department?: DispatchDepartmentTag): DispatchCall[] {
-  return dispatchCalls.filter(
-    (c) =>
-      c.status !== DispatchStatus.RESOLVED &&
-      c.status !== DispatchStatus.CANCELLED &&
-      (!department || department === DispatchDepartmentTag.TOUS || c.department === department || c.department === DispatchDepartmentTag.TOUS),
-  );
+  return state.getActiveDispatchCalls(department);
 }
 
 export function assignDispatchCall(callId: string, unitId: string): boolean {
-  const call = dispatchCalls.find((c) => c.id === callId);
+  const calls = state.getActiveDispatchCalls();
+  const call = calls.find((c) => c.id === callId);
   if (!call) return false;
   if (!call.assignedTo.includes(unitId)) call.assignedTo.push(unitId);
-  call.status = DispatchStatus.DISPATCHED;
-  saveState();
-  return true;
+  const success = state.updateDispatchCall(callId, {
+    assignedTo: call.assignedTo,
+    status: DispatchStatus.DISPATCHED,
+  });
+  if (success) saveState();
+  return success;
 }
 
 export function markOnScene(callId: string): boolean {
-  const call = dispatchCalls.find((c) => c.id === callId);
-  if (!call) return false;
-  call.status = DispatchStatus.ON_SCENE;
-  saveState();
-  return true;
+  const success = state.updateDispatchCall(callId, { status: DispatchStatus.ON_SCENE });
+  if (success) saveState();
+  return success;
 }
 
 export function resolveDispatchCall(callId: string, note?: string): boolean {
-  const call = dispatchCalls.find((c) => c.id === callId);
-  if (!call) return false;
-  call.status = DispatchStatus.RESOLVED;
-  call.resolvedAt = Date.now();
-  if (note) call.notes = note;
-  saveState();
-  return true;
+  const success = state.updateDispatchCall(callId, {
+    status: DispatchStatus.RESOLVED,
+    resolvedAt: Date.now(),
+    notes: note,
+  });
+  if (success) saveState();
+  return success;
 }
 
 export function formatDispatchLine(c: DispatchCall): string {
@@ -1003,7 +1411,7 @@ export function formatDispatchLine(c: DispatchCall): string {
 }
 
 // ═══════════════════════════════════════════════════════════
-// AJOUT v2.1 — CASIER JUDICIAIRE (RAP SHEET)
+// CASIER JUDICIAIRE
 // ═══════════════════════════════════════════════════════════
 
 export function addCriminalCharge(params: {
@@ -1024,28 +1432,31 @@ export function addCriminalCharge(params: {
     fine: params.fine,
     jailMonths: params.jailMonths,
     officerId: params.officerId,
-    officerName: getDisplayName(params.officerId),
+    officerName: state.getName(params.officerId),
     createdAt: Date.now(),
   };
-  const list = criminalRecords.get(params.identifier) ?? [];
-  list.unshift(charge);
-  criminalRecords.set(params.identifier, list);
+  state.addCriminalCharge(params.identifier, charge);
   saveState();
   return charge;
 }
 
 export function getCriminalRecord(identifier: string): CriminalCharge[] {
-  return criminalRecords.get(identifier) ?? [];
+  return state.getCriminalRecord(identifier);
 }
 
 export function formatRapSheet(identifier: string): string {
-  const charges = getCriminalRecord(identifier);
+  const charges = state.getCriminalRecord(identifier);
   if (!charges.length) return "Casier judiciaire vierge.";
   const totalFines = charges.reduce((s, c) => s + c.fine, 0);
   const totalMonths = charges.reduce((s, c) => s + c.jailMonths, 0);
   const lines = charges
     .slice(0, 15)
-    .map((c) => `  • ${c.article} — ${c.description} · ${c.fine}$ · ${c.jailMonths}mois · ${new Date(c.createdAt).toLocaleDateString("fr-CA")}`);
+    .map(
+      (c) =>
+        `  • ${c.article} — ${c.description} · ${c.fine}$ · ${c.jailMonths}mois · ${new Date(
+          c.createdAt
+        ).toLocaleDateString("fr-CA")}`
+    );
   return [
     `Casier judiciaire (${charges.length} chef${charges.length > 1 ? "s" : ""} d'accusation) :`,
     ...lines,
@@ -1054,42 +1465,51 @@ export function formatRapSheet(identifier: string): string {
 }
 
 // ═══════════════════════════════════════════════════════════
-// AJOUT v2.1 — PRIMES (BOUNTIES)
+// PRIMES (BOUNTIES)
 // ═══════════════════════════════════════════════════════════
 
-export function placeBounty(params: { targetId: string; targetName: string; amount: number; issuedBy: string; reason: string }): Bounty {
+export function placeBounty(params: {
+  targetId: string;
+  targetName: string;
+  amount: number;
+  issuedBy: string;
+  reason: string;
+}): Bounty {
   const bounty: Bounty = {
     id: `bty_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
     targetId: params.targetId,
     targetName: params.targetName,
     amount: params.amount,
     issuedBy: params.issuedBy,
-    issuedByName: getDisplayName(params.issuedBy),
+    issuedByName: state.getName(params.issuedBy),
     reason: params.reason,
     createdAt: Date.now(),
     active: true,
   };
-  bounties.unshift(bounty);
+  state.addBounty(bounty);
   saveState();
   return bounty;
 }
 
 export function listActiveBounties(): Bounty[] {
-  return bounties.filter((b) => b.active);
+  return state.getActiveBounties();
 }
 
 export function claimBounty(bountyId: string, claimerId: string): Bounty | null {
-  const bounty = bounties.find((b) => b.id === bountyId && b.active);
+  const bounties = state.getActiveBounties();
+  const bounty = bounties.find((b) => b.id === bountyId);
   if (!bounty) return null;
-  bounty.active = false;
-  bounty.claimedBy = claimerId;
-  bounty.claimedAt = Date.now();
-  saveState();
-  return bounty;
+  const success = state.updateBounty(bountyId, {
+    active: false,
+    claimedBy: claimerId,
+    claimedAt: Date.now(),
+  });
+  if (success) saveState();
+  return success ? bounty : null;
 }
 
 export function getBountyOn(targetId: string): Bounty | null {
-  return bounties.find((b) => b.targetId === targetId && b.active) ?? null;
+  return state.getActiveBounties().find((b) => b.targetId === targetId) ?? null;
 }
 
 export function formatBountyLine(b: Bounty): string {
@@ -1097,13 +1517,18 @@ export function formatBountyLine(b: Bounty): string {
 }
 
 // ═══════════════════════════════════════════════════════════
-// AJOUT v2.1 — FOURRIÈRE MUNICIPALE MTQ
+// FOURRIÈRE
 // ═══════════════════════════════════════════════════════════
 
 const IMPOUND_BASE_FEE = 250;
 const IMPOUND_DAILY_FEE = 40;
 
-export function impoundVehicle(params: { vehicleId: string; ownerId: string; ownerName: string; reason: string }): ImpoundRecord {
+export function impoundVehicle(params: {
+  vehicleId: string;
+  ownerId: string;
+  ownerName: string;
+  reason: string;
+}): ImpoundRecord {
   const rec: ImpoundRecord = {
     id: `imp_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
     vehicleId: params.vehicleId,
@@ -1113,30 +1538,34 @@ export function impoundVehicle(params: { vehicleId: string; ownerId: string; own
     impoundedAt: Date.now(),
     feeAmount: IMPOUND_BASE_FEE,
   };
-  impoundLot.push(rec);
+  state.addImpoundRecord(rec);
   saveState();
   return rec;
 }
 
 export function getImpoundFee(recordId: string): number {
-  const rec = impoundLot.find((r) => r.id === recordId);
+  const records = state.getImpoundRecords();
+  const rec = records.find((r) => r.id === recordId);
   if (!rec) return 0;
   const days = Math.max(0, Math.ceil((Date.now() - rec.impoundedAt) / 86_400_000));
   return rec.feeAmount + days * IMPOUND_DAILY_FEE;
 }
 
 export function releaseVehicleFromImpound(recordId: string, releasedBy: string): number | null {
-  const rec = impoundLot.find((r) => r.id === recordId && !r.releasedAt);
-  if (!rec) return null;
+  const records = state.getImpoundRecords();
+  const rec = records.find((r) => r.id === recordId);
+  if (!rec || rec.releasedAt) return null;
   const fee = getImpoundFee(recordId);
-  rec.releasedAt = Date.now();
-  rec.releasedBy = releasedBy;
-  saveState();
-  return fee;
+  const success = state.updateImpoundRecord(recordId, {
+    releasedAt: Date.now(),
+    releasedBy,
+  });
+  if (success) saveState();
+  return success ? fee : null;
 }
 
 export function listImpoundedVehicles(ownerId?: string): ImpoundRecord[] {
-  return impoundLot.filter((r) => !r.releasedAt && (!ownerId || r.ownerId === ownerId));
+  return state.getImpoundRecords(ownerId);
 }
 
 export function formatImpoundLine(r: ImpoundRecord): string {
@@ -1144,10 +1573,15 @@ export function formatImpoundLine(r: ImpoundRecord): string {
 }
 
 // ═══════════════════════════════════════════════════════════
-// AJOUT v2.1 — SIGNALEMENTS JOUEURS (/report)
+// REPORTS
 // ═══════════════════════════════════════════════════════════
 
-export function createReport(params: { reporterId: string; reporterName: string; targetName?: string; reason: string }): PlayerReport {
+export function createReport(params: {
+  reporterId: string;
+  reporterName: string;
+  targetName?: string;
+  reason: string;
+}): PlayerReport {
   const report: PlayerReport = {
     id: `rpt_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
     reporterId: params.reporterId,
@@ -1157,37 +1591,47 @@ export function createReport(params: { reporterId: string; reporterName: string;
     status: ReportStatus.OPEN,
     createdAt: Date.now(),
   };
-  playerReports.unshift(report);
-  if (playerReports.length > REPORT_LOG_MAX) playerReports.length = REPORT_LOG_MAX;
+  state.addReport(report);
   saveState();
   return report;
 }
 
 export function listOpenReports(): PlayerReport[] {
-  return playerReports.filter((r) => r.status === ReportStatus.OPEN || r.status === ReportStatus.CLAIMED);
+  return [
+    ...state.getReports(ReportStatus.OPEN),
+    ...state.getReports(ReportStatus.CLAIMED),
+  ];
 }
 
 export function claimReport(reportId: string, staffId: string): boolean {
-  const r = playerReports.find((r) => r.id === reportId || r.id.endsWith(reportId));
+  const reports = listOpenReports();
+  const r = reports.find((r) => r.id === reportId || r.id.endsWith(reportId));
   if (!r) return false;
-  r.status = ReportStatus.CLAIMED;
-  r.claimedBy = staffId;
-  saveState();
-  return true;
+  const success = state.updateReport(r.id, {
+    status: ReportStatus.CLAIMED,
+    claimedBy: staffId,
+  });
+  if (success) saveState();
+  return success;
 }
 
 export function resolveReport(reportId: string, staffId: string, note?: string): boolean {
-  const r = playerReports.find((r) => r.id === reportId || r.id.endsWith(reportId));
+  const reports = listOpenReports();
+  const r = reports.find((r) => r.id === reportId || r.id.endsWith(reportId));
   if (!r) return false;
-  r.status = ReportStatus.RESOLVED;
-  r.claimedBy = r.claimedBy ?? staffId;
-  r.resolvedAt = Date.now();
-  r.resolutionNote = note;
-  const metrics = getStaffMetrics(staffId);
-  metrics.reportsResolved++;
-  userMetrics.set(staffId, metrics);
-  saveState();
-  return true;
+  const success = state.updateReport(r.id, {
+    status: ReportStatus.RESOLVED,
+    claimedBy: r.claimedBy ?? staffId,
+    resolvedAt: Date.now(),
+    resolutionNote: note,
+  });
+  if (success) {
+    state.updateMetrics(staffId, {
+      reportsResolved: state.getMetrics(staffId).reportsResolved + 1,
+    });
+    saveState();
+  }
+  return success;
 }
 
 export function formatReportLine(r: PlayerReport): string {
@@ -1196,84 +1640,22 @@ export function formatReportLine(r: PlayerReport): string {
 }
 
 // ═══════════════════════════════════════════════════════════
-// EXPORT / IMPORT / RESET (BACKUP)
+// BACKUP
 // ═══════════════════════════════════════════════════════════
 
 export function exportBackup(): string {
-  const data = {
-    version: 2,
-    roster: snapshotStaff(),
-    auditLog,
-    sanctions: sanctionsLog,
-    duty: Array.from(userDuty.entries()),
-    metrics: Array.from(userMetrics.entries()),
-    ranks: Array.from(userRanks.entries()),
-    // AJOUTS v2.1
-    dispatch: dispatchCalls,
-    criminalRecords: Array.from(criminalRecords.entries()),
-    bounties,
-    impoundLot,
-    reports: playerReports,
-    exportedAt: Date.now(),
-  };
-  return JSON.stringify(data, null, 2);
+  return state.export();
 }
 
 export function importBackup(json: string): boolean {
-  try {
-    const data = JSON.parse(json);
-    if (!data || typeof data !== "object") return false;
-    userRoles.clear();
-    userJobs.clear();
-    userNames.clear();
-    userDuty.clear();
-    userMetrics.clear();
-    userRanks.clear();
-    auditLog.length = 0;
-    sanctionsLog.length = 0;
-    // AJOUTS v2.1
-    dispatchCalls.length = 0;
-    criminalRecords.clear();
-    bounties.length = 0;
-    impoundLot.length = 0;
-    playerReports.length = 0;
-
-    if (Array.isArray(data.roster)) for (const e of data.roster) seed(e);
-    if (Array.isArray(data.auditLog)) auditLog.push(...data.auditLog);
-    if (Array.isArray(data.sanctions)) sanctionsLog.push(...data.sanctions);
-    if (Array.isArray(data.duty)) for (const [id, ds] of data.duty) userDuty.set(id, ds);
-    if (Array.isArray(data.metrics)) for (const [id, m] of data.metrics) userMetrics.set(id, m);
-    if (Array.isArray(data.ranks)) for (const [id, r] of data.ranks) userRanks.set(id, r);
-    if (Array.isArray(data.dispatch)) dispatchCalls.push(...data.dispatch);
-    if (Array.isArray(data.criminalRecords)) for (const [id, charges] of data.criminalRecords) criminalRecords.set(id, charges);
-    if (Array.isArray(data.bounties)) bounties.push(...data.bounties);
-    if (Array.isArray(data.impoundLot)) impoundLot.push(...data.impoundLot);
-    if (Array.isArray(data.reports)) playerReports.push(...data.reports);
-
-    saveState();
-    return true;
-  } catch (e) {
-    console.error("[RBAC] Erreur d'import:", e);
-    return false;
-  }
+  const success = state.import(json);
+  if (success) saveState();
+  return success;
 }
 
 export function resetAll(): void {
-  userRoles.clear();
-  userJobs.clear();
-  userNames.clear();
-  userDuty.clear();
-  userMetrics.clear();
-  userRanks.clear();
-  auditLog.length = 0;
-  sanctionsLog.length = 0;
-  rateLimitBuckets.clear();
-  // AJOUTS v2.1
-  dispatchCalls.length = 0;
-  criminalRecords.clear();
-  bounties.length = 0;
-  impoundLot.length = 0;
-  playerReports.length = 0;
+  state.clear();
   for (const e of DEFAULT_ROSTER) seed(e);
   saveState();
+  emitEvent("reset", { success: true });
 }

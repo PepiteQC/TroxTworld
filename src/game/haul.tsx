@@ -234,7 +234,7 @@ function millStop(): HaulStop {
 function farmStop(): HaulStop {
   const farms = legalFarmsteads();
   const f = farms[Math.floor(Math.random() * farms.length)] ?? farms[0]!;
-  return { name: `Laiterie · ${f.name}`, x: f.x, z: f.z, sector: "agricole" };
+  return { name: `Laiterie · ${(f as any).name || f.id}`, x: f.x, z: f.z, sector: "agricole" };
 }
 
 function sugarStop(): HaulStop {
