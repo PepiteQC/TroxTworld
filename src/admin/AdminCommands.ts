@@ -1,7 +1,7 @@
 // src/admin/AdminCommands.ts
 // ETHERWORLD RP — TroxTetherworld Platinum Admin Commands Registry & Dispatcher
 
-import { AdminRole, RpJobRole, CommandContext, CommandDefinition } from "../shared/AdminTypes";
+import { AdminRole, RpJobRole, CommandContext, CommandDefinition } from "./adminTypes";
 import { checkPermission, getUserRole, setUserRole, setUserJob, getAllStaffMembers, getRoleBadgeStyle, getJobBadgeStyle } from "./AdminPermissions";
 import { AdminLogger } from "./AdminLogger";
 

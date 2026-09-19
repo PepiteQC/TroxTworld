@@ -10,7 +10,7 @@ import {
   Search, Plus, Wrench, Bot, Sprout, Save, Terminal
 } from 'lucide-react';
 
-import { getAllAdminCommands, parseAndExecuteAdminCommand } from '../game/admin/AdminCommandSystem';
+import { getAllAdminCommands, parseAndExecuteAdminCommand } from './AdminCommandSystem';
 import { AdminConsole } from './AdminConsole';
 
 interface AdminPanelProps {

@@ -1,7 +1,7 @@
 // src/admin/AdminMetrics.ts
 // ETHERWORLD RP — TroxTetherworld Platinum Server Telemetry & Metrics Tracker
 
-import type { ServerPerformanceMetrics } from "../shared/AdminTypes";
+import type { ServerPerformanceMetrics } from "./adminTypes";
 
 class AdminMetricsTracker {
   private currentMetrics: ServerPerformanceMetrics = {

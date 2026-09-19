@@ -1,4 +1,4 @@
-import { CatalogItem, PlacedProp } from "../../types";
+import { CatalogItem, PlacedProp } from "../types/game";
 
 export type AdminCategory =
   | "player"
@@ -941,7 +941,7 @@ export function getAllAdminCommands(): AdminCommand[] {
   return Array.from(unique.values());
 }
 
-import { PoliceSystem } from "../police/PoliceSystem";
+import { PoliceSystem } from "../game/city/police/PoliceSystem";
 
 // ─── POLICE & WILDLIFE COMMANDS ──────────────────────────────────────────
 

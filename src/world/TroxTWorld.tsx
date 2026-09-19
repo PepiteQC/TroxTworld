@@ -52,7 +52,7 @@ import { AudioManager } from "../game/AudioManager";
 import { useUserPersona } from "../context/UserPersonaContext";
 import { EtherForgePreviewModal, EtherForgePreviewItem } from "./EtherForgePreviewModal";
 import { GModBuilder, GMOD_CATALOG, addCustomCatalogItem } from "../game/GModBuilder";
-import { parseAndExecuteAdminCommand } from "../game/admin/AdminCommandSystem";
+import { parseAndExecuteAdminCommand } from "../admin/AdminCommandSystem";
 import { GModMenu } from "./GModMenu";
 import { PhysicsEngine, SerializedPhysicsObject } from "../game/PhysicsEngine";
 import { ProceduralTextureType, PROCEDURAL_TEXTURES } from "../utils/proceduralTextures";

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Terminal, Send, Trash2, HelpCircle, CheckCircle2, AlertTriangle, ShieldAlert, Sparkles, UserX, Ban, Gift, Zap, CornerDownLeft, Search } from 'lucide-react';
-import { getAllAdminCommands, parseAndExecuteAdminCommand, subscribeAuditLogs, AdminCommandResult } from '../game/admin/AdminCommandSystem';
+import { getAllAdminCommands, parseAndExecuteAdminCommand, subscribeAuditLogs, AdminCommandResult } from './AdminCommandSystem';
 
 interface ConsoleLogEntry {
   id: string;

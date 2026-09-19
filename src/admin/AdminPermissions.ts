@@ -1,7 +1,7 @@
 // src/admin/AdminPermissions.ts
 // ETHERWORLD RP — TroxTetherworld Platinum RBAC System
 
-import { AdminRole, RpJobRole, ROLE_HIERARCHY } from "../shared/AdminTypes";
+import { AdminRole, RpJobRole, ROLE_HIERARCHY } from "./adminTypes";
 
 export { AdminRole, RpJobRole, ROLE_HIERARCHY };
 

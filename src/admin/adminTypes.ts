@@ -829,3 +829,40 @@ export enum AdminEvent {
   BOUNTY_PLACED = "admin:bounty_placed",
   BOUNTY_CLAIMED = "admin:bounty_claimed",
 }
+
+// ═══════════════════════════════════════════════════════════
+// 20. TYPES DE COMMANDES ADMIN
+// ═══════════════════════════════════════════════════════════
+
+export interface CommandContext {
+  sender: {
+    sessionId: string;
+    username: string;
+    role: AdminRole;
+  };
+  args: string[];
+  raw: string;
+  room: any;
+}
+
+export interface CommandDefinition {
+  name: string;
+  permission: AdminRole;
+  minArgs?: number;
+  usage: string;
+  description: string;
+  category: string;
+  aliases?: string[];
+  handler: (ctx: CommandContext) => void | unknown;
+}
+
+export interface ServerPerformanceMetrics {
+  fps: number;
+  pingMs: number;
+  playersCount: number;
+  vehiclesCount: number;
+  entitiesCount: number;
+  memoryUsageMB: number;
+  networkKbps: number;
+  uptimeSeconds: number;
+}

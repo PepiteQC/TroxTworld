@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useGameStore } from "./store";
 import { addCash, removeCash, getPlayerCash } from "./banking";
-import { emsCoroner } from "./emsCoronerSystem";
+import { emsCoroner } from "../game/emsCoronerSystem";
 
 export interface AdminBarProps {
   engine?: any;
