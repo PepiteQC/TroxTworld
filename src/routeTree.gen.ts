@@ -20,21 +20,10 @@ import { Route as AdminMemoryRestoreRouteImport } from './routes/admin/memory/re
 import { Route as AdminMemorySnapshotRouteImport } from './routes/admin/memory/snapshot'
 import { Route as AdminThirdeyeStatsRouteImport } from './routes/admin/thirdeye/stats'
 import { Route as AdminThirdeyeUnbanRouteImport } from './routes/admin/thirdeye/unban'
-<<<<<<< HEAD
-import { Route as ApiBankIndexRouteImport } from './routes/api/bank/index'
-import { Route as ApiCharactersIndexRouteImport } from './routes/api/characters/index'
-import { Route as ApiCharactersIdRouteImport } from './routes/api/characters/$id'
-import { Route as ApiCommerceIndexRouteImport } from './routes/api/commerce/index'
-import { Route as ApiJobsIndexRouteImport } from './routes/api/jobs/index'
-import { Route as ApiJobsIdRouteImport } from './routes/api/jobs/$id'
-import { Route as ApiPlayersIndexRouteImport } from './routes/api/players/index'
-import { Route as ApiPoliceIndexRouteImport } from './routes/api/police/index'
-=======
 import { Route as ApiCharactersIndexRouteImport } from './routes/api/characters/index'
 import { Route as ApiCharactersIdRouteImport } from './routes/api/characters/$id'
 import { Route as ApiJobsIndexRouteImport } from './routes/api/jobs/index'
 import { Route as ApiJobsIdRouteImport } from './routes/api/jobs/$id'
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 import { Route as ApiPropertiesIndexRouteImport } from './routes/api/properties/index'
 import { Route as ApiPropertiesIdRouteImport } from './routes/api/properties/$id'
 import { Route as ApiRpBankingRouteImport } from './routes/api/rp/banking'
@@ -50,10 +39,6 @@ import { Route as ApiVehiclesIndexRouteImport } from './routes/api/vehicles/inde
 import { Route as ApiVehiclesIdRouteImport } from './routes/api/vehicles/$id'
 import { Route as ApiWeaponsIndexRouteImport } from './routes/api/weapons/index'
 import { Route as ApiWeaponsIdRouteImport } from './routes/api/weapons/$id'
-<<<<<<< HEAD
-import { Route as ApiWorldIndexRouteImport } from './routes/api/world/index'
-=======
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 import { Route as ApiCharactersIdEmploymentRouteImport } from './routes/api/characters/$id.employment'
 import { Route as ApiCharactersIdInventoryRouteImport } from './routes/api/characters/$id.inventory'
 import { Route as ApiCharactersIdLogsRouteImport } from './routes/api/characters/$id.logs'
@@ -114,14 +99,6 @@ const AdminThirdeyeUnbanRoute = AdminThirdeyeUnbanRouteImport.update({
   path: '/admin/thirdeye/unban',
   getParentRoute: () => rootRouteImport,
 } as any)
-<<<<<<< HEAD
-const ApiBankIndexRoute = ApiBankIndexRouteImport.update({
-  id: '/api/bank/',
-  path: '/api/bank/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-=======
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 const ApiCharactersIndexRoute = ApiCharactersIndexRouteImport.update({
   id: '/api/characters/',
   path: '/api/characters/',
@@ -132,14 +109,6 @@ const ApiCharactersIdRoute = ApiCharactersIdRouteImport.update({
   path: '/api/characters/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
-<<<<<<< HEAD
-const ApiCommerceIndexRoute = ApiCommerceIndexRouteImport.update({
-  id: '/api/commerce/',
-  path: '/api/commerce/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-=======
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 const ApiJobsIndexRoute = ApiJobsIndexRouteImport.update({
   id: '/api/jobs/',
   path: '/api/jobs/',
@@ -150,19 +119,6 @@ const ApiJobsIdRoute = ApiJobsIdRouteImport.update({
   path: '/api/jobs/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
-<<<<<<< HEAD
-const ApiPlayersIndexRoute = ApiPlayersIndexRouteImport.update({
-  id: '/api/players/',
-  path: '/api/players/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPoliceIndexRoute = ApiPoliceIndexRouteImport.update({
-  id: '/api/police/',
-  path: '/api/police/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-=======
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 const ApiPropertiesIndexRoute = ApiPropertiesIndexRouteImport.update({
   id: '/api/properties/',
   path: '/api/properties/',
@@ -238,14 +194,6 @@ const ApiWeaponsIdRoute = ApiWeaponsIdRouteImport.update({
   path: '/api/weapons/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
-<<<<<<< HEAD
-const ApiWorldIndexRoute = ApiWorldIndexRouteImport.update({
-  id: '/api/world/',
-  path: '/api/world/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-=======
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 const ApiCharactersIdEmploymentRoute =
   ApiCharactersIdEmploymentRouteImport.update({
     id: '/employment',
@@ -295,24 +243,11 @@ export interface FileRoutesByFullPath {
   '/api/vehicles/$id': typeof ApiVehiclesIdRoute
   '/api/weapons/$id': typeof ApiWeaponsIdRoute
   '/admin/memory/': typeof AdminMemoryIndexRoute
-<<<<<<< HEAD
-  '/api/bank/': typeof ApiBankIndexRoute
-  '/api/characters/': typeof ApiCharactersIndexRoute
-  '/api/commerce/': typeof ApiCommerceIndexRoute
-  '/api/jobs/': typeof ApiJobsIndexRoute
-  '/api/players/': typeof ApiPlayersIndexRoute
-  '/api/police/': typeof ApiPoliceIndexRoute
-  '/api/properties/': typeof ApiPropertiesIndexRoute
-  '/api/vehicles/': typeof ApiVehiclesIndexRoute
-  '/api/weapons/': typeof ApiWeaponsIndexRoute
-  '/api/world/': typeof ApiWorldIndexRoute
-=======
   '/api/characters/': typeof ApiCharactersIndexRoute
   '/api/jobs/': typeof ApiJobsIndexRoute
   '/api/properties/': typeof ApiPropertiesIndexRoute
   '/api/vehicles/': typeof ApiVehiclesIndexRoute
   '/api/weapons/': typeof ApiWeaponsIndexRoute
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   '/api/characters/$id/employment': typeof ApiCharactersIdEmploymentRoute
   '/api/characters/$id/inventory': typeof ApiCharactersIdInventoryRoute
   '/api/characters/$id/logs': typeof ApiCharactersIdLogsRoute
@@ -344,24 +279,11 @@ export interface FileRoutesByTo {
   '/api/vehicles/$id': typeof ApiVehiclesIdRoute
   '/api/weapons/$id': typeof ApiWeaponsIdRoute
   '/admin/memory': typeof AdminMemoryIndexRoute
-<<<<<<< HEAD
-  '/api/bank': typeof ApiBankIndexRoute
-  '/api/characters': typeof ApiCharactersIndexRoute
-  '/api/commerce': typeof ApiCommerceIndexRoute
-  '/api/jobs': typeof ApiJobsIndexRoute
-  '/api/players': typeof ApiPlayersIndexRoute
-  '/api/police': typeof ApiPoliceIndexRoute
-  '/api/properties': typeof ApiPropertiesIndexRoute
-  '/api/vehicles': typeof ApiVehiclesIndexRoute
-  '/api/weapons': typeof ApiWeaponsIndexRoute
-  '/api/world': typeof ApiWorldIndexRoute
-=======
   '/api/characters': typeof ApiCharactersIndexRoute
   '/api/jobs': typeof ApiJobsIndexRoute
   '/api/properties': typeof ApiPropertiesIndexRoute
   '/api/vehicles': typeof ApiVehiclesIndexRoute
   '/api/weapons': typeof ApiWeaponsIndexRoute
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   '/api/characters/$id/employment': typeof ApiCharactersIdEmploymentRoute
   '/api/characters/$id/inventory': typeof ApiCharactersIdInventoryRoute
   '/api/characters/$id/logs': typeof ApiCharactersIdLogsRoute
@@ -394,24 +316,11 @@ export interface FileRoutesById {
   '/api/vehicles/$id': typeof ApiVehiclesIdRoute
   '/api/weapons/$id': typeof ApiWeaponsIdRoute
   '/admin/memory/': typeof AdminMemoryIndexRoute
-<<<<<<< HEAD
-  '/api/bank/': typeof ApiBankIndexRoute
-  '/api/characters/': typeof ApiCharactersIndexRoute
-  '/api/commerce/': typeof ApiCommerceIndexRoute
-  '/api/jobs/': typeof ApiJobsIndexRoute
-  '/api/players/': typeof ApiPlayersIndexRoute
-  '/api/police/': typeof ApiPoliceIndexRoute
-  '/api/properties/': typeof ApiPropertiesIndexRoute
-  '/api/vehicles/': typeof ApiVehiclesIndexRoute
-  '/api/weapons/': typeof ApiWeaponsIndexRoute
-  '/api/world/': typeof ApiWorldIndexRoute
-=======
   '/api/characters/': typeof ApiCharactersIndexRoute
   '/api/jobs/': typeof ApiJobsIndexRoute
   '/api/properties/': typeof ApiPropertiesIndexRoute
   '/api/vehicles/': typeof ApiVehiclesIndexRoute
   '/api/weapons/': typeof ApiWeaponsIndexRoute
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   '/api/characters/$id/employment': typeof ApiCharactersIdEmploymentRoute
   '/api/characters/$id/inventory': typeof ApiCharactersIdInventoryRoute
   '/api/characters/$id/logs': typeof ApiCharactersIdLogsRoute
@@ -445,24 +354,11 @@ export interface FileRouteTypes {
     | '/api/vehicles/$id'
     | '/api/weapons/$id'
     | '/admin/memory/'
-<<<<<<< HEAD
-    | '/api/bank/'
-    | '/api/characters/'
-    | '/api/commerce/'
-    | '/api/jobs/'
-    | '/api/players/'
-    | '/api/police/'
-    | '/api/properties/'
-    | '/api/vehicles/'
-    | '/api/weapons/'
-    | '/api/world/'
-=======
     | '/api/characters/'
     | '/api/jobs/'
     | '/api/properties/'
     | '/api/vehicles/'
     | '/api/weapons/'
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     | '/api/characters/$id/employment'
     | '/api/characters/$id/inventory'
     | '/api/characters/$id/logs'
@@ -494,24 +390,11 @@ export interface FileRouteTypes {
     | '/api/vehicles/$id'
     | '/api/weapons/$id'
     | '/admin/memory'
-<<<<<<< HEAD
-    | '/api/bank'
-    | '/api/characters'
-    | '/api/commerce'
-    | '/api/jobs'
-    | '/api/players'
-    | '/api/police'
-    | '/api/properties'
-    | '/api/vehicles'
-    | '/api/weapons'
-    | '/api/world'
-=======
     | '/api/characters'
     | '/api/jobs'
     | '/api/properties'
     | '/api/vehicles'
     | '/api/weapons'
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     | '/api/characters/$id/employment'
     | '/api/characters/$id/inventory'
     | '/api/characters/$id/logs'
@@ -543,24 +426,11 @@ export interface FileRouteTypes {
     | '/api/vehicles/$id'
     | '/api/weapons/$id'
     | '/admin/memory/'
-<<<<<<< HEAD
-    | '/api/bank/'
-    | '/api/characters/'
-    | '/api/commerce/'
-    | '/api/jobs/'
-    | '/api/players/'
-    | '/api/police/'
-    | '/api/properties/'
-    | '/api/vehicles/'
-    | '/api/weapons/'
-    | '/api/world/'
-=======
     | '/api/characters/'
     | '/api/jobs/'
     | '/api/properties/'
     | '/api/vehicles/'
     | '/api/weapons/'
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     | '/api/characters/$id/employment'
     | '/api/characters/$id/inventory'
     | '/api/characters/$id/logs'
@@ -593,24 +463,11 @@ export interface RootRouteChildren {
   ApiVehiclesIdRoute: typeof ApiVehiclesIdRoute
   ApiWeaponsIdRoute: typeof ApiWeaponsIdRoute
   AdminMemoryIndexRoute: typeof AdminMemoryIndexRoute
-<<<<<<< HEAD
-  ApiBankIndexRoute: typeof ApiBankIndexRoute
-  ApiCharactersIndexRoute: typeof ApiCharactersIndexRoute
-  ApiCommerceIndexRoute: typeof ApiCommerceIndexRoute
-  ApiJobsIndexRoute: typeof ApiJobsIndexRoute
-  ApiPlayersIndexRoute: typeof ApiPlayersIndexRoute
-  ApiPoliceIndexRoute: typeof ApiPoliceIndexRoute
-  ApiPropertiesIndexRoute: typeof ApiPropertiesIndexRoute
-  ApiVehiclesIndexRoute: typeof ApiVehiclesIndexRoute
-  ApiWeaponsIndexRoute: typeof ApiWeaponsIndexRoute
-  ApiWorldIndexRoute: typeof ApiWorldIndexRoute
-=======
   ApiCharactersIndexRoute: typeof ApiCharactersIndexRoute
   ApiJobsIndexRoute: typeof ApiJobsIndexRoute
   ApiPropertiesIndexRoute: typeof ApiPropertiesIndexRoute
   ApiVehiclesIndexRoute: typeof ApiVehiclesIndexRoute
   ApiWeaponsIndexRoute: typeof ApiWeaponsIndexRoute
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 }
 
 declare module '@tanstack/react-router' {
@@ -692,16 +549,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminThirdeyeUnbanRouteImport
       parentRoute: typeof rootRouteImport
     }
-<<<<<<< HEAD
-    '/api/bank/': {
-      id: '/api/bank/'
-      path: '/api/bank'
-      fullPath: '/api/bank/'
-      preLoaderRoute: typeof ApiBankIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-=======
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     '/api/characters/': {
       id: '/api/characters/'
       path: '/api/characters'
@@ -716,16 +563,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCharactersIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-<<<<<<< HEAD
-    '/api/commerce/': {
-      id: '/api/commerce/'
-      path: '/api/commerce'
-      fullPath: '/api/commerce/'
-      preLoaderRoute: typeof ApiCommerceIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-=======
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     '/api/jobs/': {
       id: '/api/jobs/'
       path: '/api/jobs'
@@ -740,23 +577,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiJobsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-<<<<<<< HEAD
-    '/api/players/': {
-      id: '/api/players/'
-      path: '/api/players'
-      fullPath: '/api/players/'
-      preLoaderRoute: typeof ApiPlayersIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/police/': {
-      id: '/api/police/'
-      path: '/api/police'
-      fullPath: '/api/police/'
-      preLoaderRoute: typeof ApiPoliceIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-=======
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     '/api/properties/': {
       id: '/api/properties/'
       path: '/api/properties'
@@ -862,16 +682,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWeaponsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-<<<<<<< HEAD
-    '/api/world/': {
-      id: '/api/world/'
-      path: '/api/world'
-      fullPath: '/api/world/'
-      preLoaderRoute: typeof ApiWorldIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-=======
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     '/api/characters/$id/employment': {
       id: '/api/characters/$id/employment'
       path: '/employment'
@@ -947,24 +757,11 @@ const rootRouteChildren: RootRouteChildren = {
   ApiVehiclesIdRoute: ApiVehiclesIdRoute,
   ApiWeaponsIdRoute: ApiWeaponsIdRoute,
   AdminMemoryIndexRoute: AdminMemoryIndexRoute,
-<<<<<<< HEAD
-  ApiBankIndexRoute: ApiBankIndexRoute,
-  ApiCharactersIndexRoute: ApiCharactersIndexRoute,
-  ApiCommerceIndexRoute: ApiCommerceIndexRoute,
-  ApiJobsIndexRoute: ApiJobsIndexRoute,
-  ApiPlayersIndexRoute: ApiPlayersIndexRoute,
-  ApiPoliceIndexRoute: ApiPoliceIndexRoute,
-  ApiPropertiesIndexRoute: ApiPropertiesIndexRoute,
-  ApiVehiclesIndexRoute: ApiVehiclesIndexRoute,
-  ApiWeaponsIndexRoute: ApiWeaponsIndexRoute,
-  ApiWorldIndexRoute: ApiWorldIndexRoute,
-=======
   ApiCharactersIndexRoute: ApiCharactersIndexRoute,
   ApiJobsIndexRoute: ApiJobsIndexRoute,
   ApiPropertiesIndexRoute: ApiPropertiesIndexRoute,
   ApiVehiclesIndexRoute: ApiVehiclesIndexRoute,
   ApiWeaponsIndexRoute: ApiWeaponsIndexRoute,
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
