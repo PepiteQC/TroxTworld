@@ -30,44 +30,6 @@ export interface Actions {
   siren: boolean;
   gesture: boolean;
   surrender: boolean;
-<<<<<<< HEAD
-}
-
-const GAME_CODES = new Set([
-  "KeyW",
-  "KeyA",
-  "KeyS",
-  "KeyD",
-  "ArrowUp",
-  "ArrowLeft",
-  "ArrowDown",
-  "ArrowRight",
-  "Space",
-  "ShiftLeft",
-  "ShiftRight",
-  "KeyC",
-  "KeyN",
-  "KeyM",
-  "Escape",
-  "KeyR",
-  "KeyE",
-  "KeyF",
-  "KeyZ",
-  "KeyP",
-  "KeyI",
-  "KeyG",
-  "KeyJ",
-  "KeyK",
-  "KeyB",
-  "KeyQ",
-  "KeyT",
-  "KeyH",
-  "KeyU",
-  "KeyV",
-  "KeyX",
-  "Backquote",
-  "F1",
-=======
   // 🔫 SYSTÈME D'ARMES
   fire: boolean;
   fireHeld: boolean;
@@ -86,7 +48,6 @@ const GAME_CODES = new Set([
   "KeyB", "KeyQ", "KeyT", "KeyH", "KeyU", "KeyV", "KeyX",
   "Backquote", "F1",
   "Digit1", "Digit2", "Digit3",
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 ]);
 
 // ZERO-GC : Variables pré-allouées pour éviter la création d'objets dans radialDeadzone
@@ -122,45 +83,6 @@ export class Input {
   touchThrottle = 0;
   touchBrake = 0;
   touchHandbrake = false;
-<<<<<<< HEAD
-  prevCamera = false;
-  prevNight = false;
-  prevMap = false;
-  prevPause = false;
-  prevInteract = false;
-  prevPhone = false;
-  prevConsole = false;
-  prevRadio = false;
-  prevInventory = false;
-  prevGarage = false;
-  prevJobs = false;
-  prevFirm = false;
-  prevBuild = false;
-  prevRotate = false;
-  prevChat = false;
-  prevSiren = false;
-  prevGesture = false;
-  prevSurrender = false;
-  cameraEdge = false;
-  nightEdge = false;
-  mapEdge = false;
-  pauseEdge = false;
-  interactEdge = false;
-  phoneEdge = false;
-  consoleEdge = false;
-  radioEdge = false;
-  inventoryEdge = false;
-  garageEdge = false;
-  jobsEdge = false;
-  firmEdge = false;
-  buildEdge = false;
-  rotateEdge = false;
-  chatEdge = false;
-  sirenEdge = false;
-  gestureEdge = false;
-  surrenderEdge = false;
-=======
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   touchInteract = false;
   
   // ZERO-GC : L'objet retourné par sample() est pré-alloué au démarrage.
@@ -313,96 +235,11 @@ export class Input {
     actions.boost = active.has("ShiftLeft") || active.has("ShiftRight");
     actions.handbrake = active.has("Space") || this.touchHandbrake;
 
-<<<<<<< HEAD
-    const cameraHeld = keys.has("KeyC") || keys.has("KeyV");
-    const nightHeld = keys.has("KeyN");
-    const mapHeld = keys.has("KeyM");
-    const pauseHeld = keys.has("Escape");
-    const interactHeld = keys.has("KeyE") || keys.has("KeyF") || this.touchInteract;
-    const phoneHeld = keys.has("KeyP");
-    const consoleHeld = keys.has("Backquote") || keys.has("F1");
-    const radioHeld = keys.has("KeyR");
-    const inventoryHeld = keys.has("KeyI");
-    const garageHeld = keys.has("KeyG");
-    const jobsHeld = keys.has("KeyJ");
-    const firmHeld = keys.has("KeyK");
-    const buildHeld = keys.has("KeyB");
-    const rotateHeld = keys.has("KeyQ");
-    const chatHeld = keys.has("KeyT");
-    const sirenHeld = keys.has("KeyH");
-    const gestureHeld = keys.has("KeyU");
-    const surrenderHeld = keys.has("KeyX");
-    this.cameraEdge = cameraHeld && !this.prevCamera;
-    this.nightEdge = nightHeld && !this.prevNight;
-    this.mapEdge = mapHeld && !this.prevMap;
-    this.pauseEdge = pauseHeld && !this.prevPause;
-    this.interactEdge = interactHeld && !this.prevInteract;
-    this.phoneEdge = phoneHeld && !this.prevPhone;
-    this.consoleEdge = consoleHeld && !this.prevConsole;
-    this.radioEdge = radioHeld && !this.prevRadio;
-    this.inventoryEdge = inventoryHeld && !this.prevInventory;
-    this.garageEdge = garageHeld && !this.prevGarage;
-    this.jobsEdge = jobsHeld && !this.prevJobs;
-    this.firmEdge = firmHeld && !this.prevFirm;
-    this.buildEdge = buildHeld && !this.prevBuild;
-    this.rotateEdge = rotateHeld && !this.prevRotate;
-    this.chatEdge = chatHeld && !this.prevChat;
-    this.sirenEdge = sirenHeld && !this.prevSiren;
-    this.gestureEdge = gestureHeld && !this.prevGesture;
-    this.surrenderEdge = surrenderHeld && !this.prevSurrender;
-    this.prevCamera = cameraHeld;
-    this.prevNight = nightHeld;
-    this.prevMap = mapHeld;
-    this.prevPause = pauseHeld;
-    this.prevInteract = interactHeld;
-    this.prevPhone = phoneHeld;
-    this.prevConsole = consoleHeld;
-    this.prevRadio = radioHeld;
-    this.prevInventory = inventoryHeld;
-    this.prevGarage = garageHeld;
-    this.prevJobs = jobsHeld;
-    this.prevFirm = firmHeld;
-    this.prevBuild = buildHeld;
-    this.prevRotate = rotateHeld;
-    this.prevChat = chatHeld;
-    this.prevSiren = sirenHeld;
-    this.prevGesture = gestureHeld;
-    this.prevSurrender = surrenderHeld;
-
-    const boost = keys.has("ShiftLeft") || keys.has("ShiftRight");
-    const handbrake = keys.has("Space") || this.touchHandbrake;
-
-    return {
-      throttle,
-      brake,
-      steer,
-      boost,
-      handbrake,
-      camera: this.cameraEdge,
-      night: this.nightEdge,
-      map: this.mapEdge,
-      pause: this.pauseEdge,
-      interact: this.interactEdge,
-      phone: this.phoneEdge,
-      console: this.consoleEdge,
-      radio: this.radioEdge,
-      inventory: this.inventoryEdge,
-      garage: this.garageEdge,
-      jobs: this.jobsEdge,
-      firm: this.firmEdge,
-      build: this.buildEdge,
-      rotate: this.rotateEdge,
-      chat: this.chatEdge,
-      siren: this.sirenEdge,
-      gesture: this.gestureEdge,
-      surrender: this.surrenderEdge,
-=======
     // ── DÉTECTION DES TOUCHES & EDGE ──
     // Une macro simple pour traiter Held -> Edge -> Update Prev
     const checkEdge = (keyId: keyof typeof this.prev, condition: boolean) => {
       actions[keyId] = condition && !this.prev[keyId];
       this.prev[keyId] = condition;
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     };
 
     checkEdge("camera", active.has("KeyC") || active.has("KeyV"));

@@ -5,7 +5,7 @@
  */
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { matLib, QC_PALETTE, type QcMat } from "./materials";
+import { matLib, QC_PALETTE, type QcMat } from "../../../../materials";
 import { tex } from "./textures";
 
 export const COMMERCE_PALETTE = {
@@ -172,4 +172,3 @@ export function disposeCommerceEnv() {
   pmrem = null;
   cache.clear();
 }
-

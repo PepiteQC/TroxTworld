@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import { buildMaisonCanadienne, buildForSale, buildSedan } from "./architecture";
-import { matLib, QC_PALETTE } from "./materials";
+import { buildMaisonCanadienne, buildForSale, buildSedan } from "../buildings/architecture/architecture";
+import { matLib, QC_PALETTE } from "../../materials";
 import { type Deed } from "./rp";
 import {
   attachScenicHeat,
@@ -8,8 +8,8 @@ import {
   heatById,
   parseUtils,
   type HouseUtils,
-} from "./utilities";
-import { getTerrainHeight } from "./worlddata";
+} from "../../utilities";
+import { getTerrainHeight } from "../../worlddata";
 
 export type RenoId =
   | "eclairage"

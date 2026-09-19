@@ -26,9 +26,9 @@
  */
 
 import * as THREE from "three";
-import { depanneurOffset } from "./commerce";
-import { buildStreetProp, tickProps3d } from "./props3d";
-import { A40_EXITS, getTerrainHeight, LAKES, VILLAGES } from "./worlddata";
+import { depanneurOffset } from "../../commerce/commerce";
+import { buildStreetProp, tickProps3d } from "../../buildings/architecture/materiaux/props3d";
+import { A40_EXITS, getTerrainHeight, LAKES, VILLAGES } from "../../../worlddata";
 import { SpatialHash } from "./spatial";
 
 /* -------------------------------------------------------------------------- */
@@ -1345,15 +1345,6 @@ export function mountStreetFurniture(
   group.name = "street-furniture";
 
   const spots = countyStreetSpots();
-<<<<<<< HEAD:src/game/city/environment/roads/street.ts
-  const hot: THREE.Object3D[] = [];
-  for (const s of spots) {
-    const mesh = buildStreetProp(s.kind);
-    mesh.position.set(s.x, getTerrainHeight(s.x, s.z), s.z);
-    mesh.rotation.y = s.yaw;
-    mesh.userData.streetId = s.id;
-    mesh.userData.streetKind = s.kind;
-=======
   const entities = buildStreetRuntime(spots, options);
   const hot: THREE.Object3D[] = [];
   const entityMap = new Map<string, StreetEntity>();
@@ -1398,20 +1389,15 @@ export function mountStreetFurniture(
       hot.push(mesh);
     }
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/street.ts
     group.add(mesh);
     if (s.kind === "tlight" || s.kind === "campfire") hot.push(mesh);
   }
-<<<<<<< HEAD:src/game/city/environment/roads/street.ts
-  group.userData.hot = hot;
-=======
 
   group.userData.hot = hot;
   group.userData.streetRegistry = streetRegistry;
   group.userData.streetEntities = entityMap;
   group.userData.streetVersion = 3;
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/street.ts
   parent.add(group);
 
   return {
@@ -1483,15 +1469,6 @@ export function nearestStreet(
   return best;
 }
 
-<<<<<<< HEAD:src/game/city/environment/roads/street.ts
-export function tickStreet(group: THREE.Group, elapsed: number): void {
-  const hot = group.userData.hot as THREE.Object3D[] | undefined;
-  if (hot) {
-    for (const o of hot) tickProps3d(o, elapsed);
-    return;
-  }
-  tickProps3d(group, elapsed);
-=======
 export function nearestStreetEntity(
   x: number,
   z: number,
@@ -1499,7 +1476,6 @@ export function nearestStreetEntity(
   kind?: StreetKind,
 ): StreetEntity | null {
   return streetRegistry.findNearest(x, z, max, kind);
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/street.ts
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1763,7 +1739,4 @@ function updateEntityAnimation(entity: StreetEntity, elapsed: number): void {
 export function resetStreetRuntime(): void {
   streetRegistry.clear();
 }
-
-
-
 

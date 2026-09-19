@@ -1,9 +1,3 @@
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-import { Flame, Hammer, KeyRound, Landmark, Lock, Unlock, Wallet, Wrench, X, Zap } from "lucide-react";
-import { useEffect, useState } from "react";
-import { atmStatus } from "./banking";
-import { CAISSE_NIP } from "./caisse";
-=======
 import { 
   Building2, 
   CheckCircle2, 
@@ -23,10 +17,9 @@ import {
   Zap 
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { atmStatus } from "./banking";
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
-import { formatCad } from "./commerce";
-import type { PortneufEngine } from "./engine";
+import { atmStatus } from "../banking";
+import { formatCad } from "../commerce";
+import type { PortneufEngine } from "../engine";
 import {
   BASEMENT_FITS,
   DOOR_SLOTS,
@@ -37,8 +30,8 @@ import {
   emptyHouse,
   hasReno,
   type RenoGroup,
-} from "./house";
-import { deedById, withTax } from "./rp";
+} from "../city/maison/house.ts";
+import { deedById, withTax } from "../rp";
 import {
   KIND_LABEL,
   ZONE_LABEL,
@@ -47,8 +40,8 @@ import {
   isHouseDeed,
   ownedIds,
   propertyById,
-} from "./realestate";
-import { useGameStore } from "./store";
+} from "../realestate";
+import { useGameStore } from "../store";
 import {
   HEAT_CATALOG,
   WATER_CATALOG,
@@ -59,15 +52,11 @@ import {
   monthlyBill,
   outageLabel,
   waterById,
-} from "./utilities";
+} from "../../utils/utilities";
 
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-const AMOUNTS = [20, 40, 60, 100, 200];
-=======
 // NIP par défaut membre Desjardins
 const CAISSE_NIP = "1234";
 const AMOUNTS = [20, 40, 60, 100, 200, 500];
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
 
 type AtmUi =
   | "idle"
@@ -80,13 +69,10 @@ type AtmUi =
   | "balance"
   | "receipt"
   | "error";
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-=======
 
 // ═════════════════════════════════════════════════════════════════════════════
 // 1. GUICHET AUTOMATIQUE BANCAIRE (GAB DESJARDINS ACCÈSD)
 // ═════════════════════════════════════════════════════════════════════════════
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
 
 export function AtmOverlay() {
   const cash = useGameStore((s) => s.cash);
@@ -95,19 +81,13 @@ export function AtmOverlay() {
   const atmId = useGameStore((s) => s.atmId);
   const economy = useGameStore((s) => s.economy);
   const firm = useGameStore((s) => s.firm);
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-=======
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
   const [ui, setUi] = useState<AtmUi>("idle");
   const [pin, setPin] = useState("");
   const [amount, setAmount] = useState(20);
   const [mode, setMode] = useState<"withdraw" | "deposit" | "to-firm" | "from-firm">("withdraw");
   const [err, setErr] = useState("");
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-=======
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
   const vault = atmStatus(economy, atmId);
   const desk = (atmId ?? "").startsWith("desk") || atmId === "atm_caisse";
   const locked = economy.locked;
@@ -117,13 +97,6 @@ export function AtmOverlay() {
     const t = window.setTimeout(() => {
       const st = useGameStore.getState();
       let ok = false;
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-      if (mode === "to-firm" || mode === "from-firm") ok = st.transferBank(mode, amount);
-      else ok = st.atmOp(mode, amount);
-      setUi(ok ? "receipt" : "error");
-      if (!ok) setErr(useGameStore.getState().notice || "Opération refusée");
-    }, 900);
-=======
       if (mode === "to-firm" || mode === "from-firm") {
         ok = st.transferBank(mode, amount);
       } else {
@@ -132,7 +105,6 @@ export function AtmOverlay() {
       setUi(ok ? "receipt" : "error");
       if (!ok) setErr(useGameStore.getState().notice || "Transaction refusée par l'institution");
     }, 850);
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
     return () => window.clearTimeout(t);
   }, [ui, mode, amount]);
 
@@ -146,24 +118,12 @@ export function AtmOverlay() {
       setUi("menu");
       setErr("");
     } else {
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-      setErr("NIP incorrect");
-=======
       setErr("NIP invalide. 3 essais avant blocage.");
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
       setPin("");
     }
   };
 
   return (
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-    <div className="absolute inset-0 z-40 flex items-end justify-center bg-bg/70 px-3 py-4 backdrop-blur-sm sm:items-center">
-      <div className="w-full max-w-sm rounded-xl border border-border-strong bg-surface p-4 shadow-hud">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[10px] tracking-[0.2em] text-subtle uppercase">Guichet automatique</p>
-            <h2 className="font-display text-2xl italic">Caisse populaire</h2>
-=======
     <div className="absolute inset-0 z-40 flex items-end justify-center bg-bg/85 px-3 py-4 backdrop-blur-md sm:items-center">
       <div className="w-full max-w-sm rounded-2xl border border-border-strong bg-surface p-4 shadow-2xl">
         {/* En-tête GAB */}
@@ -176,7 +136,6 @@ export function AtmOverlay() {
               <p className="text-[10px] font-bold tracking-[0.2em] text-accent uppercase">Réseau AccèsD · Interac</p>
               <h2 className="font-display text-xl italic font-black text-fg">Caisse Desjardins</h2>
             </div>
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
           </div>
           <button
             type="button"
@@ -187,37 +146,6 @@ export function AtmOverlay() {
             <X className="size-5" />
           </button>
         </div>
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-        <div className="mt-3 rounded-lg bg-[#0d2a3a] px-3 py-4 text-center text-[#e8f4ec]">
-          {ui === "idle" && (
-            <>
-              <p className="font-display text-2xl italic">{vault.broken ? "Hors service" : "Bienvenue"}</p>
-              <p className="mt-1 text-sm text-[#8ab4c8]">
-                {vault.broken ? "Technicien en route" : locked ? "Compte verrouillé" : "Insérez votre carte pour commencer"}
-              </p>
-            </>
-          )}
-          {ui === "pin" && (
-            <>
-              <p className="text-sm">Entrez votre NIP</p>
-              <p className="mt-2 font-display text-3xl tracking-[0.4em]">{[0, 1, 2, 3].map((i) => (i < pin.length ? "●" : "○")).join(" ")}</p>
-              {err && <p className="mt-2 text-xs text-danger">{err}</p>}
-              <p className="mt-2 text-[11px] text-[#8ab4c8]">Membre · 1234</p>
-            </>
-          )}
-          {ui === "menu" && (
-            <p className="text-sm">Choisissez une opération</p>
-          )}
-          {(ui === "amount" || ui === "deposit" || ui === "transfer") && (
-            <>
-              <p className="text-sm">
-                {ui === "deposit" ? "Montant du dépôt" : ui === "transfer" ? "Montant du virement" : "Montant du retrait"}
-              </p>
-              <p className="mt-1 font-display text-4xl italic">{formatCad(amount)}</p>
-              {ui === "amount" && (
-                <p className="mt-1 text-[11px] text-[#8ab4c8]">
-                  Multiples de 20 $ · {desk ? "comptoir" : `caisse GAB ${formatCad(vault.cash)}`}
-=======
 
         {/* Écran cathodique / digital du guichet Desjardins */}
         <div className="mt-3 rounded-xl border border-[#0e4832] bg-[#072419] p-4 text-center text-[#e5f5ec] shadow-inner">
@@ -268,40 +196,10 @@ export function AtmOverlay() {
               {ui === "amount" && (
                 <p className="mt-1 text-[11px] text-[#8cd6b4]">
                   Billets de 20 $ CAD · {desk ? "Comptoir caissier" : `Réserve GAB : ${formatCad(vault.cash ?? 0)}`}
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
                 </p>
               )}
             </>
           )}
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-          {ui === "processing" && <p className="font-display text-xl italic">Traitement en cours…</p>}
-          {ui === "balance" && (
-            <>
-              <p className="text-sm">Solde du compte</p>
-              <p className="mt-1 font-display text-4xl italic">{formatCad(bank)}</p>
-              <p className="mt-1 text-[11px] text-[#8ab4c8]">Compte chèques · espèces {formatCad(cash)}</p>
-            </>
-          )}
-          {ui === "receipt" && (
-            <>
-              <p className="font-display text-xl italic">Opération réussie</p>
-              <p className="mt-1 text-sm text-[#8ab4c8]">Reprenez votre carte</p>
-            </>
-          )}
-          {ui === "error" && (
-            <>
-              <p className="font-display text-xl italic text-danger">Opération refusée</p>
-              <p className="mt-1 text-sm">{err || notice}</p>
-            </>
-          )}
-        </div>
-
-        {ui === "idle" && !vault.broken && !locked && (
-          <button type="button" className="mt-3 h-11 w-full rounded-md border border-border-strong bg-surface-2 text-sm" onClick={() => setUi("pin")}>
-            Insérer la carte
-          </button>
-        )}
-=======
 
           {ui === "processing" && (
             <div className="py-2">
@@ -348,16 +246,12 @@ export function AtmOverlay() {
           </button>
         )}
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
         {ui === "pin" && (
           <div className="mt-3 grid grid-cols-3 gap-1.5">
             {["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "OK"].map((k) => (
               <button
                 key={k}
                 type="button"
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-                className="h-10 rounded-md border border-border bg-surface-2 text-sm"
-=======
                 className={`h-11 rounded-lg border text-sm font-bold transition-all ${
                   k === "C"
                     ? "border-danger/30 bg-danger/10 text-danger hover:bg-danger/20"
@@ -365,7 +259,6 @@ export function AtmOverlay() {
                     ? "border-ok/30 bg-ok/15 text-ok hover:bg-ok/25 font-black"
                     : "border-border bg-surface-2 hover:bg-surface hover:border-border-strong text-fg"
                 }`}
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
                 onClick={() => {
                   if (k === "C") {
                     setPin("");
@@ -374,44 +267,11 @@ export function AtmOverlay() {
                   else digit(k);
                 }}
               >
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-                {k === "C" ? "Annuler" : k === "OK" ? "Entrée" : k}
-=======
                 {k === "C" ? "Effacer" : k === "OK" ? "Valider" : k}
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
               </button>
             ))}
           </div>
         )}
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-        {ui === "menu" && (
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <button type="button" className="h-10 rounded-md border border-border bg-surface-2 text-sm" onClick={() => { setMode("withdraw"); setUi("amount"); }}>
-              1 — Retrait
-            </button>
-            <button type="button" className="h-10 rounded-md border border-border bg-surface-2 text-sm" onClick={() => { setMode("deposit"); setUi("deposit"); }}>
-              2 — Dépôt
-            </button>
-            <button type="button" className="h-10 rounded-md border border-border bg-surface-2 text-sm" onClick={() => setUi("balance")}>
-              3 — Solde
-            </button>
-            <button
-              type="button"
-              className="h-10 rounded-md border border-border bg-surface-2 text-sm"
-              disabled={!firm}
-              onClick={() => { setMode("to-firm"); setUi("transfer"); }}
-            >
-              4 — Virement REQ
-            </button>
-            <button type="button" className="h-10 rounded-md border border-border bg-surface-2 text-sm" onClick={() => { setUi("idle"); setPin(""); }}>
-              0 — Annuler
-            </button>
-          </div>
-        )}
-        {(ui === "amount" || ui === "deposit" || ui === "transfer") && (
-          <div className="mt-3 space-y-2">
-            <div className="flex flex-wrap gap-1.5">
-=======
 
         {ui === "menu" && (
           <div className="mt-3 grid grid-cols-2 gap-2">
@@ -457,32 +317,10 @@ export function AtmOverlay() {
         {(ui === "amount" || ui === "deposit" || ui === "transfer") && (
           <div className="mt-3 space-y-2">
             <div className="grid grid-cols-3 gap-1.5">
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
               {AMOUNTS.map((n) => (
                 <button
                   key={n}
                   type="button"
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-                  className={`h-9 flex-1 rounded-md border px-2 text-xs ${amount === n ? "border-border-strong bg-surface-2 text-fg" : "border-border bg-surface text-muted"}`}
-                  onClick={() => setAmount(n)}
-                >
-                  {n}&nbsp;$
-                </button>
-              ))}
-            </div>
-            <button type="button" className="h-11 w-full rounded-md border border-border-strong bg-surface-2 text-sm" onClick={() => setUi("processing")}>
-              Entrée
-            </button>
-            <button type="button" className="h-9 w-full rounded-md border border-border text-xs text-muted" onClick={() => setUi("menu")}>
-              0 — Annuler
-            </button>
-          </div>
-        )}
-        {(ui === "balance" || ui === "receipt" || ui === "error") && (
-          <button
-            type="button"
-            className="mt-3 h-11 w-full rounded-md border border-border-strong bg-surface-2 text-sm"
-=======
                   className={`h-9 rounded-lg border text-xs font-bold transition-all ${
                     amount === n
                       ? "border-accent bg-accent text-accent-fg"
@@ -517,22 +355,12 @@ export function AtmOverlay() {
           <button
             type="button"
             className="mt-3 h-11 w-full rounded-lg bg-surface-2 border border-border-strong text-sm font-bold text-fg hover:bg-surface transition-colors"
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
             onClick={() => {
               setUi("idle");
               setPin("");
               setErr("");
             }}
           >
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-            Reprendre la carte
-          </button>
-        )}
-        {notice && ui === "receipt" && <p className="mt-3 text-sm text-accent">{notice}</p>}
-        <p className="mt-3 flex items-center gap-1.5 text-[10px] text-subtle">
-          <Wallet className="size-3" />
-          Compte {formatCad(bank)} · espèces {formatCad(cash)} · {vault.broken ? "hors service" : desk ? "comptoir" : `GAB ${formatCad(vault.cash)}`}
-=======
             Terminer et reprendre ma carte
           </button>
         )}
@@ -545,21 +373,12 @@ export function AtmOverlay() {
             Solde chèques : <strong className="text-fg">{formatCad(bank)}</strong>
           </span>
           <span>Espèces : <strong className="text-fg">{formatCad(cash)}</strong></span>
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
         </p>
       </div>
     </div>
   );
 }
 
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-const TABS: { id: "travaux" | "garage" | "cles" | "services" | "marche"; label: string }[] = [
-  { id: "travaux", label: "Travaux" },
-  { id: "garage", label: "Garage" },
-  { id: "cles", label: "Clés" },
-  { id: "services", label: "Chauffage" },
-  { id: "marche", label: "MLS" },
-=======
 // ═════════════════════════════════════════════════════════════════════════════
 // 2. GESTION IMMOBILIÈRE, ACTES NOTARIÉS & CENTRIS / TAL
 // ═════════════════════════════════════════════════════════════════════════════
@@ -570,7 +389,6 @@ const TABS: { id: "travaux" | "garage" | "cles" | "services" | "marche"; label: 
   { id: "cles", label: "Serrurerie" },
   { id: "services", label: "Hydro & Chauffage" },
   { id: "marche", label: "Centris & Baux" },
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
 ];
 
 const GROUPS: { id: RenoGroup; label: string }[] = [
@@ -589,12 +407,6 @@ export function DeedOverlay({ engine }: { engine: PortneufEngine | null }) {
   const houses = useGameStore((s) => s.houses);
   const inventory = useGameStore((s) => s.inventory);
   const realty = useGameStore((s) => s.realty);
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-  const [tab, setTab] = useState<"travaux" | "garage" | "cles" | "services" | "marche">("travaux");
-  const prop = propertyById(deedId ?? "");
-  const deed = deedById(deedId ?? "");
-  if (!prop && !deed) return null;
-=======
 
   const [tab, setTab] = useState<"travaux" | "garage" | "cles" | "services" | "marche">("travaux");
 
@@ -603,7 +415,6 @@ export function DeedOverlay({ engine }: { engine: PortneufEngine | null }) {
 
   if (!prop && !deed) return null;
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
   const p = prop ?? {
     id: deed!.id,
     kind: "house" as const,
@@ -621,14 +432,6 @@ export function DeedOverlay({ engine }: { engine: PortneufEngine | null }) {
     features: [],
     rentPerDay: 28,
     garageCapacity: 1,
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-  };
-  const mine = ownedIds(owned, realty).includes(p.id);
-  const house = isHouseDeed(p.id);
-  const { tax, total } = withTax(p.price);
-  const state = houses[p.id] ?? emptyHouse(p.id);
-  const value = evaluatedValue(p, state, realty);
-=======
     municipalEvaluation: Math.round(deed!.price * 0.8),
     hydroAccountNumber: `HQ-815-${deed!.id.split("-").pop()}`,
   };
@@ -639,15 +442,11 @@ export function DeedOverlay({ engine }: { engine: PortneufEngine | null }) {
   const state = houses[p.id] ?? emptyHouse(p.id);
 
   const value = evaluatedValue(p, state);
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
   const cond = conditionOf(realty, p.id);
   const rental = realty.rentals[p.id];
   const mortgage = realty.mortgages[p.id];
   const listed = realty.listings[p.id]?.listed;
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-=======
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
   const refresh = () => engine?.refreshHouses();
 
   return (
@@ -656,23 +455,6 @@ export function DeedOverlay({ engine }: { engine: PortneufEngine | null }) {
         {/* En-tête Foncier / Notarié */}
         <div className="flex items-start justify-between gap-3 border-b border-border pb-4">
           <div>
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-            <p className="text-[10px] tracking-[0.2em] text-subtle uppercase">
-              {p.town} · {KIND_LABEL[p.kind]} · {ZONE_LABEL[p.zone]}
-            </p>
-            <h2 className="font-display text-2xl italic">{p.name}</h2>
-            <p className="mt-1 text-sm text-muted">
-              {mine ? (
-                <>
-                  Évaluation <span className="hud-num text-fg">{formatCad(value)}</span>
-                  {" · "}
-                  condition {Math.round(cond)}
-                  {rental ? ` · ${rental.tenantName}` : ""}
-                </>
-              ) : (
-                <>
-                  {house ? "Coquille vide" : p.furnished ? "Meublé" : "Local nu"} · {formatCad(p.price)} + TPS+TVQ {formatCad(tax)}
-=======
             <div className="flex items-center gap-2">
               <span className="rounded bg-accent/15 px-1.5 py-0.5 text-[9px] font-bold text-accent uppercase">
                 {p.town} · {KIND_LABEL[p.kind]}
@@ -691,7 +473,6 @@ export function DeedOverlay({ engine }: { engine: PortneufEngine | null }) {
               ) : (
                 <>
                   {house ? "Résidence unifamiliale" : p.furnished ? "Meublé complet" : "Bâtisse à rénover"} • {formatCad(p.price)} + Taxes ({formatCad(totalTax)})
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
                 </>
               )}
             </p>
@@ -709,22 +490,6 @@ export function DeedOverlay({ engine }: { engine: PortneufEngine | null }) {
 
         {/* Section Achat & Hypothèque pour les non-propriétaires */}
         {!mine && (
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-          <>
-            <p className="hud-num mt-3 text-lg text-fg">{formatCad(total)}</p>
-            <p className="mt-1 text-[11px] text-subtle">
-              Banque {formatCad(bank)} · espèces {formatCad(cash)}
-            </p>
-            <p className="mt-2 text-xs text-muted">
-              {p.bedrooms ? `${p.bedrooms} ch. · ${p.bathrooms} sdb · ` : ""}
-              {p.squareFeet} pi²
-              {p.features.length ? ` · ${p.features.join(", ")}` : ""}
-            </p>
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                className="rounded-md bg-accent px-2 py-2.5 text-xs text-accent-fg"
-=======
           <div className="mt-4 flex flex-col gap-3">
             <div className="rounded-xl bg-surface-2 p-3 border border-border">
               <div className="flex justify-between items-baseline">
@@ -750,59 +515,31 @@ export function DeedOverlay({ engine }: { engine: PortneufEngine | null }) {
               <button
                 type="button"
                 className="rounded-xl bg-accent px-2 py-3 text-xs font-bold text-accent-fg hover:opacity-90 transition-opacity"
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
                 onClick={() => {
                   const ok = useGameStore.getState().buyProperty("cash");
                   if (ok) refresh();
                 }}
               >
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-                Espèces
-              </button>
-              <button
-                type="button"
-                className="rounded-md border border-border-strong bg-surface-2 px-2 py-2.5 text-xs"
-=======
                 Comptant (Cash)
               </button>
               <button
                 type="button"
                 className="rounded-xl border border-border-strong bg-surface-2 px-2 py-3 text-xs font-bold text-fg hover:bg-surface transition-colors"
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
                 onClick={() => {
                   const ok = useGameStore.getState().buyProperty("bank");
                   if (ok) refresh();
                 }}
               >
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-                Caisse
-              </button>
-              <button
-                type="button"
-                className="rounded-md border border-border-strong bg-surface-2 px-2 py-2.5 text-xs"
-=======
                 Débit Caisse
               </button>
               <button
                 type="button"
                 className="rounded-xl border border-border-strong bg-surface-2 px-2 py-3 text-xs font-bold text-fg hover:bg-surface transition-colors"
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
                 onClick={() => {
                   const ok = useGameStore.getState().buyProperty("mortgage");
                   if (ok) refresh();
                 }}
               >
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-                Hypothèque 20 %
-              </button>
-            </div>
-            <button
-              type="button"
-              className="mt-2 w-full rounded-md border border-border bg-surface-2 px-3 py-2 text-xs"
-              onClick={() => useGameStore.getState().bookVisit()}
-            >
-              Demander une visite
-=======
                 Hypothèque Desjardins (20%)
               </button>
             </div>
@@ -813,7 +550,6 @@ export function DeedOverlay({ engine }: { engine: PortneufEngine | null }) {
               onClick={() => useGameStore.getState().bookVisit()}
             >
               Contacter le courtier pour une visite libre
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
             </button>
           </div>
         )}
@@ -821,11 +557,7 @@ export function DeedOverlay({ engine }: { engine: PortneufEngine | null }) {
         {/* Onglets de gestion pour le propriétaire */}
         {mine && (
           <>
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-            <div className="mt-3 grid grid-cols-5 gap-1 rounded-lg border border-border p-1">
-=======
             <div className="mt-3 flex gap-1 rounded-xl bg-surface-2 p-1 border border-border">
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
               {(house ? TABS : TABS.filter((t) => t.id === "marche")).map((t) => (
                 <button
                   key={t.id}
@@ -1210,21 +942,6 @@ export function DeedOverlay({ engine }: { engine: PortneufEngine | null }) {
                 </div>
               )}
 
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-              {(tab === "marche" || !house) && (
-                <div className="space-y-3">
-                  <p className="text-xs text-muted">
-                    Condition {Math.round(cond)} · loyer {formatCad(p.rentPerDay)}/jour
-                    {mortgage ? ` · hypothèque ${formatCad(mortgage.monthlyPayment)}` : ""}
-                  </p>
-                  {rental ? (
-                    <button
-                      type="button"
-                      className="w-full rounded-md border border-border bg-surface-2 px-3 py-2 text-sm"
-                      onClick={() => useGameStore.getState().evictTenant()}
-                    >
-                      Évincer {rental.tenantName} · {rental.daysLeft} j
-=======
               {/* ONGLET : CENTRIS, BAUX DU TAL & REVENTE */}
               {(tab === "marche" || !house) && (
                 <div className="space-y-4">
@@ -1246,26 +963,10 @@ export function DeedOverlay({ engine }: { engine: PortneufEngine | null }) {
                       onClick={() => useGameStore.getState().evictTenant()}
                     >
                       Avis de résiliation de bail TAL ({rental.tenantName} · {rental.daysLeft} jours restants)
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
                     </button>
                   ) : (
                     <button
                       type="button"
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-                      className="w-full rounded-md border border-border-strong bg-surface-2 px-3 py-2 text-sm"
-                      onClick={() => useGameStore.getState().rentOut()}
-                    >
-                      Louer à un ménage du rang
-                    </button>
-                  )}
-                  {listed ? (
-                    <button
-                      type="button"
-                      className="w-full rounded-md border border-border bg-surface-2 px-3 py-2 text-sm"
-                      onClick={() => useGameStore.getState().unlistProperty()}
-                    >
-                      Retirer du MLS
-=======
                       className="w-full rounded-xl border border-border-strong bg-surface-2 p-3 text-xs font-bold text-fg hover:bg-surface transition-colors"
                       onClick={() => useGameStore.getState().rentOut()}
                     >
@@ -1281,52 +982,10 @@ export function DeedOverlay({ engine }: { engine: PortneufEngine | null }) {
                       onClick={() => useGameStore.getState().unlistProperty()}
                     >
                       Retirer l'inscription du registre Centris (MLS)
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
                     </button>
                   ) : (
                     <button
                       type="button"
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-                      className="w-full rounded-md border border-border-strong bg-surface-2 px-3 py-2 text-sm"
-                      onClick={() => useGameStore.getState().listProperty()}
-                    >
-                      Mettre en vente (+15 %)
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="w-full rounded-md border border-border bg-surface-2 px-3 py-2 text-sm"
-                    onClick={() => useGameStore.getState().maintainRealty()}
-                  >
-                    Entretien 40 $
-                  </button>
-                  <p className="text-[10px] tracking-[0.2em] text-subtle uppercase">Accès</p>
-                  {(realty.access[p.id] ?? []).length === 0 && (
-                    <p className="text-[11px] text-muted">Personne d'autre n'a la clé.</p>
-                  )}
-                  {(realty.access[p.id] ?? []).map((n) => (
-                    <button
-                      key={n}
-                      type="button"
-                      className="flex w-full items-center justify-between rounded-md border border-border bg-surface-2 px-3 py-2 text-sm"
-                      onClick={() => useGameStore.getState().revokeRealtyAccess(n)}
-                    >
-                      <span>{n}</span>
-                      <span className="text-[10px] text-subtle">retirer</span>
-                    </button>
-                  ))}
-                  {realty.visits.filter((v) => v.propertyId === p.id).map((v) => (
-                    <button
-                      key={v.id}
-                      type="button"
-                      className="flex w-full items-center justify-between rounded-md border border-border-strong bg-surface-2 px-3 py-2 text-sm"
-                      onClick={() => useGameStore.getState().grantRealtyAccess(v.name)}
-                    >
-                      <span>Visite · {v.name}</span>
-                      <span className="text-[10px] text-accent">accorder</span>
-                    </button>
-                  ))}
-=======
                       className="w-full rounded-xl bg-accent p-3 text-xs font-bold text-accent-fg hover:opacity-90 transition-opacity"
                       onClick={() => useGameStore.getState().listProperty()}
                     >
@@ -1385,20 +1044,12 @@ export function DeedOverlay({ engine }: { engine: PortneufEngine | null }) {
                       </div>
                     ))}
                   </div>
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
                 </div>
               )}
             </div>
           </>
         )}
 
-<<<<<<< HEAD:src/game/ui/rpui.tsx
-        {notice && <p className="mt-3 text-sm text-accent">{notice}</p>}
-        <p className="mt-3 flex items-center gap-1.5 text-[10px] text-subtle">
-          <Landmark className="size-3" />
-          {mine ? "Loyers, MLS, hypothèque Caisse" : "Espèces, Caisse ou mise de fonds 20 %"}
-        </p>
-=======
         {notice && <p className="mt-3 text-center text-xs font-semibold text-accent">{notice}</p>}
 
         <div className="mt-3 flex items-center justify-between border-t border-border pt-2 text-[10px] text-subtle">
@@ -1408,7 +1059,6 @@ export function DeedOverlay({ engine }: { engine: PortneufEngine | null }) {
           </span>
           <span>Baux conformes TAL</span>
         </div>
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/rpui.tsx
       </div>
     </div>
   );

@@ -1,128 +1,42 @@
 /**
  * Coque du comté — HUD, carte, pause, commerce, tactile.
-<<<<<<< HEAD
- */
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import {
-  Briefcase,
-  Car,
-  CloudFog,
-  CloudLightning,
-  CloudRain,
-  Compass,
-  DoorOpen,
-  Droplets,
-  Eye,
-  Flame,
-  Footprints,
-  Gauge,
-  Hammer,
-  Hand,
-  Handshake,
-  KeyRound,
-  Leaf,
-  Map as MapIcon,
-  MessageSquare,
-  Moon,
-  Music2,
-  Pause,
-  Play,
-  Pointer,
-  Radio,
-  RotateCcw,
-  Shield,
-  ShoppingBag,
-  ShoppingCart,
-  Smartphone,
-  Snowflake,
-  Sprout,
-  Star,
-  Sun,
-  Terminal,
-  Truck,
-  User,
-  Users,
-  Video,
-  Wallet,
-  X,
-  Zap,
-=======
  * Version HD Premium : Glassmorphism unifié, ombres profondes, animations fluides.
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Briefcase, Car, CloudFog, CloudLightning, CloudRain, Compass, DoorOpen, Droplets, Eye, Flame, Footprints, Gauge, Hammer, Hand, Handshake, KeyRound, Leaf, Map as MapIcon, MessageSquare, Moon, Music2, Pause, Play, Pointer, Radio, RotateCcw, Shield, ShoppingBag, ShoppingCart, Smartphone, Snowflake, Sprout, Star, Sun, Terminal, Truck, User, Users, Video, Wallet, X, Zap,
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 } from "lucide-react";
 import { AdminBar } from "./AdminBar";
-import { BuilderOverlay } from "./buildui";
+import { BuilderOverlay } from "./ui/buildui";
 import { ChatOverlay, RpNetBridge } from "./chat";
 import {
-<<<<<<< HEAD
-  bagCapacity,
-  bagWeight,
-  cartCount,
-  cartTotals,
-  catalogFor,
-  formatCad,
-  itemById,
-  sellPrice,
-  LANDMARK_SHOPS,
-  type ShopItem,
-=======
   bagCapacity, bagWeight, cartCount, cartTotals, catalogFor, formatCad, itemById, sellPrice, LANDMARK_SHOPS, type ShopItem,
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 } from "./commerce";
 import { CreatorOverlay } from "./creator";
 import { catalogForAisle, depMapMarks } from "./depanneur";
 import { catalogForCasseAisle } from "./casse";
 import { catalogForSqdcAisle } from "./sqdc";
-import { ElevatorOverlay } from "./elevator";
+import { ElevatorOverlay } from "./city/hotel/elevator";
 import type { PortneufEngine } from "./engine";
-<<<<<<< HEAD
-import { CROPS, farmMapMarks } from "./farms";
-import { FirmOverlay } from "./firm";
-import { JobsOverlay } from "./haul";
-import { input } from "./input";
-import { IntellectusOverlay, startIntellectusHeartbeat } from "./Intellectus";
-=======
 import { CROPS, farmMapMarks, type CropId } from "./farms";
 import { FirmOverlay } from "./firm";
 import { JobsOverlay } from "./JobsOverlay";
 import { input } from "./input";
 import { IntellectusOverlay, startIntellectusHeartbeat } from "./IntellectusOverlay";
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
-import { GarageOverlay, InventoryOverlay } from "./inventory";
+import { GarageOverlay, InventoryOverlay } from "./city/inventory/inventory";
 import { CartOverlay } from "./panier";
 import { LockOverlay, PhoneOverlay } from "./phone";
 import { ProductThumb } from "./productThumb";
-import { quebecFM } from "./radio";
+import { quebecFM } from "../components/radio";
 import { spatialAudio } from "./audio3d";
 import { COMMERCIALS, ownedIds } from "./realestate";
-import { AtmOverlay, DeedOverlay } from "./rpui";
+import { AtmOverlay, DeedOverlay } from "./ui/rpui";
 import { persist, useGameStore, CAMERA_LABEL, type CameraMode } from "./store";
 import { RP_GESTURES, type RpGesture } from "./gestures";
 import { getRoleBadgeStyle, AdminRole } from "./adminPerms";
 import { sugarMapMarks } from "./sugar";
 import { survivalLabel } from "./survival";
 import { CONDITION_LABEL, PLOW_STATUS_LABEL, SEASON_LABEL, type QuebecSeason, type SnowPlowStatus, type WeatherCondition } from "./seasons";
-<<<<<<< HEAD
-import {
-  A40_EXITS,
-  INDUSTRY_LABEL,
-  LAKES,
-  MAPLE_LEAVES,
-  POIS,
-  ROADS,
-  SPAWN,
-  VILLAGES,
-  WORLD,
-  getVillageAt,
-  getWorldStats,
-} from "./worlddata";
-import { DEEDS } from "./rp";
-import { rpNet } from "./net";
-=======
 import type { ChatMessageState } from "./rpSchema";
 import {
   A40_EXITS, INDUSTRY_LABEL, LAKES, MAPLE_LEAVES, POIS, ROADS, SPAWN, VILLAGES, WORLD, getVillageAt, getWorldStats,
@@ -136,7 +50,6 @@ const GLASS_PANEL_HEAVY =
   "bg-black/80 backdrop-blur-3xl border border-white/15 shadow-[0_16px_64px_rgba(0,0,0,0.7)] transition-all duration-300";
 const BTN_HOVER = "hover:bg-white/10 active:scale-[0.97] transition-all duration-150";
 const HUD_NUM = "font-mono tabular-nums tracking-tight";
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 
 export function PortneufApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -177,18 +90,6 @@ export function PortneufApp() {
       });
     }
     let cancelled = false;
-<<<<<<< HEAD
-    void import("./engine").then(({ PortneufEngine }) => {
-      if (cancelled || !canvasRef.current) return;
-      try {
-        const engine = new PortneufEngine(canvasRef.current);
-        engineRef.current = engine;
-        window.__portneuf = engine;
-        window.__store = useGameStore;
-        engine.start();
-        if (qa) useGameStore.getState().start();
-      } catch (err) {
-=======
     void import("./engine")
       .then(({ PortneufEngine }) => {
         if (cancelled || !canvasRef.current) return;
@@ -205,14 +106,9 @@ export function PortneufApp() {
         }
       })
       .catch((err) => {
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
         useGameStore.getState().setHud({ loading: false });
         setBootError(err instanceof Error ? err.message : "Le moteur 3D a échoué.");
-      }
-    }).catch((err) => {
-      useGameStore.getState().setHud({ loading: false });
-      setBootError(err instanceof Error ? err.message : "Impossible de charger le moteur 3D.");
-    });
+      });
     return () => {
       cancelled = true;
       engineRef.current?.dispose();
@@ -232,30 +128,9 @@ export function PortneufApp() {
   }, []);
 
   const overlayOpen =
-<<<<<<< HEAD
-    showMap ||
-    shopOpen ||
-    phoneOpen ||
-    lockOpen ||
-    consoleOpen ||
-    intelOpen ||
-    citationOpen ||
-    creatorOpen ||
-    inventoryOpen ||
-    garageOpen ||
-    jobsOpen ||
-    firmOpen ||
-    cartOpen ||
-    atmOpen ||
-    propertyOpen ||
-    elevatorOpen ||
-    chatOpen ||
-    buildOpen;
-=======
     showMap || shopOpen || phoneOpen || lockOpen || consoleOpen || intelOpen || citationOpen || creatorOpen ||
     inventoryOpen || garageOpen || jobsOpen || firmOpen || cartOpen || atmOpen || propertyOpen || elevatorOpen ||
     chatOpen || buildOpen;
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 
   return (
     <div className="game-root relative h-screen w-screen overflow-hidden bg-black text-white antialiased">
@@ -299,13 +174,6 @@ function StartScreen({ loading, error }: { loading: boolean; error: string | nul
   };
 
   return (
-<<<<<<< HEAD
-    <div className="absolute inset-0 z-20 flex flex-col items-center justify-end bg-linear-to-t from-bg via-bg/80 to-transparent px-6 pb-16 pt-10 sm:justify-center sm:pb-0">
-      <div className="max-w-xl text-center">
-        <p className="text-xs tracking-[0.35em] text-accent uppercase">Comté de Portneuf</p>
-        <h1 className="mt-3 font-display text-6xl italic leading-none text-fg sm:text-7xl">Portneuf</h1>
-        <p className="mt-4 text-base leading-relaxed text-muted">
-=======
     <div className="absolute inset-0 z-20 flex flex-col items-center justify-end bg-gradient-to-t from-black via-black/80 to-black/20 px-6 pb-16 pt-10 sm:justify-center sm:pb-0">
       <div className="max-w-xl text-center animate-in fade-in slide-in-from-bottom-6 duration-700">
         <p className="text-xs tracking-[0.4em] text-yellow-400/90 uppercase drop-shadow-[0_0_8px_rgba(250,204,21,0.3)]">
@@ -315,33 +183,22 @@ function StartScreen({ loading, error }: { loading: boolean; error: string | nul
           Portneuf
         </h1>
         <p className="mt-4 text-base leading-relaxed text-gray-300">
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
           Le Chemin du Roy, l'A-40 Félix-Leclerc et ses sorties 250 à 285, les rangs laitiers, l'éboulis de 1894 et les
           lacs des Laurentides. Prenez la 138, l'entrée d'autoroute, descendez du pick-up, entrez au dépanneur. Hôtel :
           NIP 1234. Caisse populaire — GAB, prêts, placements. MLS Portneuf — maisons, locaux, entrepôts.
         </p>
         {error ? (
-<<<<<<< HEAD
-          <p className="mt-6 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p>
-        ) : (
-          <div className="mt-8 flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
-=======
           <p className="mt-6 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300 backdrop-blur-md shadow-lg shadow-red-900/30">
             {error}
           </p>
         ) : (
           <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
             <button
               type="button"
               disabled={loading}
               aria-label="Start"
               onClick={() => boot(false)}
-<<<<<<< HEAD
-              className="inline-flex h-12 min-w-52 items-center justify-center rounded-lg bg-fg px-8 text-sm font-medium text-accent-fg transition-transform duration-150 hover:scale-[0.99] disabled:opacity-50"
-=======
               className="inline-flex h-12 min-w-52 items-center justify-center rounded-xl bg-white px-8 text-sm font-bold text-black shadow-[0_8px_24px_rgba(255,255,255,0.2)] transition-transform duration-150 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
             >
               {loading ? "Chargement du comté…" : "Prendre la route"}
               <span className="sr-only">Start</span>
@@ -350,11 +207,7 @@ function StartScreen({ loading, error }: { loading: boolean; error: string | nul
               type="button"
               disabled={loading}
               onClick={() => boot(true)}
-<<<<<<< HEAD
-              className="inline-flex h-12 min-w-52 items-center justify-center gap-2 rounded-lg border border-border-strong bg-surface px-8 text-sm font-medium text-fg disabled:opacity-50"
-=======
               className="inline-flex h-12 min-w-52 items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/5 px-8 text-sm font-medium text-white backdrop-blur-md transition-all duration-150 hover:bg-white/10 active:scale-[0.98] disabled:opacity-50"
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
             >
               <User className="size-4" />
               Personnage
@@ -381,11 +234,7 @@ function StartScreen({ loading, error }: { loading: boolean; error: string | nul
           <li>Maisons vides, rénos, clés — E</li>
           <li>Dépanneur — entrer, rayons, caisse</li>
           <li>Secteurs — asphalte, gravelle, rangs, forêt</li>
-<<<<<<< HEAD
-          <li>J — contrats de transport</li>
-=======
           <li>J — contrats de transport · Convois Fret</li>
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
           <li>K — entreprise, NEQ, permis</li>
           <li>G — flotte commerciale Gosselin</li>
           <li>Sac à dos — Boutique Éther</li>
@@ -500,11 +349,7 @@ function Hud() {
   const loadFill = loadCap > 0 ? loadKg / loadCap : 0;
   const here = getVillageAt(hx, hz);
   const holdings = ownedIds(ownedProps, realty);
-<<<<<<< HEAD
-  const crop = selectedSeed ? CROPS[selectedSeed] : null;
-=======
   const crop = selectedSeed ? CROPS[selectedSeed as CropId] : null;
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 
   return (
     <>
@@ -521,20 +366,12 @@ function Hud() {
               {firm?.isOpen ? ` · ${firm.tradeName} ouvert` : ""}
             </p>
             {adminRole && adminRole !== AdminRole.NONE && (
-<<<<<<< HEAD
-              <p className={`mt-0.5 text-[10px] tracking-[0.16em] uppercase ${getRoleBadgeStyle(adminRole).color}`}>
-=======
               <p className={`mt-0.5 text-[10px] tracking-[0.16em] uppercase font-semibold ${getRoleBadgeStyle(adminRole).color}`}>
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
                 {getRoleBadgeStyle(adminRole).label}
               </p>
             )}
             {mode !== "interior" && (
-<<<<<<< HEAD
-              <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-subtle">
-=======
               <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-gray-400">
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
                 <Gauge className="size-3" />
                 {limit > 0 ? `${limit} km/h` : "—"}
                 {policeEta > 0 ? ` · SQ ${Math.max(1, Math.round(policeEta / 60))} min` : ""}
@@ -549,29 +386,6 @@ function Hud() {
           </div>
 
           <div className="flex flex-col items-end gap-2">
-<<<<<<< HEAD
-            <div className="hud-panel flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-muted">
-              {night ? <Moon className="size-3.5" /> : <Sun className="size-3.5" />}
-              <span className="hud-num">
-                {String(hh).padStart(2, "0")}:{String(mm).padStart(2, "0")}
-              </span>
-              {timeHours >= 5.2 && timeHours < 7.6 ? (
-                <span className="text-subtle">aube</span>
-              ) : timeHours >= 17.4 && timeHours < 21.2 ? (
-                <span className="text-subtle">crépuscule</span>
-              ) : null}
-            </div>
-            <div className="hud-panel flex max-w-[11.5rem] flex-col gap-0.5 rounded-lg px-2.5 py-1.5 text-xs text-muted">
-              <p className="flex items-center gap-1.5">
-                {(() => {
-                  const Icon = weatherGlyph(wxCondition as WeatherCondition);
-                  return <Icon className="size-3.5 text-accent" />;
-                })()}
-                <span className="text-fg">{SEASON_LABEL[season as QuebecSeason]}</span>
-                <span className="hud-num text-fg">{Math.round(wxTemp)}°</span>
-              </p>
-              <p className="truncate text-[11px] text-subtle">
-=======
             <div className={`${GLASS_PANEL} flex items-center gap-2 rounded-xl px-3 py-2 text-xs`}>
               {night ? <Moon className="size-4 text-blue-300 drop-shadow-[0_0_6px_rgba(147,197,253,0.6)]" /> : <Sun className="size-4 text-yellow-400 drop-shadow-[0_0_6px_rgba(250,204,21,0.6)]" />}
               <span className={`${HUD_NUM} text-base font-semibold text-white`}>
@@ -594,58 +408,14 @@ function Hud() {
                 <span className={`${HUD_NUM} text-white`}>{Math.round(wxTemp)}°</span>
               </p>
               <p className="truncate text-[11px] text-gray-400">
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
                 {CONDITION_LABEL[wxCondition as WeatherCondition]}
                 {snowCm >= 1 ? ` · ${Math.round(snowCm)} cm` : ""}
               </p>
               {plowStatus !== "idle" && (
-<<<<<<< HEAD
-                <p className="truncate text-[10px] text-accent">{PLOW_STATUS_LABEL[plowStatus as SnowPlowStatus]}</p>
-              )}
-            </div>
-            {(radarActive || bloodAlcohol > 8 || licenseSuspendedUntil > Date.now() || demeritPoints > 0) && (
-              <div className="hud-panel flex max-w-[11.5rem] flex-col gap-0.5 rounded-lg px-2.5 py-1.5 text-xs text-muted">
-                <p className="flex items-center gap-1.5">
-                  <Shield className="size-3.5 text-accent" />
-                  <span className="text-fg">SQ Portneuf</span>
-                </p>
-                {radarActive && <p className="text-[11px] text-accent">Radar photo · 138 / A-40</p>}
-                {bloodAlcohol > 8 && (
-                  <p className={`text-[11px] ${bloodAlcohol >= 80 ? "text-danger" : "text-clay"}`}>
-                    Alcoolémie {Math.round(bloodAlcohol)} mg
-                  </p>
-                )}
-                {demeritPoints > 0 && (
-                  <p className="text-[11px] text-subtle">{demeritPoints} pts SAAQ</p>
-                )}
-                {licenseSuspendedUntil > Date.now() && (
-                  <p className="text-[11px] text-danger">
-                    Permis suspendu · {Math.max(1, Math.ceil((licenseSuspendedUntil - Date.now()) / 86400000))} j
-                  </p>
-                )}
-              </div>
-            )}
-            <button
-              type="button"
-              className="pointer-events-auto hud-panel flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-muted"
-              onClick={() => window.__portneuf?.cycleCamera()}
-              aria-label="Mode caméra"
-            >
-              {cameraMode === "fps" ? <Eye className="size-3.5 text-accent" /> : <Video className="size-3.5 text-accent" />}
-              <span className="text-fg">{CAMERA_LABEL[cameraMode] ?? "Épaule"}</span>
-              <span className="text-subtle">V</span>
-            </button>
-            <div className="hud-panel flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-muted">
-              <Wallet className="size-3.5 text-accent" />
-              <span className="hud-num text-fg">{formatCad(cash)}</span>
-              <span className="text-subtle">·</span>
-              <span className="hud-num">{formatCad(bank)}</span>
-=======
                 <p className="truncate text-[10px] text-yellow-400 font-medium">
                   {PLOW_STATUS_LABEL[plowStatus as SnowPlowStatus]}
                 </p>
               )}
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
             </div>
 
             {(radarActive || bloodAlcohol > 8 || licenseSuspendedUntil > Date.now() || demeritPoints > 0) && (
@@ -706,18 +476,6 @@ function Hud() {
                 {leaves.length}/{MAPLE_LEAVES.length}
               </span>
             </div>
-<<<<<<< HEAD
-            {crop && (
-              <div className="hud-panel flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-muted">
-                <Sprout className={`size-3.5 ${crop.illegal ? "text-danger" : "text-ok"}`} />
-                <span className="text-fg">{crop.label}</span>
-              </div>
-            )}
-            {holdings.length > 0 && (
-              <div className="hud-panel flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-muted">
-                <KeyRound className="size-3.5 text-accent" />
-                <span className="text-fg">
-=======
 
             {crop && (
               <div className={`${GLASS_PANEL} flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs`}>
@@ -730,7 +488,6 @@ function Hud() {
               <div className={`${GLASS_PANEL} flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs`}>
                 <KeyRound className="size-3.5 text-yellow-400" />
                 <span className="text-white">
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
                   {holdings.length} bien{holdings.length > 1 ? "s" : ""}
                 </span>
               </div>
@@ -742,29 +499,6 @@ function Hud() {
                 <span className="text-red-300">{gridOutage.kind === "verglas" ? "Verglas" : "Panne Hydro"}</span>
               </div>
             )}
-<<<<<<< HEAD
-            <div className="hud-panel flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-muted">
-              <Users className="size-3.5 text-accent" />
-              <span className="hud-num text-fg">{netPeers + 1}</span>
-              <span className="text-subtle">rang</span>
-            </div>
-            <div
-              className={`hud-panel flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs ${
-                riskLevel === "RED" || riskLevel === "ORANGE"
-                  ? "text-danger"
-                  : riskLevel === "YELLOW"
-                    ? "text-accent"
-                    : "text-ok"
-              }`}
-            >
-              <Shield className="size-3.5" />
-              <span className="hud-num">{riskLevel}</span>
-            </div>
-            {mode === "interior" && interiorKind === "home" && deedId && houses[deedId] && (
-              <div className="hud-panel flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-muted">
-                <Flame className={`size-3.5 ${houses[deedId].heatOn ? "text-accent" : "text-subtle"}`} />
-                <span className="hud-num text-fg">{Math.round(houses[deedId].indoorC)}°</span>
-=======
 
             <div className={`${GLASS_PANEL} flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs`}>
               <Users className="size-3.5 text-blue-300" />
@@ -789,7 +523,6 @@ function Hud() {
               <div className={`${GLASS_PANEL} flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs`}>
                 <Flame className={`size-3.5 ${houses[deedId].heatOn ? "text-orange-400" : "text-gray-500"}`} />
                 <span className={`${HUD_NUM} text-white`}>{Math.round(houses[deedId].indoorC)}°</span>
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
               </div>
             )}
 
@@ -823,16 +556,10 @@ function Hud() {
                 </div>
               </div>
             )}
-<<<<<<< HEAD
-            <div className="hud-panel w-[7.5rem] rounded-lg px-2.5 py-1.5">
-              <p className="hud-num text-[10px] text-muted">
-                {surv.bodyTemp.toFixed(1)} °C · {Math.round(surv.felt)}° air
-=======
 
             <div className={`${GLASS_PANEL} w-[7.5rem] rounded-xl px-3 py-2`}>
               <p className={`${HUD_NUM} text-[10px] text-gray-400`}>
                 {Number(surv.bodyTemp || 0).toFixed(1)} °C · {Math.round(surv.felt)}° air
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
               </p>
               <div className="mt-1 space-y-0.5">
                 <div className="h-1 overflow-hidden rounded-full bg-white/10">
@@ -841,15 +568,9 @@ function Hud() {
                 <div className="h-1 overflow-hidden rounded-full bg-white/10">
                   <div className={`h-full rounded-full ${surv.thirst < 20 ? "bg-red-500" : "bg-blue-400"}`} style={{ width: `${surv.thirst}%` }} />
                 </div>
-<<<<<<< HEAD
-                <div className="h-1 overflow-hidden rounded-full bg-surface-2">
-                  <div
-                    className={`h-full ${surv.bodyTemp < 35 ? "bg-danger" : surv.bodyTemp > 38.5 ? "bg-accent" : "bg-ok"}`}
-=======
                 <div className="h-1 overflow-hidden rounded-full bg-white/10">
                   <div
                     className={`h-full rounded-full ${surv.bodyTemp < 35 ? "bg-red-500" : surv.bodyTemp > 38.5 ? "bg-yellow-500" : "bg-green-500"}`}
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
                     style={{ width: `${Math.min(100, Math.max(0, (surv.bodyTemp - 32) * 12.5))}%` }}
                   />
                 </div>
@@ -858,10 +579,7 @@ function Hud() {
           </div>
         </div>
 
-<<<<<<< HEAD
-=======
         {/* ============ CONTRAT DE TRANSPORT / LOGISTIQUE ============ */}
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
         {haul && !citationOpen && (
           <div className="absolute top-[4.6rem] left-4 z-10 sm:top-24 animate-in fade-in slide-in-from-left-4 duration-300">
             <div className={`${GLASS_PANEL} max-w-[16rem] rounded-xl px-4 py-3 border-l-2 border-yellow-500`}>
@@ -876,43 +594,6 @@ function Hud() {
           </div>
         )}
 
-<<<<<<< HEAD
-        {eventBanner && !shopOpen && !citationOpen && (
-          <div className="absolute top-[4.5rem] left-1/2 z-10 w-[min(92%,22rem)] -translate-x-1/2 sm:top-24">
-            <div
-              className={`hud-panel rounded-lg px-3 py-2 text-center ${
-                eventSeverity === "catastrophe"
-                  ? "border-danger"
-                  : eventSeverity === "majeur"
-                    ? "border-clay"
-                    : ""
-              }`}
-            >
-              <p className="text-[10px] tracking-[0.18em] text-subtle uppercase">
-                {eventSeverity === "catastrophe" ? "Catastrophe" : eventSeverity === "majeur" ? "Alerte" : "Avis"}
-              </p>
-              <p
-                className={`text-sm leading-snug ${
-                  eventSeverity === "catastrophe" ? "text-danger" : eventSeverity === "majeur" ? "text-clay" : "text-fg"
-                }`}
-              >
-                {eventBanner}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {wantedStars > 0 && !shopOpen && !citationOpen && (
-          <div className={`absolute left-1/2 z-10 -translate-x-1/2 ${eventBanner ? "top-40 sm:top-44" : "top-20"}`}>
-            <div className="hud-panel rounded-lg px-3 py-1.5 text-center sm:px-4 sm:py-2">
-              <div className="flex items-center justify-center gap-1">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star key={i} className={`size-3.5 sm:size-4 ${i < wantedStars ? "fill-danger text-danger" : "text-subtle"}`} />
-                ))}
-              </div>
-              <p className="mt-1 hidden text-[11px] text-fg sm:block">
-                {evading ? "Fuite en cours" : "Poursuite SQ"} · {wantedReason}
-=======
         {/* ============ BANNIÈRE ÉVÉNEMENT ============ */}
         {eventBanner && !shopOpen && !citationOpen && (
           <div className="absolute top-[4.5rem] left-1/2 z-10 w-[min(92%,22rem)] -translate-x-1/2 sm:top-24 animate-in fade-in slide-in-from-top-4 duration-300">
@@ -934,21 +615,11 @@ function Hud() {
                 }`}
               >
                 {eventBanner}
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
               </p>
             </div>
           </div>
         )}
 
-<<<<<<< HEAD
-        <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2">
-          {activeGig && !citationOpen && (
-            <div className="hud-panel w-56 rounded-lg px-3 py-2">
-              <p className="text-[10px] tracking-[0.16em] text-subtle uppercase">{activeGig.title}</p>
-              <p className="truncate text-xs text-fg">{activeGig.steps[activeGig.currentStep]?.description ?? "En cours"}</p>
-              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-surface-2">
-                <div className="h-full bg-ok" style={{ width: `${Math.round(activeGig.progress * 100)}%` }} />
-=======
         {/* ============ RECHERCHE SQ ============ */}
         {wantedStars > 0 && !shopOpen && !citationOpen && (
           <div className={`absolute left-1/2 z-10 -translate-x-1/2 animate-in fade-in zoom-in-95 duration-300 ${eventBanner ? "top-40 sm:top-44" : "top-20"}`}>
@@ -980,7 +651,6 @@ function Hud() {
               <p className="truncate text-xs text-white mt-0.5">{activeGig.steps[activeGig.currentStep]?.description ?? "En cours"}</p>
               <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/10">
                 <div className="h-full bg-green-500 rounded-full transition-all duration-500" style={{ width: `${Math.round(activeGig.progress * 100)}%` }} />
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
               </div>
             </div>
           )}
@@ -991,11 +661,6 @@ function Hud() {
             </div>
           )}
           {!citationOpen && (
-<<<<<<< HEAD
-            <div className={`hud-panel rounded-xl px-6 py-3 text-center ${speeding ? "border-danger text-danger" : ""}`}>
-              <p className="hud-num font-display text-5xl leading-none tabular-nums">{Math.round(speed)}</p>
-              <p className="mt-1 text-[10px] tracking-[0.25em] text-muted uppercase">
-=======
             <div
               className={`${GLASS_PANEL_HEAVY} rounded-2xl px-8 py-4 text-center ${
                 speeding ? "border-red-500/60 shadow-[0_0_32px_rgba(239,68,68,0.3)]" : ""
@@ -1005,26 +670,17 @@ function Hud() {
                 {Math.round(speed)}
               </p>
               <p className="mt-1 text-[10px] tracking-[0.3em] text-gray-400 uppercase">
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
                 {onFoot ? "km/h à pied" : limit > 0 ? `km/h · max ${limit}` : "km/h"}
               </p>
             </div>
           )}
         </div>
 
-<<<<<<< HEAD
-=======
         {/* ============ MINICARTE ============ */}
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
         <div className="absolute right-4 bottom-6 hidden sm:block">
           <MiniMap />
         </div>
 
-<<<<<<< HEAD
-        <div className="absolute bottom-6 left-4 flex items-center gap-2">
-          <div className="hud-panel flex size-12 items-center justify-center rounded-full">
-            <Compass className="size-6 text-accent" style={{ transform: `rotate(${(-yaw * 180) / Math.PI}deg)` }} />
-=======
         {/* ============ BARRE D'ACTIONS ============ */}
         <div className="absolute bottom-6 left-4 flex items-center gap-2">
           <div className={`${GLASS_PANEL} flex size-12 items-center justify-center rounded-full`}>
@@ -1032,7 +688,6 @@ function Hud() {
               className="size-6 text-yellow-400 drop-shadow-[0_0_6px_rgba(250,204,21,0.4)] transition-transform duration-150"
               style={{ transform: `rotate(${(-yaw * 180) / Math.PI}deg)` }}
             />
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
           </div>
           <button
             type="button"
@@ -1094,14 +749,6 @@ function Hud() {
         </div>
       </div>
 
-<<<<<<< HEAD
-      {chat.length > 0 && !chatOpen && (
-        <div className="pointer-events-none absolute bottom-24 left-4 z-20 flex max-w-sm flex-col gap-1">
-          {chat.slice(-5).map((m) => (
-            <div key={m.id} className="hud-panel rounded-md px-3 py-1.5 text-xs">
-              <span className={m.type === "admin" ? "text-accent" : m.type === "system" ? "text-subtle" : "text-fg"}>
-                {m.sender}
-=======
       {/* ============ CHAT LOCAL (HORS OVERLAY) ============ */}
       {chat.length > 0 && !chatOpen && (
         <div className="pointer-events-none absolute bottom-24 left-4 z-20 flex max-w-sm flex-col gap-1.5">
@@ -1117,7 +764,6 @@ function Hud() {
                 }
               >
                 {m.senderId}
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
               </span>
               <span className="text-gray-300"> · {m.text}</span>
             </div>
@@ -1125,10 +771,7 @@ function Hud() {
         </div>
       )}
 
-<<<<<<< HEAD
-=======
       {/* ============ ÉTATS SPÉCIAUX (VOL, INVISIBLE, ETC.) ============ */}
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
       {flyMode && (
         <div className="pointer-events-none absolute top-20 right-4 z-20">
           <div className={`${GLASS_PANEL} rounded-lg px-3 py-1.5 text-[10px] tracking-[0.16em] text-purple-300 uppercase font-semibold`}>
@@ -1138,53 +781,34 @@ function Hud() {
       )}
       {vanished && (
         <div className="pointer-events-none absolute top-28 right-4 z-20">
-<<<<<<< HEAD
-          <div className="hud-panel rounded-md px-3 py-1 text-[10px] tracking-[0.16em] text-accent uppercase">Invisible</div>
-=======
           <div className={`${GLASS_PANEL} rounded-lg px-3 py-1.5 text-[10px] tracking-[0.16em] text-blue-300 uppercase font-semibold`}>
             Invisible
           </div>
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
         </div>
       )}
       {staffFrozen && (
         <div className="pointer-events-none absolute top-36 right-4 z-20">
-<<<<<<< HEAD
-          <div className="hud-panel rounded-md px-3 py-1 text-[10px] tracking-[0.16em] text-danger uppercase">Gelé</div>
-=======
           <div className={`${GLASS_PANEL} rounded-lg px-3 py-1.5 text-[10px] tracking-[0.16em] text-red-400 uppercase font-semibold`}>
             Gelé
           </div>
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
         </div>
       )}
       {sirenMode && sirenMode !== "off" && (
         <div className="pointer-events-none absolute top-20 left-4 z-20">
-<<<<<<< HEAD
-          <div className="hud-panel rounded-md px-3 py-1 text-[10px] tracking-[0.16em] text-accent uppercase">
-=======
           <div className={`${GLASS_PANEL} rounded-lg px-3 py-1.5 text-[10px] tracking-[0.16em] text-red-400 uppercase font-semibold drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]`}>
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
             {sirenMode === "code3_emergency" ? "Code 3" : sirenMode === "code2_visual" ? "Code 2" : "Code 1"}
           </div>
         </div>
       )}
       {gesture && gesture !== "none" && (
         <div className={`pointer-events-none absolute left-4 z-20 ${sirenMode && sirenMode !== "off" ? "top-28" : "top-20"}`}>
-<<<<<<< HEAD
-          <div className="hud-panel rounded-md px-3 py-1 text-[10px] tracking-[0.16em] text-accent uppercase">
-=======
           <div className={`${GLASS_PANEL} rounded-lg px-3 py-1.5 text-[10px] tracking-[0.16em] text-purple-300 uppercase font-semibold`}>
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
             {RP_GESTURES.find((g) => g.id === gesture)?.label ?? gesture}
           </div>
         </div>
       )}
 
-<<<<<<< HEAD
-=======
       {/* ============ NOTIFICATIONS CENTRALES ============ */}
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
       {fauna && !prompt && (
         <div className="pointer-events-none absolute inset-x-0 top-28 z-20 flex justify-center animate-in fade-in slide-in-from-top-4">
           <div className={`${GLASS_PANEL_HEAVY} rounded-xl px-5 py-2.5 text-sm text-white font-medium`}>{fauna}</div>
@@ -1221,10 +845,7 @@ function Hud() {
           </div>
         </div>
       )}
-<<<<<<< HEAD
-=======
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
       {gestureOpen && <GestureWheel current={gesture} />}
     </>
   );
@@ -1247,12 +868,6 @@ function paintCounty(
 ) {
   const sx = (px: number) => ((px - WORLD.minX) / WORLD.width) * w;
   const sy = (pz: number) => ((pz - WORLD.minZ) / WORLD.depth) * h;
-<<<<<<< HEAD
-  ctx.fillStyle = opts.labels ? "#121a16" : "#141c18";
-  ctx.fillRect(0, 0, w, h);
-  ctx.fillStyle = opts.labels ? "#1c3a52" : "#2a4a68";
-  ctx.fillRect(0, sy(96), w, h);
-=======
 
   ctx.fillStyle = opts.labels ? "#0f172a" : "#020617";
   ctx.fillRect(0, 0, w, h);
@@ -1260,20 +875,12 @@ function paintCounty(
   ctx.fillStyle = opts.labels ? "#1e3a5f" : "#172554";
   ctx.fillRect(0, sy(96), w, h);
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   for (const f of farmMapMarks()) {
     ctx.save();
     ctx.translate(sx(f.x), sy(f.z));
     ctx.rotate(-f.yaw);
     const rw = (f.w / WORLD.width) * w;
     const rh = (f.d / WORLD.depth) * h;
-<<<<<<< HEAD
-    ctx.fillStyle = f.illegal ? (opts.labels ? "#2e4a2a" : "#3a5a32") : opts.labels ? "#4a6a32" : "#5a7a3a";
-    ctx.fillRect(-rw / 2, -rh / 2, rw, rh);
-    ctx.restore();
-  }
-  ctx.fillStyle = "#c45a28";
-=======
     ctx.fillStyle = f.illegal ? (opts.labels ? "#3a4a2a" : "#4a5a32") : opts.labels ? "#4a6a32" : "#5a7a3a";
     ctx.fillRect(-rw / 2, -rh / 2, rw, rh);
     ctx.restore();
@@ -1282,45 +889,12 @@ function paintCounty(
   ctx.shadowColor = "#f59e0b";
   ctx.shadowBlur = opts.labels ? 8 : 4;
   ctx.fillStyle = "#f59e0b";
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   const sugarR = opts.labels ? 4.5 : 3.2;
   for (const s of sugarMapMarks()) {
     ctx.beginPath();
     ctx.arc(sx(s.x), sy(s.z), sugarR, 0, Math.PI * 2);
     ctx.fill();
   }
-<<<<<<< HEAD
-  const deedSize = opts.labels ? 6 : 4;
-  const deedOff = deedSize / 2;
-  for (const d of DEEDS) {
-    ctx.fillStyle = opts.owned.includes(d.id) ? "#c4a030" : opts.labels ? "#7a8078" : "#6a7068";
-    ctx.fillRect(sx(d.x) - deedOff, sy(d.z) - deedOff, deedSize, deedSize);
-  }
-  for (const c of COMMERCIALS) {
-    ctx.fillStyle = opts.owned.includes(c.id) ? "#c4a030" : "#5a7a9a";
-    ctx.fillRect(sx(c.x) - deedOff, sy(c.z) - deedOff, deedSize, deedSize);
-  }
-  ctx.fillStyle = "#c03028";
-  for (const s of depMapMarks()) ctx.fillRect(sx(s.x) - deedOff, sy(s.z) - deedOff, deedSize, deedSize);
-  ctx.fillStyle = "#1A5632";
-  for (const s of LANDMARK_SHOPS.filter((x) => x.kind === "sqdc")) {
-    ctx.fillRect(sx(s.x) - deedOff, sy(s.z) - deedOff, deedSize, deedSize);
-  }
-  for (const road of ROADS) {
-    if (road.kind === "highway") {
-      ctx.strokeStyle = "#e8c84a";
-      ctx.lineWidth = opts.labels ? 4 : 3.2;
-    } else if (road.kind === "ramp") {
-      ctx.strokeStyle = "#c4a030";
-      ctx.lineWidth = opts.labels ? 1.4 : 1.1;
-    } else if (road.kind === "regional") {
-      ctx.strokeStyle = "#d8d0c0";
-      ctx.lineWidth = opts.labels ? 2.6 : 2.2;
-    } else {
-      ctx.strokeStyle = opts.labels ? "#5a5a62" : "#4a4a52";
-      ctx.lineWidth = opts.labels ? 1.6 : 1.4;
-    }
-=======
   ctx.shadowBlur = 0;
 
   const deedSize = opts.labels ? 6 : 4;
@@ -1341,16 +915,10 @@ function paintCounty(
   }
 
   for (const road of ROADS) {
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     ctx.beginPath();
     road.points.forEach(([px, pz], i) => {
       i === 0 ? ctx.moveTo(sx(px), sy(pz)) : ctx.lineTo(sx(px), sy(pz));
     });
-<<<<<<< HEAD
-    ctx.stroke();
-  }
-  ctx.fillStyle = "#6a9a62";
-=======
     if (road.kind === "highway") {
       ctx.strokeStyle = "#fbbf24";
       ctx.lineWidth = opts.labels ? 4 : 3.2;
@@ -1374,22 +942,11 @@ function paintCounty(
   ctx.shadowBlur = 0;
 
   ctx.fillStyle = "#86efac";
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   for (const v of VILLAGES) {
     ctx.beginPath();
     ctx.arc(sx(v.center[0]), sy(v.center[1]), opts.labels ? 5 : 3.5, 0, Math.PI * 2);
     ctx.fill();
     if (opts.labels) {
-<<<<<<< HEAD
-      ctx.fillStyle = "#ece8de";
-      ctx.font = "11px Outfit, sans-serif";
-      ctx.fillText(v.name, sx(v.center[0]) + 8, sy(v.center[1]) + 4);
-      ctx.fillStyle = "#6a9a62";
-    }
-  }
-  if (!opts.labels) {
-    ctx.fillStyle = "#1a4a60";
-=======
       ctx.fillStyle = "#f1f5f9";
       ctx.font = "bold 11px Outfit, sans-serif";
       ctx.shadowColor = "#000";
@@ -1404,20 +961,11 @@ function paintCounty(
     ctx.fillStyle = "#3b82f6";
     ctx.shadowColor = "#3b82f6";
     ctx.shadowBlur = 8;
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     for (const lake of LAKES) {
       ctx.beginPath();
       ctx.arc(sx(lake.x), sy(lake.z), 5, 0, Math.PI * 2);
       ctx.fill();
     }
-<<<<<<< HEAD
-  }
-  if (opts.labels) {
-    ctx.fillStyle = "#e8c84a";
-    ctx.font = "bold 10px Outfit, sans-serif";
-    for (const ex of A40_EXITS) ctx.fillText(ex.no, sx(ex.x) + 4, sy(-178) - 6);
-  }
-=======
     ctx.shadowBlur = 0;
   }
 
@@ -1430,35 +978,18 @@ function paintCounty(
     ctx.shadowBlur = 0;
   }
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   if (opts.wantedStars > 0) {
     const traffic = window.__portneuf?.world.traffic;
     if (traffic) {
       ctx.fillStyle = "#3b82f6";
-<<<<<<< HEAD
-=======
       ctx.shadowColor = "#3b82f6";
       ctx.shadowBlur = 10;
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
       for (const car of traffic) {
         if (!car.isPolice) continue;
         ctx.beginPath();
         ctx.arc(sx(car.mesh.position.x), sy(car.mesh.position.z), car.chasing ? 3 : 2, 0, Math.PI * 2);
         ctx.fill();
       }
-<<<<<<< HEAD
-    }
-  }
-  if (opts.haul) {
-    const t = opts.haul.loaded ? opts.haul.to : opts.haul.from;
-    ctx.fillStyle = "#e8c84a";
-    ctx.beginPath();
-    ctx.arc(sx(t.x), sy(t.z), 4, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  if (opts.playerDot === "arrow") {
-    ctx.fillStyle = "#ece8de";
-=======
       ctx.shadowBlur = 0;
     }
   }
@@ -1478,20 +1009,10 @@ function paintCounty(
     ctx.shadowColor = "#ffffff";
     ctx.shadowBlur = 12;
     ctx.fillStyle = "#ffffff";
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     ctx.save();
     ctx.translate(sx(opts.x), sy(opts.z));
     ctx.rotate(-opts.yaw);
     ctx.beginPath();
-<<<<<<< HEAD
-    ctx.moveTo(0, -6);
-    ctx.lineTo(4, 5);
-    ctx.lineTo(-4, 5);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-    ctx.fillStyle = "#e8c84a";
-=======
     ctx.moveTo(0, -7);
     ctx.lineTo(5, 6);
     ctx.lineTo(0, 3);
@@ -1504,19 +1025,11 @@ function paintCounty(
     ctx.fillStyle = "#22c55e";
     ctx.shadowColor = "#22c55e";
     ctx.shadowBlur = 8;
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     for (const p of rpNet.remotes.values()) {
       ctx.beginPath();
       ctx.arc(sx(p.x), sy(p.z), 2.6, 0, Math.PI * 2);
       ctx.fill();
     }
-<<<<<<< HEAD
-  } else {
-    ctx.fillStyle = "#c44a3a";
-    ctx.beginPath();
-    ctx.arc(sx(opts.x), sy(opts.z), 5, 0, Math.PI * 2);
-    ctx.fill();
-=======
     ctx.shadowBlur = 0;
   } else {
     ctx.fillStyle = "#ef4444";
@@ -1526,7 +1039,6 @@ function paintCounty(
     ctx.arc(sx(opts.x), sy(opts.z), 5, 0, Math.PI * 2);
     ctx.fill();
     ctx.shadowBlur = 0;
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   }
 }
 
@@ -1547,18 +1059,9 @@ function MiniMap() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     paintCounty(ctx, canvas.width, canvas.height, {
-<<<<<<< HEAD
-      x,
-      z,
-      yaw,
-      owned: ownedIds(ownedProps, realty),
-      haul,
-      wantedStars,
-=======
       x, z, yaw,
       owned: ownedIds(ownedProps, realty),
       haul, wantedStars,
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
       labels: false,
       playerDot: "arrow",
     });
@@ -1580,13 +1083,9 @@ function PauseMenu({ engine }: { engine: PortneufEngine | null }) {
   const cash = useGameStore((s) => s.cash);
   const inventory = useGameStore((s) => s.inventory);
   const wantedStars = useGameStore((s) => s.wantedStars);
-<<<<<<< HEAD
-  const bag = Object.entries(inventory).filter(([, n]) => n > 0);
-=======
 
   const inventoryMap = inventory as Record<string, number>;
   const bag = Object.entries(inventoryMap).filter(([, n]) => Number(n) > 0);
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   const stats = getWorldStats();
 
   return (
@@ -1614,11 +1113,7 @@ function PauseMenu({ engine }: { engine: PortneufEngine | null }) {
           <span className="text-red-400">{fines}&nbsp;$ d'amendes</span>
           {wantedStars > 0 ? ` · ${wantedStars}★ SQ` : ""}
         </p>
-<<<<<<< HEAD
-        <p className="mt-1 text-[11px] text-subtle">
-=======
         <p className="mt-1 text-[11px] text-gray-500">
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
           {stats.villages} villages · {stats.totalPopulation.toLocaleString("fr-CA")} habitants
         </p>
         {bag.length > 0 && (
@@ -1628,59 +1123,20 @@ function PauseMenu({ engine }: { engine: PortneufEngine | null }) {
         )}
         <div className="mt-5 grid grid-cols-2 gap-2">
           <MenuBtn icon={<Play className="size-4" />} label="Reprendre" onClick={() => useGameStore.getState().togglePause()} />
-<<<<<<< HEAD
-          <MenuBtn
-            icon={<MapIcon className="size-4" />}
-            label="Carte"
-            onClick={() => useGameStore.getState().setHud({ showMap: true, paused: true })}
-          />
-          <MenuBtn icon={night ? <Sun className="size-4" /> : <Moon className="size-4" />} label={night ? "Jour" : "Nuit"} onClick={() => engine?.toggleNight()} />
-          <MenuBtn
-            icon={<RotateCcw className="size-4" />}
-            label="Respawn 138"
-            onClick={() => {
-              engine?.respawn();
-              useGameStore.getState().togglePause();
-            }}
-          />
-=======
           <MenuBtn icon={<MapIcon className="size-4" />} label="Carte" onClick={() => useGameStore.getState().setHud({ showMap: true, paused: true })} />
           <MenuBtn icon={night ? <Sun className="size-4" /> : <Moon className="size-4" />} label={night ? "Jour" : "Nuit"} onClick={() => engine?.toggleNight()} />
           <MenuBtn icon={<RotateCcw className="size-4" />} label="Respawn 138" onClick={() => { engine?.respawn(); useGameStore.getState().togglePause(); }} />
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
           <MenuBtn icon={<Smartphone className="size-4" />} label="Téléphone" onClick={() => useGameStore.getState().openPhone()} />
           <MenuBtn icon={<User className="size-4" />} label="Personnage" onClick={() => useGameStore.getState().openCreator()} />
           <MenuBtn icon={<ShoppingBag className="size-4" />} label="Sac" onClick={() => useGameStore.getState().openInventory()} />
           <MenuBtn icon={<Car className="size-4" />} label="Garage" onClick={() => useGameStore.getState().openGarage()} />
           <MenuBtn icon={<Truck className="size-4" />} label="Transport" onClick={() => useGameStore.getState().openJobs()} />
           <MenuBtn icon={<Briefcase className="size-4" />} label="Entreprise" onClick={() => useGameStore.getState().openFirm()} />
-<<<<<<< HEAD
-          <MenuBtn
-            icon={<Hammer className="size-4" />}
-            label="Builder"
-            onClick={() => {
-              useGameStore.getState().togglePause();
-              useGameStore.getState().toggleBuild();
-            }}
-          />
-          <MenuBtn icon={<Terminal className="size-4" />} label="Console" onClick={() => useGameStore.getState().openConsole()} />
-          <MenuBtn
-            icon={<Hand className="size-4" />}
-            label="Gestes RP"
-            onClick={() => {
-              useGameStore.getState().togglePause();
-              useGameStore.getState().openGesture();
-            }}
-          />
-        </div>
-        <p className="mt-3 text-center text-[11px] text-subtle">U gestes · V caméra · X se rendre · C capot</p>
-=======
           <MenuBtn icon={<Hammer className="size-4" />} label="Builder" onClick={() => { useGameStore.getState().togglePause(); useGameStore.getState().toggleBuild(); }} />
           <MenuBtn icon={<Terminal className="size-4" />} label="Console" onClick={() => useGameStore.getState().openConsole()} />
           <MenuBtn icon={<Hand className="size-4" />} label="Gestes RP" onClick={() => { useGameStore.getState().togglePause(); useGameStore.getState().openGesture(); }} />
         </div>
         <p className="mt-3 text-center text-[11px] text-gray-500">U gestes · V caméra · X se rendre · C capot</p>
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
         <MapList engine={engine} />
       </div>
     </div>
@@ -1734,23 +1190,8 @@ function MapList({ engine }: { engine: PortneufEngine | null }) {
             }}
           >
             <span>{s.name}</span>
-<<<<<<< HEAD
-            <span className="text-[10px] text-subtle">
-              {s.kind === "food"
-                ? "casse-croûte"
-                : s.kind === "clothing"
-                  ? "boutique"
-                  : s.kind === "chasse"
-                    ? "chasse"
-                    : s.kind === "quincaillerie"
-                      ? "quincaillerie"
-                      : s.kind === "sqdc"
-                        ? "SQDC"
-                        : "dépanneur"}
-=======
             <span className="text-[10px] text-gray-500 uppercase tracking-wider">
               {s.kind === "food" ? "casse-croûte" : s.kind === "clothing" ? "boutique" : s.kind === "chasse" ? "chasse" : s.kind === "quincaillerie" ? "quincaillerie" : s.kind === "sqdc" ? "SQDC" : "dépanneur"}
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
             </span>
           </button>
         ))}
@@ -1758,22 +1199,14 @@ function MapList({ engine }: { engine: PortneufEngine | null }) {
           <button
             key={c.id}
             type="button"
-<<<<<<< HEAD
-            className="flex w-full items-center justify-between border-b border-border py-2 text-left text-sm text-fg last:border-0"
-=======
             className={`flex w-full items-center justify-between border-b border-white/5 px-3 py-2 text-left text-sm text-white last:border-0 ${BTN_HOVER}`}
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
             onClick={() => {
               engine?.teleport(c.x, c.z + 6);
               useGameStore.getState().openDeed(c.id);
             }}
           >
             <span>{c.name}</span>
-<<<<<<< HEAD
-            <span className="text-[10px] text-subtle">MLS</span>
-=======
             <span className="text-[10px] text-yellow-400 uppercase tracking-wider">MLS</span>
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
           </button>
         ))}
       </div>
@@ -1802,17 +1235,7 @@ function ShopOverlay() {
         ? catalogForCasseAisle(shopAisle)
         : catalogForSqdcAisle(shopAisle)
     : null;
-<<<<<<< HEAD
-  const title =
-    shop?.name ??
-    (aisleItems && shopAisle && catalogForSqdcAisle(shopAisle).length
-      ? "SQDC"
-      : aisleItems && shopAisle && catalogForCasseAisle(shopAisle).length
-        ? "Casse-croûte"
-        : "Dépanneur");
-=======
   const title = shop?.name ?? (aisleItems && shopAisle && catalogForSqdcAisle(shopAisle).length ? "SQDC" : aisleItems && shopAisle && catalogForCasseAisle(shopAisle).length ? "Casse-croûte" : "Dépanneur");
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   const kind = shop?.kind ?? (aisleItems && shopAisle && catalogForSqdcAisle(shopAisle).length ? "sqdc" : "depanneur");
   const items = aisleItems && aisleItems.length > 0 ? aisleItems : catalogFor(kind);
 
@@ -1824,19 +1247,12 @@ function ShopOverlay() {
   const sqdc = kind === "sqdc";
   const hasId = (inventory.identite ?? 0) > 0;
 
-  const sqdc = kind === "sqdc";
-  const hasId = (inventory.identite ?? 0) > 0;
-
   return (
     <div className="absolute inset-0 z-30 flex items-end justify-center bg-black/60 backdrop-blur-md px-3 py-4 sm:items-center animate-in fade-in duration-200">
       <div className={`${GLASS_PANEL_HEAVY} w-full max-w-lg rounded-2xl p-6 animate-in slide-in-from-bottom-8 duration-300`}>
         <div className="flex items-start justify-between gap-3">
           <div>
-<<<<<<< HEAD
-            <p className="text-[10px] tracking-[0.25em] text-subtle uppercase">
-=======
             <p className="text-[10px] tracking-[0.25em] text-gray-400 uppercase">
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
               {sqdc ? "SQDC · 21 ans et plus" : shopAisle ? shopAisle : "Commerce"}
             </p>
             <h2 className="font-display text-3xl italic text-white drop-shadow-md">{title}</h2>
@@ -1846,11 +1262,7 @@ function ShopOverlay() {
               {shop?.hours ? <span className="text-gray-500">· {shop.hours}</span> : null}
             </p>
             {sqdc && (
-<<<<<<< HEAD
-              <p className={`mt-2 text-xs ${hasId ? "text-ok" : "text-danger"}`}>
-=======
               <p className={`mt-2 text-xs font-medium ${hasId ? "text-green-400" : "text-red-400"}`}>
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
                 {hasId ? "Identité vérifiée" : "Pièce d'identité requise à la caisse"}
               </p>
             )}
@@ -1864,13 +1276,6 @@ function ShopOverlay() {
             <X className="size-5" />
           </button>
         </div>
-<<<<<<< HEAD
-        <div className="mt-4 grid grid-cols-2 gap-1 rounded-lg border border-border p-1">
-          <button type="button" className={`h-9 rounded-md text-sm ${tab === "buy" ? "bg-surface-2 text-fg" : "text-muted"}`} onClick={() => setTab("buy")}>
-            Acheter
-          </button>
-          <button type="button" className={`h-9 rounded-md text-sm ${tab === "sell" ? "bg-surface-2 text-fg" : "text-muted"}`} onClick={() => setTab("sell")}>
-=======
 
         <div className="mt-4 grid grid-cols-2 gap-1 rounded-xl border border-white/10 bg-black/30 p-1">
           <button
@@ -1885,7 +1290,6 @@ function ShopOverlay() {
             className={`h-10 rounded-lg text-sm font-medium transition-all ${tab === "sell" ? "bg-white text-black shadow-lg" : "text-gray-400 hover:text-white"}`}
             onClick={() => setTab("sell")}
           >
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
             Vendre
           </button>
         </div>
@@ -1920,18 +1324,6 @@ function ShopOverlay() {
                           </span>
                         ) : null}
                       </span>
-<<<<<<< HEAD
-                      <span className="block text-xs text-muted">
-                        {item.desc}
-                        {item.hunger || item.thirst ? (
-                          <span className="text-subtle">
-                            {item.hunger ? ` · faim +${item.hunger}` : ""}
-                            {item.thirst ? ` · soif +${item.thirst}` : ""}
-                          </span>
-                        ) : null}
-                      </span>
-=======
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
                     </span>
                     <span className={`${HUD_NUM} shrink-0 text-sm text-white font-semibold`}>{formatCad(item.price)}</span>
                   </button>
@@ -1969,13 +1361,9 @@ function ShopOverlay() {
         {tab === "buy" && cartCount(cart) > 0 && (
           <button
             type="button"
-<<<<<<< HEAD
-            className={`mt-4 flex h-11 w-full items-center justify-between rounded-md px-3 text-sm ${sqdc ? "bg-sqdc text-fg" : "bg-accent text-bg"}`}
-=======
             className={`mt-4 flex h-12 w-full items-center justify-between rounded-xl px-4 text-sm font-semibold ${
               sqdc ? "bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/40" : "bg-white hover:bg-gray-100 text-black shadow-lg shadow-white/20"
             } transition-colors`}
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
             onClick={() => useGameStore.getState().openCart()}
           >
             <span className="flex items-center gap-2">
@@ -2004,13 +1392,6 @@ function CitationOverlay() {
         <p className="text-[10px] tracking-[0.25em] text-red-400 uppercase font-semibold">
           {arrest ? "Sûreté du Québec · Arrestation" : "Constat d'infraction"}
         </p>
-<<<<<<< HEAD
-        <h2 className="mt-1 font-display text-3xl italic">{arrest ? "Mise sous arrêt" : "Contravention CSR"}</h2>
-        <p className="mt-3 text-sm text-fg">{citation.article}</p>
-        <p className="mt-1 text-sm text-muted">{citation.description}</p>
-        {(citation.ticketNumber || citation.badge) && (
-          <p className="mt-2 text-[11px] tracking-[0.12em] text-subtle uppercase">
-=======
         <h2 className="mt-1 font-display text-3xl italic text-white drop-shadow-md">
           {arrest ? "Mise sous arrêt" : "Contravention CSR"}
         </h2>
@@ -2018,16 +1399,10 @@ function CitationOverlay() {
         <p className="mt-1 text-sm text-gray-300">{citation.description}</p>
         {(citation.ticketNumber || citation.badge) && (
           <p className="mt-2 text-[11px] tracking-[0.12em] text-gray-500 uppercase">
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
             {citation.ticketNumber ? citation.ticketNumber : "Constat"}
             {citation.badge ? ` · ${citation.badge}` : ""}
           </p>
         )}
-<<<<<<< HEAD
-        <div className="mt-4 flex items-center justify-between rounded-lg border border-border bg-surface-2 px-3 py-2.5">
-          <span className="text-xs text-subtle">{citation.points > 0 ? `${citation.points} points d'inaptitude` : "Sans points"}</span>
-          <span className="hud-num text-lg text-danger">{formatCad(citation.fine)}</span>
-=======
         <div className="mt-4 flex items-center justify-between rounded-xl border border-white/10 bg-black/40 px-3 py-3">
           <span className="text-xs text-gray-400">
             {citation.points > 0 ? `${citation.points} points d'inaptitude` : "Sans points"}
@@ -2035,7 +1410,6 @@ function CitationOverlay() {
           <span className={`${HUD_NUM} text-xl text-red-400 font-bold drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]`}>
             {formatCad(citation.fine)}
           </span>
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
         </div>
         {arrest && (
           <p className="mt-3 text-xs leading-relaxed text-gray-400">
@@ -2044,11 +1418,7 @@ function CitationOverlay() {
         )}
         <button
           type="button"
-<<<<<<< HEAD
-          className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-fg text-sm font-medium text-accent-fg"
-=======
           className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-white text-sm font-bold text-black shadow-lg shadow-white/10 hover:bg-gray-100 active:scale-[0.98] transition-all"
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
           onClick={() => useGameStore.getState().payCitation()}
         >
           <Shield className="size-4" />
@@ -2056,11 +1426,7 @@ function CitationOverlay() {
         </button>
         <button
           type="button"
-<<<<<<< HEAD
-          className="mt-2 flex h-10 w-full items-center justify-center text-xs text-muted"
-=======
           className="mt-2 flex h-10 w-full items-center justify-center text-xs text-gray-500 hover:text-white transition-colors"
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
           onClick={() => useGameStore.getState().closeCitation()}
         >
           Contester plus tard
@@ -2105,13 +1471,7 @@ function BigMap() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     paintCounty(ctx, canvas.width, canvas.height, {
-<<<<<<< HEAD
-      x,
-      z,
-      yaw: 0,
-=======
       x, z, yaw: 0,
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
       owned: ownedIds(ownedProps, realty),
       haul: null,
       wantedStars: 0,
@@ -2120,11 +1480,7 @@ function BigMap() {
     });
   }, [x, z, ownedProps, realty]);
 
-<<<<<<< HEAD
-  return <canvas ref={ref} width={640} height={360} className="w-full rounded-lg" />;
-=======
   return <canvas ref={ref} width={640} height={360} className="w-full rounded-xl border border-white/5" />;
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 }
 
 function TouchPad() {
@@ -2159,11 +1515,7 @@ function TouchPad() {
         <HoldBtn label="Glisse" onHold={(v) => (input.touchHandbrake = v)} />
         <button
           type="button"
-<<<<<<< HEAD
-          className="h-12 min-w-20 rounded-lg border border-border bg-surface/80 px-4 text-sm text-fg"
-=======
           className={`${GLASS_PANEL} ${BTN_HOVER} h-12 min-w-20 rounded-xl px-4 text-sm text-white font-medium`}
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
           onClick={() => {
             const s = useGameStore.getState();
             if (s.chatOpen) s.closeChat();
@@ -2174,11 +1526,7 @@ function TouchPad() {
         </button>
         <button
           type="button"
-<<<<<<< HEAD
-          className="h-12 min-w-20 rounded-lg border border-border bg-surface/80 px-4 text-sm text-fg"
-=======
           className={`${GLASS_PANEL} ${BTN_HOVER} h-12 min-w-20 rounded-xl px-4 text-sm text-white font-medium`}
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
           onClick={() => useGameStore.getState().toggleGesture()}
         >
           Gestes
@@ -2255,81 +1603,10 @@ function Stick() {
       onPointerUp={onEnd}
       onPointerCancel={onEnd}
     >
-<<<<<<< HEAD
-      <div ref={knob} className="absolute top-1/2 left-1/2 size-12 -translate-x-1/2 -translate-y-1/2 rounded-full bg-fg/80" />
-    </div>
-  );
-}
-
-function gestureIcon(id: RpGesture) {
-  switch (id) {
-    case "wave":
-      return Hand;
-    case "surrender":
-      return Hand;
-    case "cross_arms":
-      return Users;
-    case "point":
-      return Pointer;
-    case "dance":
-      return Music2;
-    case "gang_sign":
-      return Handshake;
-    case "sit":
-      return User;
-    case "phone":
-      return Smartphone;
-    case "salute":
-      return Shield;
-    default:
-      return Hand;
-  }
-}
-
-function GestureWheel({ current }: { current: RpGesture }) {
-  return (
-    <div className="pointer-events-auto absolute inset-0 z-40 flex items-center justify-center bg-bg/40">
-      <div className="relative size-72 sm:size-80">
-        {RP_GESTURES.map((g, i) => {
-          const a = (i / RP_GESTURES.length) * Math.PI * 2 - Math.PI / 2;
-          const r = 112;
-          const x = Math.cos(a) * r;
-          const y = Math.sin(a) * r;
-          const Icon = gestureIcon(g.id);
-          const on = current === g.id;
-          return (
-            <button
-              key={g.id}
-              type="button"
-              className={`absolute flex size-14 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border text-[10px] ${
-                on ? "border-accent bg-accent text-accent-fg" : "border-border bg-surface text-fg"
-              }`}
-              style={{ left: `calc(50% + ${x}px)`, top: `calc(50% + ${y}px)` }}
-              onClick={() => window.__portneuf?.playGesture(g.id)}
-            >
-              <Icon className="size-4" />
-              <span className="mt-0.5 max-w-14 truncate">{g.label}</span>
-            </button>
-          );
-        })}
-        <button
-          type="button"
-          className="absolute top-1/2 left-1/2 flex size-20 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border border-border bg-surface-2 text-xs text-muted"
-          onClick={() => {
-            window.__portneuf?.playGesture("none");
-            useGameStore.getState().closeGesture();
-          }}
-        >
-          <X className="size-4" />
-          Repos
-        </button>
-      </div>
-=======
       <div
         ref={knob}
         className="absolute top-1/2 left-1/2 size-14 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-white/30 to-white/5 border border-white/20 backdrop-blur-sm shadow-[0_4px_16px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.2)] transition-transform duration-75"
       />
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     </div>
   );
 }

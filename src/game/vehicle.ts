@@ -15,8 +15,6 @@ import type { Actions } from "./input";
 import { physics } from "./physics";
 import { findLightbar, LIGHTBAR_CYCLE, LIGHTBAR_LABEL, type LightbarPattern } from "./lightbar";
 import { QuebecPoliceSirens } from "./police";
-<<<<<<< HEAD
-=======
 import { dynamicEventsService } from "./events"; // Intégration du directeur d'événements Third Eye
 
 interface CachedWheel {
@@ -24,7 +22,6 @@ interface CachedWheel {
   radius: number;
   isFront: boolean;
 }
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 
 export class Vehicle {
   x = SPAWN.x;
@@ -58,11 +55,8 @@ export class Vehicle {
   braking = false;
   collided = false;
   sirenIndex = 0;
-<<<<<<< HEAD
-=======
 
   private wheels: CachedWheel[] = [];
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 
   constructor() {
     const s = useGameStore.getState();
@@ -84,8 +78,6 @@ export class Vehicle {
     this.group.name = next.name || id;
     this.group.userData = next.userData;
     if (id !== "sq") this.sirenIndex = 0;
-<<<<<<< HEAD
-=======
     this.roll = 0;
     this.pitch = 0;
     this.cacheWheels();
@@ -100,7 +92,6 @@ export class Vehicle {
         this.wheels.push({ obj, radius: r, isFront });
       }
     });
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   }
 
   cycleSiren(): string {
@@ -151,30 +142,18 @@ export class Vehicle {
     this.surface = getSurfaceAt(this.x, this.z);
     const st = useGameStore.getState();
     const wx = quebecSeasons.getState();
-<<<<<<< HEAD
-    const iced = wx.roadFrictionCoeff < 0.72 || st.weather === "snow" || st.weather === "storm" || st.gridOutage?.kind === "verglas";
-=======
     
     // Vérification combinée store, saisons et événements dynamiques en cours
     const isBlizzardActive = dynamicEventsService.hasGlobalModifier("speedLimitMultiplier");
     const iced = wx.roadFrictionCoeff < 0.72 || st.weather === "snow" || st.weather === "storm" || st.gridOutage?.kind === "verglas" || isBlizzardActive;
     
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     const s = withIce(this.surface, iced);
     this.surface = s;
     const spec = fleetById(this.kind);
     const speedKmh = Math.abs(this.speed) * 3.6;
 
     const heavy = spec.mass > 1.4 ? s.heavyPenalty : 1;
-<<<<<<< HEAD
-    let traction = (s.traction * spec.grip / heavy) * wx.roadFrictionCoeff;
-    if (this.kind === "deplaceige") traction = Math.min(1.08, traction / Math.max(0.42, wx.roadFrictionCoeff) * 0.94);
-    if (a.boost) traction *= 1.12;
-    const throttle = a.throttle * traction;
-    const maxSpeed = spec.maxSpeed * s.traction * wx.roadFrictionCoeff * (a.boost ? 1.18 : 1) * loadMul / Math.sqrt(heavy);
-=======
     const traction = (s.traction * spec.grip / heavy) * wx.roadFrictionCoeff;
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 
     // Vitesse max calibrée (m/s) avec modificateur global de tempête si actif
     const baseMaxKmh = Math.min(spec.maxSpeed, 135);
@@ -233,12 +212,6 @@ export class Vehicle {
     const grip = s.lateralGrip * 2.5 * spec.grip;
     const hb = a.handbrake ? 3.0 : 1.0;
     const demand = (corner * hb) / Math.max(0.05, grip);
-<<<<<<< HEAD
-    const sf = Math.max(0, (speedKmh - s.slipThreshold * 0.45) / Math.max(20, s.slipThreshold));
-    const targetSlip = Math.min(1, Math.max(0, (demand - 0.75) * sf * 1.5));
-    if (targetSlip > this.slip) this.slip += (targetSlip - this.slip) * Math.min(1, dt * 9);
-    else this.slip += (targetSlip - this.slip) * Math.min(1, dt * s.gripRecovery);
-=======
     const sf = Math.max(0, (speedKmh - s.slipThreshold * 0.5) / Math.max(20, s.slipThreshold));
     const targetSlip = Math.min(1, Math.max(0, (demand - 0.75) * sf * 1.2));
 
@@ -248,22 +221,12 @@ export class Vehicle {
       this.slip += (targetSlip - this.slip) * Math.min(1, safeDt * s.gripRecovery);
     }
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     this.slip = clamp(this.slip, 0, 1);
     this.drifting = this.slip > 0.22;
     this.lateral = this.slip * Math.abs(this.speed) * 0.4;
 
     // Intégration position monde
     this.updateHeading();
-<<<<<<< HEAD
-    const rx = Math.cos(this.yaw);
-    const rz = -Math.sin(this.yaw);
-    const ox = this.x;
-    const oy = this.y;
-    const oz = this.z;
-    this.x += this.headingX * this.speed * dt + rx * this.lateral * 0.25 * dt * Math.sign(a.steer || 1);
-    this.z += this.headingZ * this.speed * dt + rz * this.lateral * 0.25 * dt * Math.sign(a.steer || 1);
-=======
     const perpX = -this.headingZ;
     const perpZ = this.headingX;
     const ox = this.x;
@@ -272,7 +235,6 @@ export class Vehicle {
 
     this.x += this.headingX * this.speed * safeDt + perpX * this.lateral * 0.2 * safeDt * Math.sign(this.steer || 1);
     this.z += this.headingZ * this.speed * safeDt + perpZ * this.lateral * 0.2 * safeDt * Math.sign(this.steer || 1);
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 
     if (!inWorld(this.x, this.z)) {
       this.x = clamp(this.x, WORLD.minX + 24, WORLD.maxX - 24);
@@ -280,32 +242,14 @@ export class Vehicle {
       this.speed *= 0.4;
     }
 
-<<<<<<< HEAD
-=======
     // Collision
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     const hit = physics.correctVehicle(ox, oy, oz, this.x, this.y, this.z, this.yaw);
     this.collided = hit.hit;
     if (hit.hit) {
       this.x = hit.x;
       this.z = hit.z;
-<<<<<<< HEAD
-      this.speed *= 0.55;
-    }
-
-    this.bumpPhase += dt * (4 + speedKmh * 0.12);
-    const bumpT =
-      s.bumpiness *
-      Math.min(1, speedKmh / 50) *
-      (Math.sin(this.bumpPhase) * 0.6 + Math.sin(this.bumpPhase * 2.6) * 0.3) *
-      0.12;
-    this.bumpVel += (bumpT - this.bump) * dt * 40;
-    this.bumpVel *= 0.86;
-    this.bump += this.bumpVel * dt;
-=======
       this.speed *= 0.5;
     }
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 
     // Suspension
     this.updateChassisDynamics(safeDt, speedKmh, s);
@@ -348,7 +292,6 @@ export class Vehicle {
     tickCouch(this.group, dt, this.clock, this.speed, this.steer, this.throttle, this.braking);
     if (dt > 0) this.spinWheels(dt);
     this.tickLightbar(this.clock);
-<<<<<<< HEAD
   }
 
   tickLightbar(elapsed = this.clock) {
@@ -363,33 +306,6 @@ export class Vehicle {
       trafficAdvisor: pattern === "code1_advisor" && active ? "split" : pattern === "code3_emergency" ? "split" : "off",
       takedown: pattern === "code3_emergency",
       alleyLights: pattern === "code3_emergency",
-      sirenPhase: QuebecPoliceSirens.getSyncPhase(),
-    });
-  }
-
-  private spinWheels(dt: number) {
-    const spin = this.speed * dt;
-    this.group.traverse((obj) => {
-      const r = obj.userData.wheel as number | undefined;
-      if (!r || !(obj instanceof THREE.Mesh || obj instanceof THREE.Group)) return;
-      obj.rotation.x += spin / Math.max(0.2, r);
-    });
-=======
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
-  }
-
-  tickLightbar(elapsed = this.clock) {
-    const mode = this.sirenPattern();
-    const handle = findLightbar(this.group);
-    if (!handle) return;
-    const active = mode !== "off";
-    const pattern = mode === "off" ? "code1_advisor" : mode;
-    handle.tick(elapsed, {
-      active,
-      pattern,
-      trafficAdvisor: pattern === "code1_advisor" && active ? "split" : pattern === "code3_emergency" ? "split" : "off",
-      takedown: pattern === "code3_emergency",
-      alleyLights: pattern ===="code3_emergency",
       sirenPhase: QuebecPoliceSirens.getSyncPhase(),
     });
   }

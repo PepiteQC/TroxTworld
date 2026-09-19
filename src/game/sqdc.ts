@@ -8,7 +8,7 @@
 import * as THREE from "three";
 import { matLib, QC_PALETTE } from "./materials";
 import { commerceMat } from "./commerceMats";
-import { finishMap } from "./textures";
+import { finishMap } from "./city/buildings/architecture/materiaux/textures";
 import type { ShopItemId, ShopSpot } from "./commerce";
 import { itemById } from "./commerce";
 import type { BoutiqueGarment } from "./boutique";

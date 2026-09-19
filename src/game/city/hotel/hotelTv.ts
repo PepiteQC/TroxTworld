@@ -7,9 +7,10 @@
  */
 
 import * as THREE from "three";
-import { matLib } from "./materials";
-import { getGeo } from "./geometries";
-import { finishMap } from "./textures";
+import { matLib } from "../../materials";
+import { getGeo } from "../../geometries";
+import { tex } from "../buildings/architecture/materiaux/textures";
+import { finishMap } from "../buildings/architecture/materiaux/textures";
 
 export interface HotelTvSetup {
   tvGroup: THREE.Group;

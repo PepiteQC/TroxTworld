@@ -19,8 +19,8 @@
  * @author xblade benz (TroxTWorld)
  */
 
-import { A40_EXITS, villageCivicSpot, type VillageDef } from "./worlddata";
-import { getWeapon, weaponAmmo, weaponHarvestRange } from "./weapons";
+import { A40_EXITS, villageCivicSpot, type VillageDef } from "../../worlddata";
+import { getWeapon, weaponAmmo, weaponHarvestRange } from "../../weapons";
 
 // ==========================================
 // 📌 1. TYPES & CONSTANTES

@@ -10,12 +10,12 @@ import {
   sellPrice,
   type BagGroup,
   type ShopItem,
-} from "./commerce";
-import type { PortneufEngine } from "./engine";
-import { FLEET, persoFleet, proFleet, type VehicleId } from "./fleet";
+} from "../../commerce";
+import type { PortneufEngine } from "../../engine";
+import { FLEET, persoFleet, proFleet, type VehicleId } from "../../fleet";
 import { ProductThumb } from "./productThumb";
-import { persist, useGameStore } from "./store";
-import { getWeapon } from "./weapons";
+import { persist, useGameStore } from "../../store";
+import { getWeapon } from "../../weapons";
 
 // Filtres immersifs et bien traduits
 const FILTERS: { id: BagGroup; label: string }[] = [
@@ -185,18 +185,6 @@ export function InventoryOverlay({ engine }: { engine: PortneufEngine | null }) 
                           </span>
                         )}
                       </span>
-<<<<<<< HEAD:src/game/city/inventory/inventory.tsx
-                      <span className="block text-xs text-muted">
-                        {stackKg} kg · {formatCad(sellPrice(item) * n)}
-                        {item.hunger ? ` · faim +${item.hunger}` : ""}
-                        {item.thirst ? ` · soif +${item.thirst}` : ""}
-                        {(() => {
-                          const w = getWeapon(item.id);
-                          if (!w) return null;
-                          const tag =
-                            w.policeOnly ? " · SQ" : w.legal === "prohibee" ? " · prohibée" : w.need.length ? " · PAL" : "";
-                          return tag;
-=======
 
                       <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
                         <span>{stackKg} kg</span>
@@ -243,7 +231,6 @@ export function InventoryOverlay({ engine }: { engine: PortneufEngine | null }) 
                             );
                           }
                           return null;
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/inventory.tsx
                         })()}
                       </span>
                     </span>
@@ -268,15 +255,11 @@ export function InventoryOverlay({ engine }: { engine: PortneufEngine | null }) 
                           className="h-9 rounded-md bg-accent px-3 text-xs font-bold text-accent-fg hover:opacity-90 transition-opacity"
                           onClick={() => useGameStore.getState().useItem(item.id)}
                         >
-<<<<<<< HEAD:src/game/city/inventory/inventory.tsx
-                          {item.use === "drink" ? "Boire" : item.use === "eat" ? "Manger" : "Utiliser"}
-=======
                           {item.use === "drink"
                             ? "S'hydrater"
                             : item.use === "eat"
                               ? "Consommer"
                               : "Utiliser l'objet"}
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/inventory.tsx
                         </button>
                       )}
 

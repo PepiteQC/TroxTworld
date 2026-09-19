@@ -1,183 +1,3 @@
-<<<<<<< HEAD
-/**
- * ═════════════════════════════════════════════════════════════════════════════
- * 💼 SYSTÈME D'EMPLOIS, SALAIRES, CNESST & CHÔMAGE — PORTNEUF RP
- * ═════════════════════════════════════════════════════════════════════════════
- * 
- * Gestion des carrières, fiches de paie, cotisations sociales et accidents du travail :
- *  - 🚛 Emplois syndiqués (Teamsters 106, FTQ-Construction, CSN, APPQ)
- *  - ⏱️ Pointage des heures régulières et supplémentaires (Temps et demi 1.5x)
- *  - 🧾 Calcul précis des déductions fiscales (Impôt QC/CA, RRQ, AE, RQAP)
- *  - 🏥 Indemnités CNESST (90 % du salaire net) & chômage de transition
- *  - 📜 Formations et cartes de compétence SAAQ, ASP & CCQ
- * ═════════════════════════════════════════════════════════════════════════════
- */
-
-import { netEmit } from "./net";
-import { registerRemote } from "./remotes";
-import { sendPrivateMessage, sendChatMessage } from "./chat";
-import { triggerNotification } from "./phone";
-import { addCash, removeCash, getAccount, pushTx } from "./banking";
-import { modifyHealth } from "./survival";
-
-// --- ENUMÉRATIONS & TYPES FORTEMENT TYPÉS ---
-
-export type JobCategory =
-  | "securite_publique"
-  | "sante_urgence"
-  | "construction_metiers"
-  | "energie_services"
-  | "transport_logistique"
-  | "agriculture_foret"
-  | "commerce_services"
-  | "juridique_immo";
-
-export type JobId =
-  | "agent_sq"
-  | "agent_spvm"
-  | "pompier_municipal"
-  | "agent_correctionnel"
-  | "paramedic_urgence"
-  | "monteur_hydro"
-  | "deneigeur_mtq"
-  | "eboueur_municipal"
-  | "menuisier_ccq"
-  | "electricien_ccq"
-  | "operateur_papeterie"
-  | "bucheron_foret"
-  | "fermier_laitier"
-  | "acericulteur_sirop"
-  | "camionneur_teamster"
-  | "livreur_express"
-  | "chauffeur_taxi"
-  | "commis_sqdc"
-  | "caissier_desjardins"
-  | "commis_depanneur"
-  | "courtier_immobilier"
-  | "notaire_juriste";
-
-export type UnionType =
-  | "ftq_construction"
-  | "csn_sante"
-  | "teamsters_quebec"
-  | "fipq_pompiers"
-  | "appsq_police"
-  | "aucun";
-
-export type CertificationType =
-  | "carte_asp_construction"
-  | "carte_ccq_apprenti"
-  | "carte_ccq_compagnon"
-  | "permis_classe_1"
-  | "permis_classe_3"
-  | "permis_classe_4a"
-  | "diplome_enpq"
-  | "ordre_infirmiers_oiiq"
-  | "chambre_notaires_cdn"
-  | "permis_courtier_oaciq";
-
-// --- INTERFACES COMPLÈTES ---
-
-export interface JobDefinition {
-  id: JobId;
-  title: string;
-  category: JobCategory;
-  department: string;
-  baseHourlyWage: number;
-  overtimeRateMultiplier: number;
-  union: UnionType;
-  requiredCertifications: CertificationType[];
-  hazardPayBonus: number;
-  uniformColor: number;
-  description: string;
-  responsibilities: string[];
-}
-
-export interface EmployeeContract {
-  playerId: string;
-  playerName: string;
-  jobId: JobId;
-  jobTitle: string;
-  hourlyWage: number;
-  hiredAt: number;
-  hoursWorkedTotal: number;
-  hoursWorkedThisWeek: number;
-  careerEarningsTotal: number;
-  reputationScore: number;
-  certificationsObtained: CertificationType[];
-  unionMember: boolean;
-  isOnDuty: boolean;
-  activeShift: WorkShift | null;
-  cnesstActive: boolean;
-}
-
-export interface WorkShift {
-  shiftId: string;
-  jobId: JobId;
-  startedAt: number;
-  endedAt: number | null;
-  hoursWorked: number;
-  overtimeHours: number;
-  tasksCompleted: number;
-  hazardsEncountered: number;
-  accumulatedPayGross: number;
-}
-
-export interface PayStub {
-  stubId: string;
-  playerId: string;
-  jobTitle: string;
-  periodEnd: number;
-  grossAmount: number;
-  deductions: {
-    provincialTaxQC: number;  // Impôt Québec (14%)
-    federalTaxARC: number;   // Impôt Canada (15%)
-    rrqContribution: number;  // Régime de rentes du Québec (6.4%)
-    aeContribution: number;   // Assurance-Emploi (1.63%)
-    rqapContribution: number; // Régime québécois d'assurance parentale (0.494%)
-    unionDues: number;        // Cotisations syndicales (1.5%)
-  };
-  netAmount: number;
-  hoursRegular: number;
-  hoursOvertime: number;
-}
-
-export interface CnesstClaim {
-  claimId: string;
-  playerId: string;
-  jobId: JobId;
-  incidentDate: number;
-  injuryDescription: string;
-  dailyCompensation: number;
-  daysRemaining: number;
-  status: "approved" | "under_review" | "closed";
-}
-
-export interface UnemploymentBenefit {
-  claimId: string;
-  playerId: string;
-  weeklyAmount: number;
-  weeksRemaining: number;
-  approvedDate: number;
-  isActive: boolean;
-}
-
-export interface GigOffer {
-  id: string;
-  title: string;
-  description: string;
-  locationName: string;
-  position: { x: number; z: number };
-  payCash: number;
-  durationMinutes: number;
-  requiredItems?: string[];
-  hazardRisk: number;
-  reputationGain: number;
-}
-
-// --- CATALOGUES ---
-
-=======
 import { netEmit } from "./net";
 import { registerRemote } from "./remotes";
 import { sendPrivateMessage, sendChatMessage } from "./chat";
@@ -198,7 +18,6 @@ export interface CnesstClaim { claimId: string; playerId: string; jobId: JobId; 
 export interface UnemploymentBenefit { claimId: string; playerId: string; weeklyAmount: number; weeksRemaining: number; approvedDate: number; isActive: boolean; }
 export interface GigOffer { id: string; title: string; description: string; locationName: string; position: { x: number; z: number }; payCash: number; durationMinutes: number; requiredItems?: string[]; hazardRisk: number; reputationGain: number; }
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 export const JOB_CATALOG: Record<JobId, JobDefinition> = {
   agent_sq: { id: "agent_sq", title: "Agent Patrouilleur — Sûreté du Québec", category: "securite_publique", department: "District Portneuf (Poste 104)", baseHourlyWage: 38.50, overtimeRateMultiplier: 1.5, union: "appsq_police", requiredCertifications: ["diplome_enpq", "permis_classe_4a"], hazardPayBonus: 4.50, uniformColor: 0x223322, description: "Application du Code de la sécurité routière.", responsibilities: ["Patrouiller la route 138", "Émettre des constats"] },
   agent_spvm: { id: "agent_spvm", title: "Policier — SPVM", category: "securite_publique", department: "Poste de quartier 21", baseHourlyWage: 41.00, overtimeRateMultiplier: 1.5, union: "appsq_police", requiredCertifications: ["diplome_enpq", "permis_classe_4a"], hazardPayBonus: 6.00, uniformColor: 0x1a2430, description: "Maintien de l'ordre en milieu urbain.", responsibilities: ["Interventions en milieu dense", "Contrôles de foule"] },
@@ -237,276 +56,6 @@ export const CERTIFICATION_CATALOG: Record<CertificationType, any> = {
   permis_courtier_oaciq: { id: "permis_courtier_oaciq", title: "Permis de Courtage Immobilier — OACIQ", costCAD: 2200, durationMinutes: 10, institution: "OACIQ", description: "Afficher sur Centris/MLS." }
 };
 
-<<<<<<< HEAD
-// --- MULTI-MAPS DE PERSISTANCE EN MÉMOIRE VIVE ---
-const CONTRACTS = new Map<string, EmployeeContract>();
-const ACTIVE_SHIFTS = new Map<string, WorkShift>();
-const ACTIVE_GIGS = new Map<string, GigOffer>();
-const CNESST_CLAIMS = new Map<string, CnesstClaim>();
-const UNEMPLOYMENT_BENEFITS = new Map<string, UnemploymentBenefit>();
-
-export interface JobApplyResult {
-  success: boolean;
-  message: string;
-  contract: EmployeeContract | null;
-}
-
-export function applyForJob(playerId: string, playerName: string, jobId: JobId): JobApplyResult {
-  const jobDef = JOB_CATALOG[jobId];
-  if (!jobDef) return { success: false, message: "Offre d'emploi introuvable.", contract: null };
-
-  let contract = CONTRACTS.get(playerId);
-  const playerCerts = contract?.certificationsObtained ?? [];
-
-  for (const cert of jobDef.requiredCertifications) {
-    if (!playerCerts.includes(cert)) {
-      return { success: false, message: `Candidature rejetée : Carte de compétence requise manquante (${cert}).`, contract: null };
-    }
-  }
-
-  contract = {
-    playerId,
-    playerName,
-    jobId,
-    jobTitle: jobDef.title,
-    hourlyWage: jobDef.baseHourlyWage,
-    hiredAt: Date.now(),
-    hoursWorkedTotal: contract?.hoursWorkedTotal ?? 0,
-    hoursWorkedThisWeek: contract?.hoursWorkedThisWeek ?? 0,
-    careerEarningsTotal: contract?.careerEarningsTotal ?? 0,
-    reputationScore: contract?.reputationScore ?? 50,
-    certificationsObtained: playerCerts,
-    unionMember: jobDef.union !== "aucun",
-    isOnDuty: false,
-    activeShift: null,
-    cnesstActive: false,
-  };
-
-  CONTRACTS.set(playerId, contract);
-
-  triggerNotification(playerId, {
-    title: "🎉 Embauché !",
-    body: `Poste: ${jobDef.title} | Salaire de base: ${jobDef.baseHourlyWage.toFixed(2)} $/h`,
-    icon: "💼",
-  });
-
-  sendChatMessage(`📢 [RECRUTEMENT] ${playerName} a signé son contrat d'embauche de ${jobDef.title} !`);
-  netEmit("jobs:player_hired", { contract });
-
-  return { success: true, message: `Félicitations ! Vous êtes engagé comme [${jobDef.title}].`, contract };
-}
-
-export function quitJob(playerId: string): { success: boolean; message: string } {
-  const contract = CONTRACTS.get(playerId);
-  if (!contract) return { success: false, message: "Vous n'avez aucun emploi actif." };
-
-  if (contract.isOnDuty) {
-    clockOut(playerId);
-  }
-
-  const oldTitle = contract.jobTitle;
-  CONTRACTS.delete(playerId);
-
-  triggerNotification(playerId, {
-    title: "Démission validée",
-    body: `Vous avez quitté votre poste de ${oldTitle}.`,
-    icon: "📋",
-  });
-
-  netEmit("jobs:player_quit", { playerId, oldJobId: contract.jobId });
-  return { success: true, message: `Vous avez démissionné de votre poste de ${oldTitle}.` };
-}
-
-export function clockIn(playerId: string): { success: boolean; message: string; shift: WorkShift | null } {
-  const contract = CONTRACTS.get(playerId);
-  if (!contract) return { success: false, message: "Vous n'avez pas de contrat de travail actif.", shift: null };
-  if (contract.isOnDuty) return { success: false, message: "Vous êtes déjà en service.", shift: null };
-  if (contract.cnesstActive) {
-    return { success: false, message: "Action interdite : vous êtes en arrêt CNESST payé !", shift: null };
-  }
-
-  const shiftId = "SHIFT-" + Date.now().toString(36).toUpperCase();
-  const shift: WorkShift = {
-    shiftId,
-    jobId: contract.jobId,
-    startedAt: Date.now(),
-    endedAt: null,
-    hoursWorked: 0,
-    overtimeHours: 0,
-    tasksCompleted: 0,
-    hazardsEncountered: 0,
-    accumulatedPayGross: 0,
-  };
-
-  contract.isOnDuty = true;
-  contract.activeShift = shift;
-  ACTIVE_SHIFTS.set(shiftId, shift);
-
-  triggerNotification(playerId, {
-    title: "⏱️ Prise de service",
-    body: `Quart débuté pour ${contract.jobTitle}. Bon travail !`,
-    icon: "🟢",
-  });
-
-  netEmit("jobs:clocked_in", { playerId, shift });
-  return { success: true, message: `Quart de travail débuté pour [${contract.jobTitle}].`, shift };
-}
-
-export function clockOut(playerId: string): { success: boolean; message: string; payStub: PayStub | null } {
-  const contract = CONTRACTS.get(playerId);
-  if (!contract || !contract.isOnDuty || !contract.activeShift) {
-    return { success: false, message: "Vous n'êtes pas en service actuellement.", payStub: null };
-  }
-
-  const shift = contract.activeShift;
-  shift.endedAt = Date.now();
-
-  const elapsedMinutes = Math.max(1, (shift.endedAt - shift.startedAt) / 60000);
-  
-  // 🛑 CORRECTION BOGUE DU CODE D'ORIGINE : elapsedMinutes était converti directement en heures (fraude salariale !)
-  const hoursFraction = Math.round((elapsedMinutes / 60) * 100) / 100;
-
-  const jobDef = JOB_CATALOG[contract.jobId]!;
-  let regularHours = hoursFraction;
-  let overtimeHours = 0;
-
-  // Calcul du temps supplémentaire hebdomadaire (> 40 heures de service)
-  if (contract.hoursWorkedThisWeek + hoursFraction > 40) {
-    const regularLeft = Math.max(0, 40 - contract.hoursWorkedThisWeek);
-    regularHours = regularLeft;
-    overtimeHours = hoursFraction - regularLeft;
-  }
-
-  shift.hoursWorked = hoursFraction;
-  shift.overtimeHours = overtimeHours;
-
-  const baseRate = contract.hourlyWage + jobDef.hazardPayBonus;
-  const regularPay = regularHours * baseRate;
-  const overtimePay = overtimeHours * (baseRate * jobDef.overtimeRateMultiplier);
-  const grossTotal = Math.round((regularPay + overtimePay) * 100) / 100;
-  shift.accumulatedPayGross = grossTotal;
-
-  // Déductions fiscales provinciales et fédérales du Québec
-  const deductions = {
-    provincialTaxQC: Math.round(grossTotal * 0.14 * 100) / 100, // Impôt Québec
-    federalTaxARC: Math.round(grossTotal * 0.15 * 100) / 100,   // Impôt Canada
-    rrqContribution: Math.round(grossTotal * 0.064 * 100) / 100, // RRQ
-    aeContribution: Math.round(grossTotal * 0.0163 * 100) / 100, // AE
-    rqapContribution: Math.round(grossTotal * 0.0049 * 100) / 100,// RQAP
-    unionDues: contract.unionMember ? Math.round(grossTotal * 0.015 * 100) / 100 : 0, // Syndicat (1.5%)
-  };
-
-  const totalDeductions =
-    deductions.provincialTaxQC +
-    deductions.federalTaxARC +
-    deductions.rrqContribution +
-    deductions.aeContribution +
-    deductions.rqapContribution +
-    deductions.unionDues;
-
-  const netPay = Math.max(0, Math.round((grossTotal - totalDeductions) * 100) / 100);
-
-  contract.hoursWorkedTotal += hoursFraction;
-  contract.hoursWorkedThisWeek += hoursFraction;
-  contract.careerEarningsTotal += netPay;
-  contract.isOnDuty = false;
-  contract.activeShift = null;
-
-  // Versement sur la Caisse Desjardins du joueur
-  pushTx({
-    id: `pay_${Date.now()}`,
-    timestamp: Date.now(),
-    type: "salary",
-    amount: netPay,
-    description: `Paie nette de quart [${contract.jobTitle}]`,
-  }, playerId);
-
-  const stub: PayStub = {
-    stubId: "STUB-" + Date.now().toString(36).toUpperCase(),
-    playerId,
-    jobTitle: contract.jobTitle,
-    periodEnd: Date.now(),
-    grossAmount: grossTotal,
-    deductions,
-    netAmount: netPay,
-    hoursRegular: regularHours,
-    hoursOvertime: overtimeHours,
-  };
-
-  triggerNotification(playerId, {
-    title: "💵 Paie versée !",
-    body: `Heures: ${hoursFraction.toFixed(2)}h | +${netPay.toFixed(2)} $ net déposés sur votre Caisse.`,
-    icon: "🏦",
-  });
-
-  netEmit("jobs:clocked_out", { playerId, shift, stub });
-  return { success: true, message: `Quart clôturé. +${netPay.toFixed(2)} $ net versés.`, payStub: stub };
-}
-
-export function applyForUnemploymentBenefits(playerId: string): { success: boolean; message: string; claim: UnemploymentBenefit | null } {
-  const contract = CONTRACTS.get(playerId);
-  if (contract) {
-    return { success: false, message: `Inéligible : Vous détenez un poste de travail actif (${contract.jobTitle}).`, claim: null };
-  }
-
-  const claimId = "AE-" + Date.now().toString(36).toUpperCase();
-  const claim: UnemploymentBenefit = {
-    claimId,
-    playerId,
-    weeklyAmount: 485.00, // Prestation hebdomadaire fixe standard
-    weeksRemaining: 26,   // 6 mois d'admissibilité
-    approvedDate: Date.now(),
-    isActive: true,
-  };
-
-  UNEMPLOYMENT_BENEFITS.set(playerId, claim);
-
-  triggerNotification(playerId, {
-    title: "📋 Assurance-Emploi active",
-    body: "Prestations approuvées de 485.00 $/semaine.",
-    icon: "⚖️",
-  });
-
-  return { success: true, message: "Votre demande d'assurance-chômage a été approuvée.", claim };
-}
-
-export function reportWorkplaceInjury(playerId: string, injuryDescription: string, severityDamage: number): { success: boolean; claim: CnesstClaim | null; message: string } {
-  const contract = CONTRACTS.get(playerId);
-  if (!contract) return { success: false, claim: null, message: "Vous devez détenir un emploi pour réclamer la CNESST." };
-
-  modifyHealth(-severityDamage, playerId);
-
-  if (contract.isOnDuty) {
-    contract.isOnDuty = false;
-    contract.activeShift = null;
-  }
-
-  // 90% du salaire quotidien estimé sur 7.5 heures de travail
-  const dailyComp = Math.round((contract.hourlyWage * 7.5 * 0.9) * 100) / 100;
-  const claimId = "CNESST-" + Date.now().toString(36).toUpperCase();
-
-  const claim: CnesstClaim = {
-    claimId,
-    playerId,
-    jobId: contract.jobId,
-    incidentDate: Date.now(),
-    injuryDescription,
-    dailyCompensation: dailyComp,
-    daysRemaining: 14, // 2 semaines de rétablissement payées
-    status: "approved",
-  };
-
-  CNESST_CLAIMS.set(playerId, claim);
-  contract.cnesstActive = true;
-
-  triggerNotification(playerId, {
-    title: "🏥 Dossier CNESST Approuvé",
-    body: `Indemnité de remplacement de ${dailyComp} $/jour active. Bon rétablissement.`,
-    icon: "🚑",
-  });
-
-  return { success: true, claim, message: "Déclaration d'accident enregistrée et approuvée." };
-=======
 const CONTRACTS = new Map<string, EmployeeContract>();
 const ACTIVE_SHIFTS = new Map<string, WorkShift>();
 const ACTIVE_GIGS = new Map<string, GigOffer>();
@@ -597,57 +146,10 @@ export function applyForUnemploymentBenefits(playerId: string): { success: boole
 export function reportWorkplaceInjury(playerId: string, injuryDescription: string, severityDamage: number): { success: boolean; claim: CnesstClaim | null; message: string } {
   modifyHealth(-severityDamage, playerId);
   return { success: true, message: "Réclamation CNESST envoyée.", claim: null };
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 }
 
 export function takeCertificationCourse(playerId: string, playerName: string, certId: CertificationType): { success: boolean; message: string } {
   const certDef = CERTIFICATION_CATALOG[certId];
-<<<<<<< HEAD
-  if (!certDef) return { success: false, message: "Formation professionnelle introuvable." };
-
-  let contract = CONTRACTS.get(playerId);
-  if (!contract) {
-    contract = {
-      playerId,
-      playerName,
-      jobId: "commis_depanneur",
-      jobTitle: "Sans emploi",
-      hourlyWage: 0,
-      hiredAt: Date.now(),
-      hoursWorkedTotal: 0,
-      hoursWorkedThisWeek: 0,
-      careerEarningsTotal: 0,
-      reputationScore: 50,
-      certificationsObtained: [],
-      unionMember: false,
-      isOnDuty: false,
-      activeShift: null,
-      cnesstActive: false,
-    };
-    CONTRACTS.set(playerId, contract);
-  }
-
-  if (contract.certificationsObtained.includes(certId)) {
-    return { success: false, message: "Vous possédez déjà cette carte de compétence." };
-  }
-
-  const acct = getAccount(playerId);
-  if (!acct || acct.balance < certDef.costCAD) {
-    return { success: false, message: `Fonds insuffisants chez Desjardins (${certDef.costCAD} $ requis).` };
-  }
-
-  removeCash(certDef.costCAD, playerId);
-  contract.certificationsObtained.push(certId);
-
-  triggerNotification(playerId, {
-    title: "🎓 Diplôme obtenu !",
-    body: certDef.title,
-    icon: "📜",
-  });
-
-  netEmit("jobs:cert_obtained", { playerId, certId });
-  return { success: true, message: `Félicitations ! Vous avez obtenu votre [${certDef.title}].` };
-=======
   if (!certDef) return { success: false, message: "Formation introuvable." };
   let contract = CONTRACTS.get(playerId);
   if (!contract) {
@@ -662,18 +164,12 @@ export function takeCertificationCourse(playerId: string, playerName: string, ce
   triggerNotification(playerId, { title: "🎓 Diplôme obtenu !", body: certDef.title, icon: "📜" });
   netEmit("jobs:cert_obtained", { playerId, certId });
   return { success: true, message: "Certificat obtenu : " + certDef.title + " !" };
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 }
 
 export function generateGigBoard(): GigOffer[] {
   const gigs: GigOffer[] = [
-<<<<<<< HEAD
-    { id: "gig_divan", title: "Déménagement de meuble lourd", description: "Monter un canapé au 3e étage à la force des bras.", locationName: "Pont-Rouge", position: { x: -22, z: 16 }, payCash: 60, durationMinutes: 2, hazardRisk: 10, reputationGain: 2 },
-    { id: "gig_pelleter", title: "Pelleter une entrée enneigée", description: "Dégager 30 cm de poudrerie lourde.", locationName: "Donnacona", position: { x: 40, z: -28 }, payCash: 75, durationMinutes: 3, hazardRisk: 15, reputationGain: 4 }
-=======
     { id: "gig_divan", title: "Déménagement de meuble lourd", description: "Monter un divan au 3e étage.", locationName: "Pont-Rouge", position: { x: -22, z: 16 }, payCash: 60, durationMinutes: 2, hazardRisk: 10, reputationGain: 2 },
     { id: "gig_pelleter", title: "Pelleter une entrée", description: "Dégager 30 cm de neige lourde.", locationName: "Donnacona", position: { x: 40, z: -28 }, payCash: 75, durationMinutes: 3, hazardRisk: 15, reputationGain: 4 }
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   ];
   gigs.forEach((g) => ACTIVE_GIGS.set(g.id, g));
   return gigs;
@@ -681,26 +177,6 @@ export function generateGigBoard(): GigOffer[] {
 
 export function completeGig(playerId: string, gigId: string): { success: boolean; message: string; payCash: number } {
   const gig = ACTIVE_GIGS.get(gigId);
-<<<<<<< HEAD
-  if (!gig) return { success: false, message: "Ce contrat d'appoint n'est plus disponible.", payCash: 0 };
-
-  if (Math.random() < gig.hazardRisk / 100) {
-    modifyHealth(-15, playerId);
-    sendPrivateMessage(playerId, "⚠️ Blessure : Vous vous êtes fait un tour de rein en forçant !");
-  }
-
-  addCash(gig.payCash, playerId);
-  ACTIVE_GIGS.delete(gigId);
-
-  triggerNotification(playerId, {
-    title: "💵 Payé comptant !",
-    body: `${gig.title} terminé. +${gig.payCash} $ en liquide.`,
-    icon: "🤝",
-  });
-
-  netEmit("jobs:gig_completed", { playerId, gigId, payCash: gig.payCash });
-  return { success: true, message: `Contrat accompli ! Vous touchez ${gig.payCash} $ en liquide.`, payCash: gig.payCash };
-=======
   if (!gig) return { success: false, message: "Ce contrat n'est plus disponible.", payCash: 0 };
   if (Math.random() < gig.hazardRisk / 100) {
     modifyHealth(-15, playerId);
@@ -711,7 +187,6 @@ export function completeGig(playerId: string, gigId: string): { success: boolean
   triggerNotification(playerId, { title: "💵 Payé comptant !", body: gig.title + " terminé. +" + gig.payCash + "$ en liquide.", icon: "🤝" });
   netEmit("jobs:gig_completed", { playerId, gigId, payCash: gig.payCash });
   return { success: true, message: "Boulot terminé ! Vous touchez " + gig.payCash + "$ en liquide.", payCash: gig.payCash };
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 }
 
 export function getCurrentJob(playerId: string): JobDefinition | null {
@@ -734,10 +209,6 @@ export function resetWeeklyHours(): void {
   }
 }
 
-<<<<<<< HEAD
-// Enregistrement des rpc remotes
-=======
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 registerRemote("jobs:apply", applyForJob);
 registerRemote("jobs:quit", quitJob);
 registerRemote("jobs:clock_in", clockIn);
@@ -747,19 +218,10 @@ registerRemote("jobs:apply_unemployment", applyForUnemploymentBenefits);
 registerRemote("jobs:take_course", takeCertificationCourse);
 registerRemote("jobs:complete_gig", completeGig);
 
-<<<<<<< HEAD
-export function rollBoard(): GigOffer[] {
-  return generateGigBoard();
-}
-
-// ═══════════════════════════════════════════════════════════
-// TYPES COMPATIBILITÉ LEGACY
-=======
 export function rollBoard(): GigOffer[] { return generateGigBoard(); }
 
 // ═══════════════════════════════════════════════════════════
 // TYPES LEGACY HAUL (Compatibilité)
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 // ═══════════════════════════════════════════════════════════
 export type HaulKind = "delivery" | "construction" | "moving" | "garbage" | "fuel" | "food" | "furniture" | "camionneur_lourd" | "laitier" | "siropier" | "deblayeur_neige" | "taxi";
 export interface HaulLocation { x: number; z: number; name?: string; }

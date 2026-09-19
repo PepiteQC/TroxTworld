@@ -3,9 +3,9 @@
  * Fichier: src/game/carabine.ts
  */
 import * as THREE from "three";
-import { matLib, type QcMat } from "./materials";
-import { tex } from "./textures";
-import { getGeo } from "./geometries";
+import { matLib, type QcMat } from "../../materials";
+import { tex } from "../../textures";
+import { getGeo } from "../../geometries";
 
 const box = new THREE.Box3();
 const size = new THREE.Vector3();

@@ -7,7 +7,75 @@
  * ═════════════════════════════════════════════════════════════════════════════
  */
 
+import * as THREE from "three";
 import { VILLAGES, PAPETERIE, PRISON, SQ_JAIL } from "./worlddata";
+
+export interface WorldItemEntry {
+  id: string;
+  x: number;
+  z: number;
+  kind: string;
+  value?: number;
+}
+
+export const WORLD_ITEM_DEFS: Array<{ kind: string; label: string; rarity: string; color: number }> = [
+  { kind: "cargo", label: "Cargaison", rarity: "common", color: 0x94a3b8 },
+  { kind: "contraband", label: "Contrebande", rarity: "rare", color: 0xf59e0b },
+  { kind: "high_value", label: "Objet de valeur", rarity: "legendary", color: 0xa78bfa },
+];
+
+export function getRarityColor(rarity: string): number {
+  return rarity === "legendary" ? 0xa78bfa : rarity === "rare" ? 0xf59e0b : 0x94a3b8;
+}
+
+export function getRarityLabel(rarity: string): string {
+  return rarity === "legendary" ? "Légendaire" : rarity === "rare" ? "Rare" : "Commun";
+}
+
+export class WorldItemField {
+  readonly group = new THREE.Group();
+  private items: WorldItemEntry[] = [];
+
+  build(looted: string[] = []): void {
+    this.group.clear();
+    this.items = COUNTY_LOGISTICS_ROUTES
+      .map((route) => ({ id: route.id, x: route.startX, z: route.startZ, kind: route.category, value: route.rewardCAD }))
+      .filter((item) => !looted.includes(item.id));
+    for (const item of this.items) {
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(0.5, 0.5, 0.5),
+        new THREE.MeshStandardMaterial({ color: getRarityColor(item.kind === "contraband" ? "rare" : "common") }),
+      );
+      mesh.position.set(item.x, 0.35, item.z);
+      mesh.userData.worldItemId = item.id;
+      this.group.add(mesh);
+    }
+  }
+
+  tick(_elapsed: number): void {}
+
+  nearest(x: number, z: number, radius: number): WorldItemEntry | null {
+    let result: WorldItemEntry | null = null;
+    let best = radius * radius;
+    for (const item of this.items) {
+      const distance = (item.x - x) ** 2 + (item.z - z) ** 2;
+      if (distance <= best) {
+        best = distance;
+        result = item;
+      }
+    }
+    return result;
+  }
+
+  collect(id: string): WorldItemEntry | null {
+    const index = this.items.findIndex((item) => item.id === id);
+    if (index < 0) return null;
+    const [item] = this.items.splice(index, 1);
+    const mesh = this.group.getObjectByName(id);
+    if (mesh) this.group.remove(mesh);
+    return item ?? null;
+  }
+}
 
 export type CargoCategory = "legal_cargo" | "industrial_supply" | "contraband" | "high_value_transport";
 

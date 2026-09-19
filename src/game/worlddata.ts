@@ -12,6 +12,13 @@
 
 import { dist2 } from "./rng";
 
+export const MAPLE_LEAVES: Array<{ x: number; z: number }> = [];
+export const pushOffRoad = (x: number, z: number) => ({ x, z });
+export const inlandSide = 1;
+export const villageAxis = (_v: unknown) => 0;
+export const villageSetback = 10;
+export const lotHitsThroughRoad = () => false;
+
 // ─── LIMITES DU MONDE DE JEU AGRANDIES (MRC DE PORTNEUF) ─────────────────────
 export const WORLD = {
   minX: -1800, // Étendu vers l'ouest (Saint-Ubalde)

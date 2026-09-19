@@ -1,7 +1,7 @@
 import * as THREE from "three";
-import { getGeo } from "./geo";
-import { matLib, QC_PALETTE } from "./materials";
-import { finishMap, tex } from "./textures";
+import { getGeo } from "../../../../geometries";
+import { matLib, QC_PALETTE } from "../../../../materials";
+import { finishMap, tex } from "../../architecture/materiaux/textures";
 
 export class SwingDoor {
   hinge: THREE.Group;

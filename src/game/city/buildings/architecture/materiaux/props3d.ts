@@ -7,10 +7,10 @@
  */
 
 import * as THREE from "three";
-import { getGeo } from "./geometries";
-import { matLib } from "./materials";
+import { getGeo } from "../../../../geometries";
+import { matLib } from "../../../../materials";
 import { tex } from "./textures";
-import { chandelier as lobbyChandelier, kingBed, loungeChair } from "./luxury";
+import { chandelier as lobbyChandelier, kingBed, loungeChair } from "../../../../luxury";
 
 // ─── PALETTE DE COULEURS PARTAGÉES ───────────────────────────────────────────
 

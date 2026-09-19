@@ -1,6 +1,7 @@
 // src/buildings/House.js
 import * as THREE from 'three';
-import { BuildingFactory } from './BuildingFactory';
+import { BuildingFactory } from '../buildings/BuildingFactory';
+export { BASEMENT_FITS, emptyHouse, parseHouses, renoById, hasReno, buildWorkbench } from './house.ts';
 
 export class House {
   /**

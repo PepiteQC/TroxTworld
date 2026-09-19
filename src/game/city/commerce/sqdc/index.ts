@@ -18,7 +18,7 @@ import { sqdcMaterials, disposeMaterials } from "./materiaux";
 import { disposeTextures, texSqdcSign, texConcrete } from "./materiaux/textures";
 import { disposePosters, POSTERS, makePosterMesh } from "./posters";
 import {
-  registerStore, type SqdcStore,
+  registerStore, unregisterStore, type SqdcStore,
 } from "./sqdc";
 
 export interface SqdcBuilding {
@@ -89,4 +89,68 @@ export function buildSqdcBuilding(
   const signBack = box(6.5, 1.6, 0.15, 0, H + 1.1, D / 2 + 0.12, new THREE.MeshStandardMaterial({ color: 0x0f3d22, roughness: 0.8 }));
   root.add(signBack);
 
-  /* ═══ 4) A
+  /* ═══ 4) AMÉNAGEMENTS INTÉRIEURS ═══ */
+  const security = buildSqdcSecurity(storeId, storePos, interior.cameras);
+  const storage = buildSqdcStorage();
+  const store: SqdcStore = {
+    id: storeId,
+    name: storeName,
+    city: "Portneuf",
+    address: storeName,
+    position: storePos,
+    ownerId: "government",
+    isOpen: true,
+    openedBy: null,
+    openedAt: Date.now(),
+    bannedCustomers: new Set(),
+    todayRevenue: 0,
+    todayCustomers: 0,
+    weeklyRevenue: 0,
+    interior,
+    security,
+    storage,
+    license: {
+      number: `SQDC-${storeId}`,
+      issuedTo: "Société québécoise du cannabis",
+      valid: true,
+      expiryDate: Date.now() + 365 * 24 * 60 * 60 * 1000,
+      violations: 0,
+      suspensions: 0,
+    },
+  };
+  registerStore(store);
+
+  root.position.set(storePos.x, 0, storePos.z);
+
+  const update = (dt: number, playerPos: THREE.Vector3, hasId: boolean) => {
+    security.update(dt);
+    const localPlayer = playerPos.clone().sub(root.position);
+    const nearEntry = Math.abs(localPlayer.x) < 2.5 && localPlayer.z > 4;
+    root.userData.prompt = nearEntry && hasId ? "Entrer dans la SQDC" : null;
+  };
+
+  const dispose = () => {
+    root.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return;
+      child.geometry.dispose();
+      const materials = Array.isArray(child.material) ? child.material : [child.material];
+      materials.forEach((material) => material.dispose());
+    });
+    unregisterStore(storeId);
+    disposeMaterials();
+    disposeTextures();
+    disposePosters();
+  };
+
+  return {
+    group: root,
+    interior,
+    security,
+    storage,
+    spawn: interior.spawn.clone().add(root.position),
+    exit: interior.exit.clone().add(root.position),
+    walls: interior.walls,
+    update,
+    dispose,
+  };
+}

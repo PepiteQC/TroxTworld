@@ -1,56 +1,12 @@
 /**
-<<<<<<< HEAD
- * ═════════════════════════════════════════════════════════════════════════════
- * PONT D'ACCÈS DATABASE INTELLIGENT (PostgreSQL Cloud / PGLite WASM Fallback)
- * ═════════════════════════════════════════════════════════════════════════════
- * 
- * Gestionnaire d'accès universel et multi-environnements :
- *  - Commutation automatique entre PostgreSQL distant (Neon) et PGlite local.
- *  - Support complet des Transactions atomiques ACID (sql.transaction).
- *  - Requêtes rapides typées (sql.first, sql.query).
- *  - Migration automatique des schémas SQL au démarrage.
- * ═════════════════════════════════════════════════════════════════════════════
-=======
  * TroxTWorld / EtherWorld — Pont d'accès Database Intelligent (PostgreSQL / PGLite Fallback).
  * Détection automatique du protocole pour éviter les conflits SQLite/Postgres.
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
  */
 
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
 
 export type DbSource = "neon" | "pglite";
 
-<<<<<<< HEAD
-// ─── 1. DÉTECTION DU PROTOCOLE & URL DATABASE ────────────────────────────────
-
-function resolveDatabaseUrl(): string | undefined {
-  if (typeof process !== "undefined" && process.env?.DATABASE_URL) {
-    const raw = process.env.DATABASE_URL.trim();
-    if (raw) return raw;
-  }
-  try {
-    const metaEnv = (import.meta as { env?: Record<string, string> }).env?.DATABASE_URL;
-    if (metaEnv && metaEnv.trim()) return metaEnv.trim();
-  } catch {
-    // Ignorer si indisponible
-  }
-  return undefined;
-}
-
-const databaseUrl = resolveDatabaseUrl();
-
-/**
- * On active Neon (Postgres distant) UNIQUEMENT si l'URL commence par "postgres://" ou "postgresql://".
- * Si l'URL pointe vers un fichier SQLite (ex: file:xxx.db) ou est absente, on bascule vers PGlite.
- */
-const isRealPostgres = Boolean(
-  databaseUrl && (databaseUrl.startsWith("postgres://") || databaseUrl.startsWith("postgresql://"))
-);
-
-export const dbSource: DbSource = isRealPostgres ? "neon" : "pglite";
-
-// ─── 2. INTERFACE SQL UNIFIÉE ────────────────────────────────────────────────
-=======
 const rawDatabaseUrl =
   typeof process !== "undefined" ? process.env.DATABASE_URL : undefined;
 const databaseUrl =
@@ -66,7 +22,6 @@ const isRealPostgres =
   (databaseUrl.startsWith("postgres://") || databaseUrl.startsWith("postgresql://"));
 
 export const dbSource: DbSource = isRealPostgres ? "neon" : "pglite";
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 
 export interface Sql {
   /** Tagged template query standard : sql`SELECT * FROM users WHERE id = ${userId}` */
@@ -97,11 +52,6 @@ export interface Sql {
   transaction<T>(callback: (tx: Sql) => Promise<T>): Promise<T>;
 }
 
-<<<<<<< HEAD
-// ─── 3. SINGLETONS ET IDENTIFIANTS OID POSTGRES ──────────────────────────────
-
-=======
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 const globalRef = globalThis as typeof globalThis & {
   __pgSqlPromise__?: Promise<Sql>;
   __pgliteInstance__?: Promise<import("@electric-sql/pglite").PGlite>;
@@ -116,14 +66,7 @@ const identity = (v: string) => v;
 
 type RunQuery = <T>(text: string, params: unknown[]) => Promise<T[]>;
 
-<<<<<<< HEAD
-function buildSqlInterface(
-  run: RunQuery,
-  transactionHandler: <T>(callback: (tx: Sql) => Promise<T>) => Promise<T>
-): Sql {
-=======
 function toSql(run: Run): Sql {
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   const sql = (async <T = Record<string, unknown>>(
     strings: TemplateStringsArray,
     ...values: unknown[]
@@ -163,10 +106,6 @@ function toSql(run: Run): Sql {
 
 function createNeonSql(): Promise<Sql> {
   globalRef.__pgSqlPromise__ ??= (async () => {
-<<<<<<< HEAD
-    console.log("\x1b[36m[DB]\x1b[0m Connexion au cluster PostgreSQL distant (Neon)...");
-=======
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     const { Pool, types } = await import("pg");
 
     types.setTypeParser(OID_INT8, Number);
@@ -250,30 +189,6 @@ async function createPgliteSql(): Promise<Sql> {
 
   const pg = await globalRef.__pgliteInstance__;
 
-<<<<<<< HEAD
-  // Migration des schémas SQL
-  const migrate = async (): Promise<void> => {
-    try {
-      const migrations = import.meta.glob("/migrations/*.sql", {
-        query: "?raw",
-        import: "default",
-        eager: true,
-      }) as Record<string, string>;
-
-      const doneRows = await pg.query<{ name: string }>("SELECT name FROM _migrations");
-      const done = doneRows.rows.map((r) => r.name);
-      const pending = pendingMigrations(Object.keys(migrations), done);
-
-      for (const { name, path } of pending) {
-        await pg.transaction(async (tx) => {
-          await tx.exec(migrations[path]!);
-          await tx.query("INSERT INTO _migrations (name) VALUES ($1)", [name]);
-        });
-        console.log(`\x1b[35m[MIGRATION]\x1b[0m Appliquée : ${name}`);
-      }
-    } catch (e) {
-      console.warn("\x1b[33m[MIGRATION NOTICE]\x1b[0m Pas de migrations automatiques détectées ou déjà synchronisées.");
-=======
   const migrate = async (): Promise<void> => {
     const migrations = import.meta.glob("/migrations/*.sql", {
       query: "?raw",
@@ -289,7 +204,6 @@ async function createPgliteSql(): Promise<Sql> {
         await tx.exec(migrations[path]);
         await tx.query("insert into _migrations (name) values ($1)", [name]);
       });
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     }
   };
 
@@ -334,12 +248,6 @@ async function createSql(): Promise<Sql> {
   return dbSource === "neon" ? createNeonSql() : createPgliteSql();
 }
 
-<<<<<<< HEAD
-/**
- * Récupère l'instance SQL globale du serveur.
- */
-=======
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 export function getSql(): Promise<Sql> {
   sqlPromise ??= createSql().catch((err) => {
     sqlPromise = null;
@@ -348,12 +256,6 @@ export function getSql(): Promise<Sql> {
   return sqlPromise;
 }
 
-<<<<<<< HEAD
-/**
- * Récupère directement l'instance PGlite sous-jacente (disponible uniquement en fallback PGlite).
- */
-=======
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 export async function getPglite(): Promise<import("@electric-sql/pglite").PGlite> {
   if (dbSource !== "pglite") {
     throw new Error("getPglite() est uniquement accessible en mode local PGlite (pas de DATABASE_URL PostgreSQL).");
@@ -364,21 +266,11 @@ export async function getPglite(): Promise<import("@electric-sql/pglite").PGlite
   return pg;
 }
 
-<<<<<<< HEAD
-/**
- * S'assure que la base de données et les migrations sont prêtes avant de servir des requêtes.
- */
-=======
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 export function ensureDbReady(): Promise<void> {
   if (dbSource !== "pglite") return Promise.resolve();
   return getSql().then(() => undefined);
 }
 
-<<<<<<< HEAD
-// Amorçage automatique en environnement serveur
-=======
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 const globalBoot = globalThis as typeof globalThis & {
   __pgBootstrapPromise__?: Promise<void>;
 };

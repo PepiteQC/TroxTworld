@@ -1,5 +1,5 @@
 import { Building2, Diamond, DoorOpen, Hotel, X } from "lucide-react";
-import { useGameStore } from "./store";
+import { useGameStore } from "../../store";
 
 const FLOORS = [
   { id: "lobby", label: "Grand Lobby", hint: "Réception · cloche · lustres", icon: Hotel },

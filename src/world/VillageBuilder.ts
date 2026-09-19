@@ -2,9 +2,9 @@
 // ETHERWORLD RP — Village Builder & Placement Engine for Portneuf World
 
 import * as THREE from 'three';
-import { VILLAGE_PROFILES, VillageProfile } from './VillageProfiles';
-import { buildBuilding, matLib } from './QuebecArchitecture';
-import { buildSaintCasimir } from './villages/SaintCasimir';
+import { VILLAGE_PROFILES, VillageProfile } from '../game/city/villages/VillageProfiles';
+import { buildBuilding, matLib } from '../game/city/buildings/architecture/QuebecArchitecture';
+import { buildSaintCasimir } from '../game/city/villages/SaintCasimir';
 
 export { VILLAGE_PROFILES };
 

@@ -11,9 +11,9 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import * as THREE from 'three';
-import { RoadNetworkBuilder, PORTNEUF_ROAD_NETWORK } from './RoadNetworkBuilder';
+import { RoadNetworkBuilder, PORTNEUF_ROAD_NETWORK } from '../game/city/environment/roads/RoadNetworkBuilder';
 import { VillageBuilder, VILLAGE_PROFILES, BuiltVillage } from './VillageBuilder';
-import { matLib } from './QuebecArchitecture';
+import { matLib } from '../game/city/buildings/architecture/QuebecArchitecture';
 
 // ─────────────────────────────────────────────────────────────────────────
 //  LIMITES DU MONDE

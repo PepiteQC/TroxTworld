@@ -1,10 +1,10 @@
 import * as THREE from "three";
-import { buildDoorCasing, buildPanelLeaf, doorLabelMat } from "./door";
-import { getGeo } from "./geo";
-import { matLib } from "./materials";
-import { tex } from "./textures";
-import { mountNightstandMesh } from "./nightstand";
-import { mountSofaMesh } from "./sofa";
+import { buildDoorCasing, buildPanelLeaf, doorLabelMat } from "../buildings/access-control/doors/door";
+import { getGeo } from "../../geometries";
+import { matLib } from "../../materials";
+import { tex } from "../buildings/architecture/materiaux/textures";
+import { mountNightstandMesh } from "../../nightstand";
+import { mountSofaMesh } from "../maison/sofa";
 
 const GOLD = 0xd4a853;
 const VELVET = 0x3d1c1c;

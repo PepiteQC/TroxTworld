@@ -1917,6 +1917,10 @@ export function deedById(id: string): Deed | undefined {
   return DEEDS.find((d) => d.id === id);
 }
 
+export const defeedById = deedById;
+export { addWantedPoints } from "./police";
+export const getCrimeById = crimeById;
+
 export function crimeById(id: CrimeId): CrimeDef {
   return CRIMES.find((c) => c.id === id) ?? CRIMES[0]!;
 }
@@ -2106,11 +2110,3 @@ export const TOTAL_GANGS = GANGS.length;
 export const TOTAL_DEEDS = DEEDS.length;
 export const TOTAL_ATMS = ATM_SPOTS.length;
 export const TOTAL_LICENSES = Object.keys(LICENSES).length;
-<<<<<<< HEAD
-
-export function addWantedPoints(...args: any[]): void {}
-export function getCrimeById(id: any): any { return null; }
-export type Crime = any;
-export const defeedById = () => undefined;
-=======
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158

@@ -9,7 +9,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import * as THREE from 'three';
-import { matLib, buildBuilding, QC_PALETTE } from './QuebecArchitecture';
+import { matLib, buildBuilding, QC_PALETTE } from '../buildings/architecture/QuebecArchitecture';
 
 // ─────────────────────────────────────────────────────────────────────────
 //  TYPES

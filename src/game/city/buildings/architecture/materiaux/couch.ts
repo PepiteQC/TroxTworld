@@ -17,8 +17,8 @@
  */
 
 import * as THREE from "three";
-import { matLib, QC_PALETTE } from "./materials";
-import { playSound } from "./audio3d"; // À adapter selon ton système audio
+import { matLib, QC_PALETTE } from "../../../../materials";
+import { playSound } from "../../../../audio3d";
 
 // ==========================================
 // 📌 1. TYPES & CONSTANTES
@@ -2218,13 +2218,8 @@ export {
   DamageType,
   CouchDamage,
   CouchOptions,
-  Couch,
 
   // Constantes
-  FABRIC_COLORS,
-  LEATHER_COLORS,
-  WOOD_COLORS,
-  METAL_COLORS,
   COUCH_DIMENSIONS,
   COUCH_PRICES,
   COUCH_WEIGHTS,
@@ -2232,14 +2227,9 @@ export {
   COUCH_COMFORTS,
 
   // Fonctions
-  buildCouch,
-  tickCouch,
   darken,
 
   // Classes
-  Couch,
-  CouchManager,
 
   // Instance globale
-  couchManager,
 };

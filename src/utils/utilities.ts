@@ -14,9 +14,21 @@
  */
 
 import * as THREE from "three";
-import { matLib } from "./materials";
-import { tex } from "./textures";
-import { netEmit } from "./net";
+import { matLib } from "../game/materials";
+import { tex } from "../game/textures";
+import { netEmit } from "../game/net";
+
+export const PIPE_THAW = 85;
+export function scenicHeat(seed: number, rural = false): HeatId {
+  const choices: HeatId[] = rural ? ["poele", "foyer", "central"] : ["electrique", "thermopompe", "plinthes"];
+  return choices[Math.abs(Math.trunc(seed)) % choices.length]!;
+}
+export function parseUtils(value: unknown, _id = ""): Record<string, unknown> {
+  return value && typeof value === "object" ? { ...(value as Record<string, unknown>) } : {};
+}
+export function heatHint(u: HouseUtils, grid: GridOutage | null, ambient: number): string {
+  return heatWorks(u, grid, ambient) ? "Chauffage fonctionnel" : "Chauffage indisponible";
+}
 
 export type HeatId = "plinthes" | "electrique" | "thermopompe" | "central" | "foyer" | "poele";
 export type WaterId = "municipal" | "puits";
@@ -276,11 +288,7 @@ export function tickHouseUtils(
 
     // 2. Génératrice d'urgence
     if (nextGrid && cur.generator !== "aucun" && gasReserve > 0) {
-<<<<<<< HEAD:src/utils/utilities.ts
-      const burnRate = (cur.generator as any) === "industriel" ? 0.5 : 0.2; // Litres par minute
-=======
       const burnRate = cur.generator === "industriel" ? 0.5 : 0.2; // Litres par minute
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/utilities.ts
       gasReserve = Math.max(0, gasReserve - burnRate * dt);
       if (gasReserve <= 0 && !notice) {
         notice = "Génératrice arrêtée · Panne d'essence sèche";
@@ -549,15 +557,4 @@ export function attachScenicHeat(parent: THREE.Object3D, heat: HeatId, yaw: numb
     pile.rotation.y = yaw;
     parent.add(pile);
   }
-<<<<<<< HEAD:src/utils/utilities.ts
 }
-// Fallback exports requis
-export const scenicHeat: any = 0;
-
-export const parseUtils: any = () => ({});
-export const PIPE_THAW: any = 1;
-export const heatHint: any = () => "";
-
-=======
-}
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/utilities.ts

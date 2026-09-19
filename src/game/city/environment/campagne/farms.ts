@@ -6,9 +6,9 @@
  */
 
 import * as THREE from "three";
-import { matLib } from "./materials";
-import { getTerrainHeight } from "./worlddata";
-import { addWantedPoints } from "./police"; // Adapte si nécessaire
+import { matLib } from "../../../materials";
+import { getTerrainHeight } from "../../../worlddata";
+import { addWantedPoints } from "../../../police";
 import { ShopItemId } from "./commerce";
 
 // ───────────────────────────────────────────────────────────────

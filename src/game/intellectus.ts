@@ -1,11 +1,6 @@
 /**
-<<<<<<< HEAD
- * Noyau Intellectus — constantes, AOI, de poses, de synchronisation et de persistance.
- * Fichier: /src/game/intellectus.ts
-=======
  * Noyau Intellectus — constantes, AOI, poses, synchronisation.
  * Fichier: /src/game/Intellectus.ts
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
  * Architecture : Universal Env, O(1) Lookups, Zero-GC Spatial Queries.
  */
 
@@ -44,24 +39,14 @@ export const INTELLECTUS = {
   identityIntervalMs: envNumber("VITE_IDENTITY_INTERVAL_MS", 2500),
 };
 
-<<<<<<< HEAD
-// Validation des configurations critiques
-if (INTELLECTUS.aoiRadius <= 0) {
-  console.warn("[Intellectus] Invalid AOI radius, using default (350)");
-=======
 // Validation des configs critiques
 if (INTELLECTUS.aoiRadius <= 0) {
   console.warn("[Intellectus] Invalid AOI radius, using default");
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   (INTELLECTUS as any).aoiRadius = 350;
 }
 
 if (INTELLECTUS.aoiCellSize <= 0) {
-<<<<<<< HEAD
-  console.warn("[Intellectus] Invalid AOI cell size, using default (64)");
-=======
   console.warn("[Intellectus] Invalid AOI cell size, using default");
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   (INTELLECTUS as any).aoiCellSize = 64;
 }
 
@@ -136,17 +121,7 @@ export function decodePose(data: unknown): DecodedPose | null {
     return null;
   }
   
-<<<<<<< HEAD
-  const arr = data as unknown[];
-  const x = arr[0];
-  const y = arr[1];
-  const z = arr[2];
-  const rot = arr[3];
-  const vel = arr[4] ?? 0;
-  const anim = arr[5] ?? 0;
-=======
   const [x, y, z, rot, vel = 0, anim = 0] = data;
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   
   if (
     typeof x !== "number" || 
@@ -194,10 +169,7 @@ export interface IntellectusWorld {
 export function worldFromClock(hour: number, weather?: string): IntellectusWorld {
   const wx = quebecSeasons.getState();
   
-<<<<<<< HEAD
-=======
   // Mapping saison -> mois représentatif
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   const seasonToMonth: Record<QuebecSeason, number> = {
     hiver: 1,      // Janvier
     printemps: 4,  // Avril
@@ -304,10 +276,6 @@ export class PersistBehind {
 export const spatial = new SpatialHash(INTELLECTUS.aoiCellSize);
 export const persistBehind = new PersistBehind();
 
-<<<<<<< HEAD
-// Pool de buffers pour requêtes et compatibilité ascendante/descendante
-const queryBuf: SpatialEntry[] = [];
-=======
 // Pool de buffers pour éviter les conflits en cas d'appels récursifs
 const queryBufPool: SpatialEntry[][] = [
   [],
@@ -322,7 +290,6 @@ function getQueryBuffer(): SpatialEntry[] {
   buf.length = 0;
   return buf;
 }
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 
 export function nearbyIds(
   x: number, 
@@ -331,29 +298,6 @@ export function nearbyIds(
   kind?: "player" | "entity",
   outBuffer: string[] = []
 ): string[] {
-<<<<<<< HEAD
-  outBuffer.length = 0;
-  
-  if (!Number.isFinite(x) || !Number.isFinite(z)) {
-    return outBuffer;
-  }
-
-  let entries: SpatialEntry[] = [];
-  const spatialAny = spatial as any;
-
-  // Détection dynamique et sécurisée de la signature de méthode de SpatialHash
-  if (typeof spatialAny.queryRadius === "function") {
-    entries = spatialAny.queryRadius(x, z, radius);
-  } else if (typeof spatialAny.query === "function") {
-    queryBuf.length = 0;
-    spatialAny.query(x, z, radius, queryBuf);
-    entries = queryBuf;
-  }
-  
-  const len = entries.length;
-  for (let i = 0; i < len; i++) {
-    const e = entries[i];
-=======
   if (!Number.isFinite(x) || !Number.isFinite(z)) {
     outBuffer.length = 0;
     return outBuffer;
@@ -367,7 +311,6 @@ export function nearbyIds(
   const len = queryBuf.length;
   for (let i = 0; i < len; i++) {
     const e = queryBuf[i];
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     if (e && (!kind || e.kind === kind)) {
       outBuffer.push(e.id);
     }
@@ -395,11 +338,7 @@ export function distanceSquared(ax: number, az: number, bx: number, bz: number):
 }
 
 // ==========================================
-<<<<<<< HEAD
-// UTILITAIRES DE CALCULS
-=======
 // UTILITAIRES SUPPLÉMENTAIRES
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 // ==========================================
 
 export function clamp(value: number, min: number, max: number): number {
@@ -417,11 +356,7 @@ export function normalizeAngle(angle: number): number {
 }
 
 // ==========================================
-<<<<<<< HEAD
-// GESTION DU CYCLE DE VIE DES EVENEMENTS
-=======
 // GESTION DU CYCLE DE VIE CLIENT
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 // ==========================================
 
 const cleanupFunctions: Array<() => void> = [];
@@ -453,11 +388,7 @@ export function cleanup(): void {
 }
 
 // ==========================================
-<<<<<<< HEAD
-// SYSTEM DIAGNOSTICS & DEBUG
-=======
 // EXPORTS POUR DEBUGGING
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 // ==========================================
 
 export function getDebugInfo() {
@@ -465,14 +396,8 @@ export function getDebugInfo() {
     config: { ...INTELLECTUS },
     animations: ANIMATIONS.length,
     persistStats: persistBehind.getStats(),
-<<<<<<< HEAD
-    spatialHash: (spatial as any).getStats?.() ?? null,
-  };
-}
-=======
     spatialHash: spatial.getStats?.() ?? null,
   };
 }
 
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158

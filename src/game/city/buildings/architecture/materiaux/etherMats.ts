@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { matLib, type QcMat } from "./materials";
+import { matLib, type QcMat } from "../../../../materials";
 
 /** Catalogue Ether — définitions uniquement. GPU via matLib (cache partagé). */
 export type EtherCat =

@@ -1,20 +1,3 @@
-<<<<<<< HEAD
-/**
- * ═══════════════════════════════════════════════════════════════════════════
- * 🎮 PORTNEUF ENGINE v2.0 — Orchestrateur principal du monde RP
- * ───────────────────────────────────────────────────────────────────────────
- *  • Construction safe (try/catch + events)
- *  • tick() découpé en 12 phases claires
- *  • pushHud() diff-based (skip si rien n'a changé)
- *  • dispose() complet (interiors + props + caddie + textures)
- *  • Events système (boot, tick, interact, mode_change, dispose, error)
- *  • Stats & health & config hot-reload
- *  • Graceful shutdown (beforeunload)
- *  • API publique 100% préservée
- * ═══════════════════════════════════════════════════════════════════════════
- */
-
-=======
 // --- Filtre anti-spam console Three.js / FBXLoader ---
 if (typeof window !== 'undefined' && !(window as any).__threeWarnPatched) {
   (window as any).__threeWarnPatched = true;
@@ -35,7 +18,6 @@ if (typeof window !== 'undefined' && !(window as any).__threeWarnPatched) {
   };
 }
 // -----------------------------------------------------
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 import * as THREE from "three";
 import { parseAdmin } from "./admin";
 import { FIRM_TYPES, canOperate, gameMonth, jobBonusType, PERMIT_FEES, shopKindForFirm, seasonalFactor, startupTotal, type MapaqGrantId } from "./business";
@@ -45,8 +27,8 @@ import { buildCaddie, fillCaddie } from "./cart";
 import type { CityDoor } from "./city";
 import { hotelSecurity } from "./hotel";
 import { input } from "./input";
-import { createInteriors, INTERIOR_ORIGIN, paintHomeInterior, type InteriorRoom } from "./interiors";
-import { setLobbyLights } from "./luxury";
+import { createInteriors, INTERIOR_ORIGIN, paintHomeInterior, type InteriorRoom } from "./city/buildings/interiors";
+import { setLobbyLights } from "./city/hotel/luxury";
 import { police } from "./police";
 import { quebecFM, QUEBEC_FM_STATIONS } from "./radio";
 import { spatialAudio } from "./audio3d";
@@ -54,8 +36,8 @@ import { physics } from "./physics";
 import { sunElevation } from "./sky";
 import { persist, useGameStore, type PlayMode, CAMERA_CYCLE, CAMERA_LABEL, type CameraMode } from "./store";
 import { PropField, isPropId } from "./builder";
-import { ANIM_TYPES, propAnim, type AnimType } from "./anim";
-import { geoStats } from "./geo";
+import { ANIM_TYPES, propAnim, type AnimType } from "./animations/anim";
+import { geoStats } from "./geometries";
 import { Vehicle } from "./vehicle";
 import { Walker } from "./walker";
 import { PortneufWorld } from "./world";
@@ -64,22 +46,14 @@ import { tex } from "./textures";
 import { installCommerceEnv } from "./commerceMats";
 import type { Appearance } from "./character";
 import { fleetById, isVehicleId, type VehicleId } from "./fleet";
-<<<<<<< HEAD
-import { buildCargoCrate, haulDistance, nearHaul } from "./jobs";
-=======
 import { buildCargoCrate, haulDistance, nearHaul } from "./haul";
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 import { currentStep, getCannotStartReason, nearestGig } from "./gigs";
 import { workJobAt } from "./tools";
 import { shelterOf, applyMeal, ambientOf } from "./survival";
 import { crimeById, gangById, jobById } from "./rp";
 import { KIND_LABEL, nearestCommercial, ownedIds } from "./realestate";
 import { ENFORCE_SPEED_LIMITS, getPoiAt, getSpeedLimitAt, getSurfaceAt, getTerrainHeight, getZoneName, SPAWN, SQ_JAIL, PRISON, withIce } from "./worlddata";
-<<<<<<< HEAD
-import { prisonSystem, type ChargeId } from "./prison";
-=======
 import { prisonSystem } from "./prison";
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 import { zoneSystem } from "./zones";
 import { worldConfig } from "./worldconfig";
 import { checkCarryLegality, isZoneWeapon } from "./weapons";
@@ -91,12 +65,6 @@ import { RemoteField } from "./remotes";
 import { fieldPrompt, seizeField, workField, CROPS, type CropId } from "./farms";
 import { stockPrompt, workStock } from "./livestock";
 import { evapPrompt, tapPrompt, workEvap, workTap } from "./sugar";
-<<<<<<< HEAD
-import { canOpenDoor, doorDenied, emptyHouse, hasReno, housePrompt, insideHouseBody, type DoorSlot, type HouseLot } from "./house";
-import { caisseHoursLabel, isCaisseOpen } from "./caisse";
-import { breakAtm } from "./banking";
-import { depHoursLabel, depPrompt, isDepOpen, shopDoorOffset, shopPumpOffset, type DepAisleHot } from "./depanneur";
-=======
 import {
   canOpenDoor,
   doorDenied,
@@ -120,7 +88,6 @@ import {
   shopPumpOffset,
   type DepAisleHot,
 } from "./depanneur";
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 import { isSqdcOpen, sqdcHoursLabel, sqdcPrompt } from "./sqdc";
 import { casseHoursLabel, cassePrompt, isCasseOpen } from "./casse";
 import { cycleCarabine } from "./carabine";
@@ -134,79 +101,7 @@ import { dynamicEventsService } from "./events";
 import { AdminMetrics } from "./adminMetrics";
 import { gestureDef, type RpGesture } from "./gestures";
 
-<<<<<<< HEAD
-// ═══════════════════════════════════════════════════════════════════════════
-// 🆕 v2 — TYPES & CONFIG
-// ═══════════════════════════════════════════════════════════════════════════
-
-export interface PortneufEngineConfig {
-  targetFps: number;
-  dprCapDesktop: number;
-  dprCapMobile: number;
-  hudIntervalS: number;
-  fineCooldownS: number;
-  persistIntervalS: number;
-  cameraFar: number;
-  cameraFov: number;
-  shadowThrottleS: number;
-  maxProps: number;
-  metricsEnabled: boolean;
-  eventsEnabled: boolean;
-  gracefulShutdown: boolean;
-}
-
-const DEFAULT_CONFIG: PortneufEngineConfig = {
-  targetFps: 60,
-  dprCapDesktop: 1.25,
-  dprCapMobile: 1.1,
-  hudIntervalS: 0.12,
-  fineCooldownS: 4,
-  persistIntervalS: 20,
-  cameraFar: 1200,
-  cameraFov: 62,
-  shadowThrottleS: 0.16,
-  maxProps: 80,
-  metricsEnabled: true,
-  eventsEnabled: true,
-  gracefulShutdown: true,
-};
-
-export type EngineEventType =
-  | "boot"
-  | "ready"
-  | "tick"
-  | "interact"
-  | "teleport"
-  | "mode_change"
-  | "dispose"
-  | "error";
-
-export interface EngineEvent {
-  type: EngineEventType;
-  data?: Record<string, unknown>;
-  timestamp: number;
-}
-
-interface EngineStats {
-  ticksTotal: number;
-  lastTickMs: number;
-  avgTickMs: number;
-  peakTickMs: number;
-  interactCount: number;
-  teleportCount: number;
-  modeChanges: number;
-  hudPushes: number;
-  hudSkips: number;
-  errorsCaught: number;
-  uptimeMs: number;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// CLASS
-// ═══════════════════════════════════════════════════════════════════════════
-=======
 type ChargeId = string;
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 
 export class PortneufEngine {
   readonly version = WORLD_ENGINE_VERSION;
@@ -330,18 +225,10 @@ export class PortneufEngine {
     void warmMeshopt();
     const qa = new URLSearchParams(window.location.search).get("qa") === "1";
     const mobile = Math.min(window.innerWidth, window.innerHeight) < 800;
-<<<<<<< HEAD
-    this.dprCap = mobile ? this.config.dprCapMobile : this.config.dprCapDesktop;
-    this.dprNow = Math.min(window.devicePixelRatio || 1, this.dprCap);
-
-    this.renderer = new THREE.WebGLRenderer({
-      canvas: this.canvas,
-=======
     this.dprCap = mobile ? 1.1 : 1.25;
     this.dprNow = Math.min(window.devicePixelRatio || 1, this.dprCap);
     this.renderer = new THREE.WebGLRenderer({
       canvas,
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
       antialias: !mobile,
       powerPreference: "high-performance",
       alpha: false,
@@ -349,18 +236,6 @@ export class PortneufEngine {
       preserveDrawingBuffer: qa,
     });
     this.renderer.setPixelRatio(this.dprNow);
-<<<<<<< HEAD
-    this.renderer.setSize(
-      this.canvas.clientWidth || window.innerWidth,
-      this.canvas.clientHeight || window.innerHeight,
-      false,
-    );
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.BasicShadowMap;
-    this.renderer.shadowMap.autoUpdate = false;
-    this.renderer.toneMapping = THREE.ReinhardToneMapping;
-    this.renderer.toneMappingExposure = 1.35;
-=======
     this.renderer.setSize(canvas.clientWidth || window.innerWidth, canvas.clientHeight || window.innerHeight, false);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // 柔 PCF Soft Shadows (Finies les ombres pixelisées !)
@@ -371,27 +246,12 @@ export class PortneufEngine {
     this.renderer.shadowMap.needsUpdate = true;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping; // Tonemapping cinéma réaliste (couleurs riches et contrastées)
     this.renderer.toneMappingExposure = 1.05;              // Exposition équilibrée pour ACES Filmic
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     tex.attach(this.renderer);
     attachGltfDecoders(this.renderer);
     this.scene = new THREE.Scene();
-<<<<<<< HEAD
-    this.camera = new THREE.PerspectiveCamera(this.config.cameraFov, 1, 0.35, this.config.cameraFar);
-    this.fit();
-
-    this.initWorld();
-    this.initCharacters();
-    this.initInteriors();
-    this.initSystems();
-    this.initListeners();
-  }
-
-  private initWorld(): void {
-=======
     this.camera = new THREE.PerspectiveCamera(62, 1, 0.35, 1200);
     this.fit();
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     this.world = new PortneufWorld(this.scene, this.camera);
     this.world.build();
     installCommerceEnv(this.renderer, this.scene);
@@ -435,11 +295,7 @@ export class PortneufEngine {
 
     this.indoorHemi = new THREE.HemisphereLight(0xf0e8d8, 0x2a2a32, 0);
     this.scene.add(this.indoorHemi);
-<<<<<<< HEAD
-
-=======
     this.savedFog = new THREE.Color(0x8aa0a8);
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     this.night = useGameStore.getState().night;
     this.clockShift = this.night ? 5.1 : 0;
     this.world.setTime(this.clockHours());
@@ -452,29 +308,6 @@ export class PortneufEngine {
     if (savedRadio) quebecFM.stationId = savedRadio;
     police.demeritTotal = useGameStore.getState().demeritPoints ?? 0;
     police.licenseSuspendedUntil = useGameStore.getState().licenseSuspendedUntil ?? 0;
-<<<<<<< HEAD
-
-    input.attach();
-    this.wireControlsTest();
-    spatialAudio.attachUnlock();
-
-    void physics.init()
-      .then(() => {
-        if (this.disposed) return;
-        physics.setSolids(this.world.solids);
-      })
-      .catch((err) => {
-        this.engineStats.errorsCaught++;
-        console.warn("[PortneufEngine] Physics init failed — fallback no-collision:", err);
-        this.emit("error", { phase: "physics_init", error: String(err) });
-      });
-
-    (window as any).__rpNet = rpNet;
-    (window as any).__physics = physics;
-  }
-
-  private initListeners(): void {
-=======
     input.attach();
     this.wireControlsTest();
     spatialAudio.attachUnlock();
@@ -483,7 +316,6 @@ export class PortneufEngine {
     });
     window.__rpNet = rpNet;
     window.__physics = physics;
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     this.onResize = () => this.fit();
     window.addEventListener("resize", this.onResize);
 
@@ -572,20 +404,6 @@ export class PortneufEngine {
     return (16.5 + this.elapsed / 90 + this.clockShift + 48) % 24;
   }
 
-<<<<<<< HEAD
-  private setMode(mode: PlayMode): void {
-    if (this.mode === mode) return;
-    this.mode = mode;
-    this.engineStats.modeChanges++;
-    this.emit("mode_change", { to: mode });
-  }
-
-  // ═════════════════════════════════════════════════════════════════════════
-  // SHADOWS & DPR
-  // ═════════════════════════════════════════════════════════════════════════
-
-=======
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   private tickShadows(dt: number, active: boolean) {
     if (this.mode === "interior" || this.night || !active) {
       this.renderer.shadowMap.needsUpdate = false;
@@ -594,11 +412,7 @@ export class PortneufEngine {
     this.shadowAcc += dt;
     const moved = this.player.distanceToSquared(this.lastShadow) > 16;
     const turned = Math.abs(this.pYaw() - this.lastYawShadow) > 0.12;
-<<<<<<< HEAD
-    if (moved || turned || this.shadowAcc > this.config.shadowThrottleS) {
-=======
     if (moved || turned || this.shadowAcc > 0.16) {
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
       updateCsm(this.clockHours());
       this.renderer.shadowMap.needsUpdate = true;
       this.lastShadow.copy(this.player);
@@ -619,8 +433,6 @@ export class PortneufEngine {
     if (Math.abs(next - this.dprNow) > 0.04) {
       this.dprNow = next;
       this.renderer.setPixelRatio(this.dprNow);
-<<<<<<< HEAD
-=======
     }
   }
 
@@ -656,7 +468,6 @@ export class PortneufEngine {
         this.world.setTime(hours);
         this.night = sunElevation(hours) < 0.07;
       }
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     }
   }
 
@@ -801,82 +612,6 @@ export class PortneufEngine {
     this.walker.noclip = store.noclipMode;
     if (this.mode !== "drive") this.walker.group.visible = !store.vanished;
     this.world.placeFirm(store.firm);
-<<<<<<< HEAD
-  }
-
-  private tickCarryCheck(store: ReturnType<typeof useGameStore.getState>): void {
-    if (!store.playing || store.paused) return;
-    if (this.elapsed - this.lastCarry < 7) return;
-    const carry = checkCarryLegality(store.licenses, store.equippedTool, store.rpJob);
-    const here = zoneSystem.getAt(this.px(), this.pz());
-    const banned = here && !here.rules.carryWeapons && isZoneWeapon(store.equippedTool);
-    if (!carry.legal || banned) {
-      this.lastCarry = this.elapsed;
-      police.report("arme_prohibee", this.elapsed);
-      store.setHud({ notice: carry.legal ? "Arme interdite dans cette zone" : carry.message });
-    }
-  }
-
-  private tickPrisonCheck(store: ReturnType<typeof useGameStore.getState>): void {
-    if (!store.playing || store.paused) return;
-    if (this.elapsed - this.lastPrison < 1) return;
-    this.lastPrison = this.elapsed;
-    const held = prisonSystem.inmate;
-    prisonSystem.tick(0.12);
-    if (held && !prisonSystem.inmate && this.activeInterior?.kind === "prison") {
-      this.leaveInterior();
-      store.setHud({ notice: "Libéré · fin de peine" });
-    }
-  }
-
-  private tickSurvivalSystems(dt: number, store: ReturnType<typeof useGameStore.getState>): void {
-    const hotel = this.interiors.hotel;
-    if (hotel.tvSetup && hotel.group.visible) {
-      hotel.tvSetup.tickTv(this.elapsed, store.hotelTvOn);
-    }
-
-    if (!store.playing || store.paused) return;
-    if (this.elapsed - this.lastSurv <= 0.25) return;
-
-    const dtSurv = this.elapsed - this.lastSurv;
-    this.lastSurv = this.elapsed;
-    const hours = this.clockHours();
-    const month = gameMonth(this.elapsed);
-    const wx = quebecSeasons.getState();
-    const ambient = ambientOf(hours, this.night, month, wx.temperatureCelsius);
-
-    let indoorC: number | undefined;
-    let nearFire = this.mode === "walk" && this.world.nearFire(this.walker.x, this.walker.z);
-    if (this.mode === "interior") {
-      if (this.activeInterior?.kind === "home" && this.homeDeedId) {
-        const st = store.houses[this.homeDeedId] ?? emptyHouse(this.homeDeedId);
-        indoorC = st.indoorC;
-        nearFire = heatWorks(st, store.gridOutage, ambient);
-      } else {
-        indoorC = store.gridOutage ? 11 : 21;
-      }
-    }
-
-    store.tickSurvival(dtSurv, {
-      shelter: shelterOf(this.mode),
-      night: this.night,
-      hours,
-      month,
-      outfit: store.appearance.outfit,
-      hair: store.appearance.hairStyle,
-      god: store.godMode,
-      nearFire,
-      indoorC,
-    });
-    store.tickEconomy(hours);
-    this.walker.syncHurt(store.surv.health, store.surv.energy);
-
-    if (this.elapsed - this.lastUtil > 0.5) {
-      const dtU = this.elapsed - this.lastUtil;
-      this.lastUtil = this.elapsed;
-      store.tickUtilities(dtU, {
-        ambient,
-=======
 
     if (store.playing && !store.paused && this.elapsed - this.lastCarry > 7) {
       const carry = checkCarryLegality(store.licenses, store.equippedTool, store.rpJob);
@@ -927,68 +662,10 @@ export class PortneufEngine {
         shelter: shelterOf(this.mode),
         night: this.night,
         hours,
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
         month,
         elapsed: this.elapsed,
         weather: store.weather,
       });
-<<<<<<< HEAD
-      if (this.mode === "interior" && this.activeInterior?.kind === "home" && this.homeDeedId) {
-        const st = useGameStore.getState().houses[this.homeDeedId];
-        if (st) {
-          const on = heatWorks(st, useGameStore.getState().gridOutage, ambient);
-          setHeatGlow(this.interiors.home.group, on);
-          const hydro = hydroLive(st, useGameStore.getState().gridOutage);
-          const bright =
-            this.homeFloor === "basement" ? 0.38 : hasReno(st, "eclairage") ? 0.95 : 0.42;
-          this.indoorHemi.intensity = hydro ? bright : 0.12;
-        }
-      }
-    }
-  }
-
-  private tickFirmAndPayroll(store: ReturnType<typeof useGameStore.getState>): void {
-    if (!store.playing || store.paused) return;
-
-    if (store.firm?.isOpen && this.elapsed - this.lastFirmSale > 8) {
-      this.lastFirmSale = this.elapsed;
-      store.tickFirm(this.elapsed);
-    }
-    if (this.elapsed - this.lastPayroll > 45) {
-      this.lastPayroll = this.elapsed;
-      store.tickPayroll(this.elapsed);
-    }
-  }
-
-  private tickPlayerActions(
-    dt: number,
-    actions: ReturnType<typeof input.sample>,
-    store: ReturnType<typeof useGameStore.getState>,
-  ): void {
-    if (this.mode === "drive") {
-      if (!store.staffFrozen) {
-        this.vehicle.update(
-          dt,
-          actions,
-          vehicleLoadMul(
-            haulCargoKg(store.job),
-            bagWeight(store.inventory),
-            fleetById(this.vehicle.kind).mass,
-          ),
-        );
-        this.kmAcc += Math.abs(this.vehicle.speed) * dt;
-      }
-    } else {
-      if (store.sitting && (actions.throttle > 0.1 || actions.brake > 0.1 || Math.abs(actions.steer) > 0.2)) {
-        store.stand();
-        if (this.walker.gesture === "sit") this.walker.setGesture("none");
-      }
-      const move =
-        store.sitting || store.gestureOpen
-          ? { ...actions, throttle: 0, brake: 0, steer: 0, boost: false }
-          : actions;
-      this.walker.update(dt, move, this.elapsed);
-=======
       store.tickEconomy(hours);
       this.walker.syncHurt(store.surv.health, store.surv.energy);
 
@@ -1072,7 +749,6 @@ export class PortneufEngine {
       if (store.shopOpen && actions.interact) store.closeShop();
       if (store.cartOpen && actions.interact) store.closeCart();
       if (store.citationOpen && actions.interact) store.closeCitation();
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     }
 
     this.player.set(this.px(), this.py(), this.pz());
@@ -1127,17 +803,6 @@ export class PortneufEngine {
       const i = CAMERA_CYCLE.indexOf(this.cameraMode);
       this.cameraMode = CAMERA_CYCLE[(i + 1) % CAMERA_CYCLE.length]!;
       store.setHud({ cameraMode: this.cameraMode, notice: `Caméra · ${CAMERA_LABEL[this.cameraMode]}` });
-<<<<<<< HEAD
-    }
-    if (actions.gesture && store.playing && !store.overlayOpen()) {
-      store.toggleGesture();
-    } else if (actions.gesture && store.playing && store.gestureOpen) {
-      store.closeGesture();
-    }
-    if (actions.surrender && store.playing) {
-      this.playGesture(this.walker.gesture === "surrender" ? "none" : "surrender");
-=======
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     }
 
     if (actions.gesture && store.playing && !store.overlayOpen()) {
@@ -1163,18 +828,12 @@ export class PortneufEngine {
       if (store.phoneOpen) store.closePhone();
       else store.openPhone();
     }
-<<<<<<< HEAD
-=======
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     if (actions.chat && store.playing) {
       if (store.chatOpen) store.closeChat();
       else if (!store.overlayOpen()) store.openChat();
     }
-<<<<<<< HEAD
-=======
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     if (actions.console && store.playing) {
       if (store.consoleOpen) store.closeConsole();
       else store.openConsole();
@@ -1183,19 +842,13 @@ export class PortneufEngine {
     if (actions.radio && store.playing && !store.overlayOpen()) {
       void this.cycleRadio();
     }
-<<<<<<< HEAD
-=======
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     if (actions.siren && store.playing && !store.overlayOpen()) {
       const msg = this.vehicle.cycleSiren();
       if (this.vehicle.sirenPattern() === "code3_emergency") police.siren.setActive(true);
       store.setHud({ notice: msg, sirenMode: this.vehicle.sirenPattern() });
     }
-<<<<<<< HEAD
-=======
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     if (actions.inventory && store.playing) {
       if (store.inventoryOpen) store.closeInventory();
       else store.openInventory();
@@ -1229,8 +882,6 @@ export class PortneufEngine {
     if (actions.pause && store.playing) {
       store.togglePause();
     }
-<<<<<<< HEAD
-=======
 
     this.hudAcc += dt;
     if (this.hudAcc > 0.12) {
@@ -1287,7 +938,6 @@ export class PortneufEngine {
     }
 
     this.renderer.render(this.scene, this.camera);
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   }
 
   private tickWeatherAndSeasons(dt: number, store: ReturnType<typeof useGameStore.getState>): void {
@@ -1450,28 +1100,19 @@ export class PortneufEngine {
       this.tryEnterCasse(shopEarly);
       return;
     }
-<<<<<<< HEAD
-=======
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     const atm = this.world.nearestAtm(this.walker.x, this.walker.z, 4.8);
     if (atm) {
       store.openAtm(atm.id);
       return;
     }
-<<<<<<< HEAD
-=======
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     const caisseEarly = this.world.nearestCaisse(this.walker.x, this.walker.z, 7.5);
     if (caisseEarly) {
       this.tryEnterCaisse(caisseEarly);
       return;
     }
-<<<<<<< HEAD
-=======
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     const vend = this.world.nearestStreet(this.walker.x, this.walker.z, 2.4, "vending");
     if (vend) {
       const ok = store.buyItem("cola") || store.buyItem("chips");
@@ -1566,19 +1207,13 @@ export class PortneufEngine {
     }
 
     if (this.tryHouse()) return;
-<<<<<<< HEAD
-=======
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     const mls = nearestCommercial(this.walker.x, this.walker.z, 7);
     if (mls) {
       store.openDeed(mls.id);
       return;
     }
-<<<<<<< HEAD
-=======
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     const crime = this.world.nearestCrime(this.walker.x, this.walker.z, 4.8);
     if (crime) {
       store.commitCrime(crime.crime, this.elapsed);
@@ -1727,28 +1362,16 @@ export class PortneufEngine {
 
   private enterVehicle() {
     const s = useGameStore.getState();
-<<<<<<< HEAD
-    police.licenseSuspendedUntil = Math.max(
-      police.licenseSuspendedUntil,
-      s.licenseSuspendedUntil ?? 0,
-    );
-=======
     police.licenseSuspendedUntil = Math.max(police.licenseSuspendedUntil, s.licenseSuspendedUntil ?? 0);
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     if (police.isLicenseSuspended() && !s.godMode) {
       s.setHud({
         notice: `Permis SAAQ suspendu · ${police.suspendDaysLeft()} j · Art. 202 / points d'inaptitude`,
       });
       return;
     }
-<<<<<<< HEAD
-    for (const [id, h] of Object.entries(s.houses)) {
-      if (h.parked.includes(s.vehicleId)) {
-=======
     const houses = s.houses as Record<string, { parked: string[] }>;
     for (const [id, h] of Object.entries(houses)) {
       if (h && h.parked && h.parked.includes(s.vehicleId)) {
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
         useGameStore.setState({ deedId: id });
         s.takeFromGarage(s.vehicleId);
         this.vehicle.group.visible = true;
@@ -1818,25 +1441,7 @@ export class PortneufEngine {
     const room = this.interiors[id];
     this.showRoom(
       room,
-<<<<<<< HEAD
-      id === "lobby"
-        ? 0.7
-        : id === "hotel"
-          ? 0.85
-          : id === "corridor"
-            ? 1.15
-            : id === "prison"
-              ? 0.45
-              : id === "sqdc"
-                ? 1.05
-                : id === "depanneur" || id === "casse"
-                  ? 0.9
-                  : id === "caisse"
-                    ? 0.95
-                    : 1.15,
-=======
       id === "lobby" ? 0.7 : id === "hotel" ? 0.85 : id === "corridor" ? 1.15 : id === "prison" ? 0.45 : id === "sqdc" ? 1.05 : id === "depanneur" || id === "casse" ? 0.9 : id === "caisse" ? 0.95 : 1.15,
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     );
   }
 
@@ -1923,17 +1528,10 @@ export class PortneufEngine {
     } else {
       this.walker.place(this.vehicle.x + 2.2, this.vehicle.z, this.vehicle.yaw, false);
     }
-<<<<<<< HEAD
-    this.setMode("walk");
-    this.camera.near = 0.35;
-    this.camera.far = this.config.cameraFar;
-    this.camera.fov = this.config.cameraFov;
-=======
     this.mode = "walk";
     this.camera.near = 0.35;
     this.camera.far = 1200;
     this.camera.fov = 62;
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     this.camera.updateProjectionMatrix();
     useGameStore.getState().setHud({ interiorKind: null, mode: "walk" });
   }
@@ -1975,11 +1573,6 @@ export class PortneufEngine {
     return false;
   }
 
-<<<<<<< HEAD
-  // ═════════════════════════════════════════════════════════════════════════
-  // CAMERA
-  // ═════════════════════════════════════════════════════════════════════════
-=======
   // --- RP : repas / dîner sur place ---------------------------------------
   // Table basse et casse-croûte : s'asseoir puis "manger" un article de
   // nourriture/boisson déjà présent dans le sac restaure la survie via le
@@ -2025,7 +1618,6 @@ export class PortneufEngine {
     return true;
   }
   // -------------------------------------------------------------------------
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 
   private updateCamera(dt: number) {
     const indoor = this.mode === "interior";
@@ -2119,14 +1711,7 @@ export class PortneufEngine {
   cycleCamera() {
     const i = CAMERA_CYCLE.indexOf(this.cameraMode);
     this.cameraMode = CAMERA_CYCLE[(i + 1) % CAMERA_CYCLE.length]!;
-<<<<<<< HEAD
-    useGameStore.getState().setHud({
-      cameraMode: this.cameraMode,
-      notice: `Caméra · ${CAMERA_LABEL[this.cameraMode]}`,
-    });
-=======
     useGameStore.getState().setHud({ cameraMode: this.cameraMode, notice: `Caméra · ${CAMERA_LABEL[this.cameraMode]}` });
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   }
 
   private updateCreatorCamera(dt: number) {
@@ -2200,17 +1785,6 @@ export class PortneufEngine {
       useGameStore.getState().setHud({ notice: "Collision · unité SQ" });
     }
 
-<<<<<<< HEAD
-    if (this.mode === "drive" && police.bloodAlcohol >= 80 && this.elapsed - this.lastCatchAt > 8) {
-      this.lastCatchAt = this.elapsed;
-      const name = store.appearance.name || "Citoyen";
-      const test = police.breathalyzer(name);
-      store.setHud({
-        bloodAlcohol: test.bloodAlcoholMgPercent,
-        notice: `Contrôle SQ · ${test.bloodAlcoholMgPercent} mg · facultés affaiblies`,
-      });
-      const last = police.tickets[0];
-=======
     if (this.mode === "drive" && (police as any).bloodAlcohol >= 80 && this.elapsed - this.lastCatchAt > 8) {
       this.lastCatchAt = this.elapsed;
       const name = store.appearance.name || "Citoyen";
@@ -2223,7 +1797,6 @@ export class PortneufEngine {
         notice: `Contrôle SQ · ${test.bloodAlcoholMgPercent ?? 0} mg · facultés affaiblies`,
       });
       const last = (police as any).tickets?.[0];
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
       if (last) {
         store.openCitation({
           kind: "ticket",
@@ -2231,45 +1804,26 @@ export class PortneufEngine {
           description: last.description,
           fine: last.fine,
           points: last.demeritPoints ?? 4,
-<<<<<<< HEAD
-          message: `Art. 202 CSR · ${test.bloodAlcoholMgPercent} mg`,
-          ticketNumber: last.ticketNumber,
-          badge: last.issuingOfficerBadge,
-=======
           message: `Art. 202 CSR · ${test.bloodAlcoholMgPercent ?? 0} mg`,
           ticketNumber: last.ticketNumber,
           badge: last.issuingOfficerBadge ?? last.badge,
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
         });
       }
       this.vehicle.speed = 0;
       return;
     }
 
-<<<<<<< HEAD
-    if (
-      police.stars > 0 &&
-=======
     const wanted = {
       stars: (police as any).stars ?? 0,
     };
     if (
       wanted.stars > 0 &&
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
       dist < (this.mode === "drive" ? 5.2 : 3.4) * worldConfig.policeCatchMul(x, z) &&
       speedKmh < 16 &&
       this.elapsed - this.lastCatchAt > 4
     ) {
       this.lastCatchAt = this.elapsed;
       if (this.mode === "drive") this.vehicle.speed = 0;
-<<<<<<< HEAD
-      if (police.stars >= 4) {
-        const notice = police.arrest();
-        const booked = prisonSystem.book(
-          useGameStore.getState().appearance.name || "Citoyen",
-          chargesForStars(police.stars),
-        );
-=======
       if (wanted.stars >= 4) {
         const notice = (police as any).arrest?.() ?? { message: "Arrestation", kind: "arrest" };
         const name = useGameStore.getState().appearance.name || "Citoyen";
@@ -2277,7 +1831,6 @@ export class PortneufEngine {
           booking: `BK-${Date.now().toString(36)}`,
           minutes: 30,
         };
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
         const door = this.world.doors.find((d) => d.kind === "prison");
         if (door) {
           if (this.mode === "drive") this.exitVehicle();
@@ -2383,24 +1936,16 @@ export class PortneufEngine {
     if (shopNow?.kind === "depanneur") return this.depLotPrompt(shopNow);
     if (shopNow?.kind === "sqdc") return this.sqdcLotPrompt(shopNow);
     if (shopNow?.kind === "food") return this.casseLotPrompt(shopNow);
-<<<<<<< HEAD
-=======
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     const biz = this.countyFirmPrompt();
     if (biz) return biz;
 
     const atm = this.world.nearestAtm(this.walker.x, this.walker.z, 4.8);
     if (atm) return `E — Guichet · ${atm.name}`;
-<<<<<<< HEAD
-    const caisseNow = this.world.nearestCaisse(this.walker.x, this.walker.z, 8);
-    if (caisseNow) return this.caisseLotPrompt(caisseNow);
-=======
 
     const caisseNow = this.world.nearestCaisse(this.walker.x, this.walker.z, 8);
     if (caisseNow) return this.caisseLotPrompt(caisseNow);
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     const vend = this.world.nearestStreet(this.walker.x, this.walker.z, 2.4, "vending");
     if (vend) return `E — ${vend.name} · cola 2,50 $`;
 
@@ -2425,17 +1970,6 @@ export class PortneufEngine {
     if (mail) return "E — Boîte aux lettres";
 
     if (this.nearPortal()) return "E — Téléporteur · Saint-Alban";
-<<<<<<< HEAD
-    const loot = this.world.worldItems.nearest(this.walker.x, this.walker.z, 2.4);
-    if (loot) return `E — Ramasser · ${loot.name}`;
-    const field = this.world.nearestField(this.walker.x, this.walker.z, 14);
-    if (field)
-      return fieldPrompt(
-        field,
-        useGameStore.getState().equippedTool,
-        useGameStore.getState().selectedSeed,
-      );
-=======
 
     const loot = this.world.worldItems.nearest(this.walker.x, this.walker.z, 2.4);
     if (loot) return `E — Ramasser · ${loot.name}`;
@@ -2443,7 +1977,6 @@ export class PortneufEngine {
     const field = this.world.nearestField(this.walker.x, this.walker.z, 14);
     if (field) return fieldPrompt(field, useGameStore.getState().equippedTool, useGameStore.getState().selectedSeed);
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     const stNow = useGameStore.getState();
     const stock = this.world.nearestStock(this.walker.x, this.walker.z, 3.6);
     if (stock) {
@@ -2469,20 +2002,14 @@ export class PortneufEngine {
         false,
       );
     }
-<<<<<<< HEAD
-=======
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     const mls = nearestCommercial(this.walker.x, this.walker.z, 7);
     if (mls) {
       const st = useGameStore.getState();
       const mine = ownedIds(st.ownedProps, st.realty).includes(mls.id);
       return mine ? `E — ${mls.name}` : `E — MLS · ${KIND_LABEL[mls.kind]} · ${mls.name}`;
     }
-<<<<<<< HEAD
-=======
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     const crime = this.world.nearestCrime(this.walker.x, this.walker.z, 4.8);
     if (crime) {
       const spec = crimeById(crime.crime);
@@ -2495,11 +2022,6 @@ export class PortneufEngine {
         const open = this.world.swingDoors.some((d) => d.open);
         return open ? "E — Entrer · Boutique Éther" : "Poussez la porte — corps ou main, ou foncez au pick-up";
       }
-<<<<<<< HEAD
-      if (shop.kind === "depanneur") return this.depLotPrompt(shop);
-      if (shop.kind === "sqdc") return this.sqdcLotPrompt(shop);
-      if (shop.kind === "food") return this.casseLotPrompt(shop);
-=======
       if (shop.kind === "depanneur") {
         return this.depLotPrompt(shop);
       }
@@ -2509,7 +2031,6 @@ export class PortneufEngine {
       if (shop.kind === "food") {
         return this.casseLotPrompt(shop);
       }
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
       return `E — Entrer au ${shop.name}`;
     }
 
@@ -2925,13 +2446,8 @@ export class PortneufEngine {
       const next = useGameStore.getState().houses[this.homeDeedId ?? ""];
       if (next) {
         const hours = this.clockHours();
-<<<<<<< HEAD
-        const ambient = ambientOf(hours, this.night, gameMonth(this.elapsed));
-        setHeatGlow(this.interiors.home.group, heatWorks(next, useGameStore.getState().gridOutage, ambient));
-=======
         const ambient = ambientOf(quebecSeasons.getState().season, hours);
         setHeatGlow(this.interiors.home.group, heatWorks(next, useGameStore.getState().gridOutage, ambient.temp));
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
       }
       return true;
     }
@@ -3223,39 +2739,6 @@ export class PortneufEngine {
   }
 
   private tryEnterSqdc(shop: ShopSpot): boolean {
-<<<<<<< HEAD
-    const store = useGameStore.getState();
-    const open = isSqdcOpen(store.timeHours);
-    if (!open) {
-      store.setHud({ notice: `Fermé · ${sqdcHoursLabel()}` });
-      return true;
-    }
-    const near = this.nearSwing(5.2);
-    const anyOpen = this.world.swingDoors.some((d) => d.open);
-    if (near && !anyOpen) {
-      store.setHud({ notice: "Poussez la porte vitrée" });
-      return true;
-    }
-    const found =
-      this.world.doors.find((d) => d.id === shop.id) ??
-      this.world.doors.find((d) => d.kind === "sqdc" && Math.hypot(d.x - shop.x, d.z - shop.z) < 18);
-    const off = shopDoorOffset(shop);
-    const door: CityDoor = found ?? {
-      id: shop.id,
-      name: shop.name,
-      kind: "sqdc",
-      x: off.x,
-      y: getTerrainHeight(off.x, off.z),
-      z: off.z,
-      yaw: off.yaw,
-      prompt: `Entrer · ${shop.name}`,
-    };
-    this.enterSqdc(shop, door);
-    return true;
-  }
-
-  private enterSqdc(shop: ShopSpot | null, door: CityDoor) {
-=======
     // MLO Seamless : Pas de téléportation, accès naturel à pied
     return false;
   }
@@ -3271,7 +2754,6 @@ export class PortneufEngine {
       return;
     }
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     this.depShopId = shop?.id ?? door.id;
     this.lastDoor = door;
     const room = this.interiors.sqdc;
@@ -3347,21 +2829,12 @@ export class PortneufEngine {
     const store = useGameStore.getState();
     const open = isCaisseOpen(store.timeHours);
     if (!open) {
-<<<<<<< HEAD
-      const armed =
-        (store.inventory.pistol ?? 0) + (store.inventory.shotgun ?? 0) + (store.inventory.crochet ?? 0) > 0;
-=======
       const armed = (store.inventory.pistol ?? 0) + (store.inventory.shotgun ?? 0) + (store.inventory.crochet ?? 0) > 0;
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
       if (!armed) {
         store.setHud({ notice: `Fermée · ${caisseHoursLabel()}` });
         return true;
       }
-<<<<<<< HEAD
-      store.commitCrime("bank_robbery", this.elapsed);
-=======
       store.commitCrime("bank_robbery" as any, this.elapsed);
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     }
     const near = this.nearSwing(5.2);
     const anyOpen = this.world.swingDoors.some((d) => d.open);
@@ -3390,13 +2863,7 @@ export class PortneufEngine {
     this.lastDoor = door;
     const room = this.interiors.caisse;
     room.title = door.name;
-<<<<<<< HEAD
-    room.subtitle = isCaisseOpen(useGameStore.getState().timeHours)
-      ? "Ouvert · guichets et conseillers"
-      : "Fermé · alarme";
-=======
     room.subtitle = isCaisseOpen(useGameStore.getState().timeHours) ? "Ouvert · guichets et conseillers" : "Fermé · alarme";
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     this.showRoom(room, 0.95);
   }
 
@@ -3434,23 +2901,13 @@ export class PortneufEngine {
       return true;
     }
     if (room.vaultSpot && Math.hypot(wx - room.vaultSpot.x, wz - room.vaultSpot.z) < 2.0) {
-<<<<<<< HEAD
-      const armed =
-        (store.inventory.pistol ?? 0) + (store.inventory.shotgun ?? 0) + (store.inventory.crochet ?? 0) > 0;
-=======
       const armed = (store.inventory.pistol ?? 0) + (store.inventory.shotgun ?? 0) + (store.inventory.crochet ?? 0) > 0;
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
       if (!armed) {
         store.setHud({ notice: "Porte de voûte · acier, scellée" });
         return true;
       }
-<<<<<<< HEAD
-      store.commitCrime("bank_robbery", this.elapsed);
-      store.setHud({ economy: breakAtm(store.economy, "atm_caisse") });
-=======
       store.commitCrime("bank_robbery" as any, this.elapsed);
       store.setHud({ economy: breakAtm(store.economy) });
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
       store.addCash(420, "Voûte · 420 $");
       return true;
     }
@@ -3553,23 +3010,15 @@ export class PortneufEngine {
     const oz = room.group.position.z;
     const wx = this.walker.x - ox;
     const wz = this.walker.z - oz;
-<<<<<<< HEAD
-    const atCaisse =
-      Boolean(room.caisse && Math.hypot(wx - room.caisse.x, wz - room.caisse.z) < 1.7) || this.nearCaisse();
-=======
     const atCaisse = Boolean(room.caisse && Math.hypot(wx - room.caisse.x, wz - room.caisse.z) < 1.7) || this.nearCaisse();
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     return sqdcPrompt(
       this.nearAisle(),
       this.nearGarment(),
       atCaisse,
       cartCount(useGameStore.getState().cart),
       (useGameStore.getState().inventory.identite ?? 0) > 0,
-<<<<<<< HEAD
-=======
       rpNet.selfId || "local",
       String(this.elapsed),
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     );
   }
 
@@ -3597,13 +3046,7 @@ export class PortneufEngine {
 
   private syncCaddie() {
     const room = this.activeInterior;
-<<<<<<< HEAD
-    const inShop =
-      this.mode === "interior" &&
-      (room?.kind === "boutique" || room?.kind === "depanneur" || room?.kind === "casse" || room?.kind === "sqdc");
-=======
     const inShop = this.mode === "interior" && (room?.kind === "boutique" || room?.kind === "depanneur" || room?.kind === "casse" || room?.kind === "sqdc");
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     if (!inShop) {
       if (this.caddie) this.caddie.visible = false;
       return;
@@ -3742,15 +3185,9 @@ export class PortneufEngine {
     const { limit: roadLimit } = getSpeedLimitAt(x, z);
     const speedKmh = onFoot ? Math.abs(this.walker.speed) * 3.6 : Math.abs(this.vehicle.speed) * 3.6;
     const ice =
-<<<<<<< HEAD
-      store.weather === "snow" ||
-      store.weather === "storm" ||
-      store.gridOutage?.kind === "verglas";
-=======
       useGameStore.getState().weather === "snow" ||
       useGameStore.getState().weather === "storm" ||
       useGameStore.getState().gridOutage?.kind === "verglas";
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     const surface = withIce(getSurfaceAt(x, z), ice);
     const cfg = this.mode === "interior" ? null : worldConfig.at(x, z);
     const zp = zoneSystem.getAt(x, z);
@@ -3768,21 +3205,6 @@ export class PortneufEngine {
       const add = excess < 20 ? 105 : excess < 40 ? 225 : excess < 60 ? 495 : 1050;
       fines += add;
       fineFlash = add;
-<<<<<<< HEAD
-      const hit = police.reportSpeeding(excess, this.elapsed);
-      const name = store.appearance.name || "Citoyen";
-      const radar = police.radarTicket(excess, speedKmh, limit, name);
-      const label = radar
-        ? `${radar.csrArticle} · ${radar.ticketNumber} · −${add}\u00a0$`
-        : hit?.citation
-          ? `${hit.citation.article} · −${add}\u00a0$`
-          : `Contravention · −${add}\u00a0$`;
-      store.addCash(-add, label);
-      if (radar) {
-        useGameStore.setState({
-          demeritPoints: police.demeritTotal,
-          licenseSuspendedUntil: police.licenseSuspendedUntil,
-=======
       const hit = (police as any).reportSpeeding?.(excess, String(this.elapsed));
       const name = useGameStore.getState().appearance.name || "Citoyen";
       const radar = (police as any).radarTicket?.(excess, speedKmh, limit, name);
@@ -3796,25 +3218,15 @@ export class PortneufEngine {
         useGameStore.setState({
           demeritPoints: (police as any).demeritTotal ?? 0,
           licenseSuspendedUntil: (police as any).licenseSuspendedUntil ?? 0,
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
         });
       }
     } else {
       fineFlash = Math.max(0, fineFlash - 18);
     }
-<<<<<<< HEAD
-
-    const km = store.km + this.kmAcc / 1000;
-    this.kmAcc = 0;
-    const hours = this.clockHours();
-
-    let leaves = store.leaves;
-=======
     const km = useGameStore.getState().km + this.kmAcc / 1000;
     this.kmAcc = 0;
     const hours = this.clockHours();
     let leaves = useGameStore.getState().leaves;
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     if (this.mode === "walk") {
       const found = this.world.nearestLeaf(x, z, 1.8);
       if (found && this.world.collectLeaf(found.id)) {
@@ -3831,15 +3243,6 @@ export class PortneufEngine {
           store.addCash(got.cash, `${got.name} · +${got.cash}\u00a0$`);
         }
       }
-      const loot = this.world.worldItems.nearest(x, z, 1.7);
-      if (loot) {
-        const got = this.world.worldItems.collect(loot.id);
-        if (got) {
-          useGameStore.getState().addItem(got.itemId, 1);
-          useGameStore.getState().lootItem(got.id);
-          useGameStore.getState().addCash(got.cash, `${got.name} · +${got.cash}\u00a0$`);
-        }
-      }
     }
     const fieldHere = this.mode === "interior" ? null : this.world.nearestField(x, z, 18);
     const bushHere = this.mode === "interior" || fieldHere ? null : this.world.nearestBush(x, z, 36);
@@ -3851,39 +3254,12 @@ export class PortneufEngine {
       evading: (police as any).evading ?? false,
     };
     const np = quebecFM.on ? quebecFM.nowPlaying() : null;
-<<<<<<< HEAD
-    const prompt = this.promptText();
-
-    const hashParts = [
-      Math.round(speedKmh),
-      limit,
-      this.mode,
-      room?.title ?? "",
-      prompt ?? "",
-      wanted.stars,
-      Math.round(store.surv.health),
-      Math.round(store.surv.hunger),
-      Math.round(store.surv.thirst),
-      fines,
-      speeding ? 1 : 0,
-    ];
-    const hash = hashParts.join("|");
-    if (hash === this.lastHudHash) {
-      this.engineStats.hudSkips++;
-      return;
-    }
-    this.lastHudHash = hash;
-    this.engineStats.hudPushes++;
-
-    store.setHud({
-=======
     const inmate = (prisonSystem as any).inmate;
     const interiorSub =
       room?.kind === "prison" && inmate
         ? `${inmate.booking} · ${((prisonSystem as any).remain?.() ?? 0).toFixed(0)} min · ${(prisonSystem as any).lockdown ? "LOCKDOWN" : "cour fermée"}`
         : (room?.subtitle ?? null);
     useGameStore.getState().setHud({
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
       speedKmh,
       limit: this.mode === "interior" ? 0 : limit,
       zone:
@@ -3899,27 +3275,16 @@ export class PortneufEngine {
       fineFlash,
       fines,
       policeEta: cfg?.policeResponseSeconds ?? 0,
-<<<<<<< HEAD
-      bloodAlcohol: Math.round(police.bloodAlcohol),
-      radarActive: police.units.some((u) => u.radarActive),
-      demeritPoints: police.demeritTotal,
-      licenseSuspendedUntil: police.licenseSuspendedUntil,
-=======
       bloodAlcohol: Math.round((police as any).bloodAlcohol ?? 0),
       radarActive: (police as any).units?.some((u: any) => u.radarActive) ?? false,
       demeritPoints: (police as any).demeritTotal ?? 0,
       licenseSuspendedUntil: (police as any).licenseSuspendedUntil ?? 0,
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
       safeZone: cfg?.isSafeZone ?? false,
       x,
       z,
       yaw,
       km,
-<<<<<<< HEAD
-      timeHours: rpNet.live && !rpNet.isHost() ? store.timeHours : hours,
-=======
       timeHours: rpNet.live && !rpNet.isHost() ? useGameStore.getState().timeHours : hours,
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
       night: this.night,
       cameraMode: this.cameraMode,
       poi: poi?.name ?? null,
@@ -4031,13 +3396,7 @@ export class PortneufEngine {
         useGameStore.getState().setWeather("storm");
         this.world.setWeather("storm");
         this.fx.play("lightning");
-<<<<<<< HEAD
-        useGameStore
-          .getState()
-          .addChat("MTQ", "Alerte blizzard — Route 138, visibilité nulle. Chasse-neige en cours.", "system");
-=======
         useGameStore.getState().addChat("MTQ", "Alerte blizzard — Route 138, visibilité nulle. Chasse-neige en cours.", "system");
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
       },
       runPlow: (id) => {
         const wx = quebecSeasons.getState();
@@ -4061,14 +3420,7 @@ export class PortneufEngine {
         }
         if (k === "panne" || k === "hydro" || k === "outage") {
           dynamicEventsService.triggerOutage();
-<<<<<<< HEAD
-          useGameStore.setState({
-            gridOutage: { kind: "panne", t: 70 },
-            notice: "Panne Hydro-Québec · Saint-Casimir",
-          });
-=======
           useGameStore.setState({ gridOutage: { kind: "panne", t: 70 }, notice: "Panne Hydro-Québec · Saint-Casimir" });
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
           this.teleport(-900, -280);
           return "Événement · panne Hydro Saint-Casimir";
         }
@@ -4092,11 +3444,7 @@ export class PortneufEngine {
           return "Événement · tempête d'Éther";
         }
         if (k === "police_chase" || k === "chase" || k === "poursuite") {
-<<<<<<< HEAD
-          police.setStars(4, "Course-poursuite Route 138", 8000);
-=======
           (police as any).setStars?.(4, "Course-poursuite Route 138", 8000);
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
           dynamicEventsService.triggerEvent({
             title: "Poursuite SQ — Route 138",
             category: "urgence",
@@ -4110,11 +3458,7 @@ export class PortneufEngine {
           return "Événement · poursuite SQ";
         }
         if (k === "bank_robbery" || k === "braquage" || k === "bank") {
-<<<<<<< HEAD
-          police.setStars(5, "Braquage de caisse populaire", 14000);
-=======
           (police as any).setStars?.(5, "Braquage de caisse populaire", 14000);
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
           dynamicEventsService.triggerEvent({
             title: "Braquage de la Caisse populaire",
             category: "urgence",
@@ -4186,14 +3530,7 @@ export class PortneufEngine {
           this.world.setWeather("storm");
         }
         dynamicEventsService.triggerOutage();
-<<<<<<< HEAD
-        useGameStore.setState({
-          gridOutage: { kind, t: 70 },
-          notice: kind === "verglas" ? "Verglas · réseau Hydro hors service" : "Panne Hydro-Québec",
-        });
-=======
         useGameStore.setState({ gridOutage: { kind, t: 70 }, notice: kind === "verglas" ? "Verglas · réseau Hydro hors service" : "Panne Hydro-Québec" });
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
         persist();
       },
       say: (text) => {
@@ -4244,11 +3581,7 @@ export class PortneufEngine {
         useGameStore.getState().setHud({ notice: "Véhicules réparés" });
       },
       unjail: () => {
-<<<<<<< HEAD
-        prisonSystem.release();
-=======
         (prisonSystem as any).release?.();
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
         if (this.activeInterior?.kind === "prison") this.leaveInterior();
         this.teleport(SPAWN.x, SPAWN.z);
         useGameStore.getState().setHud({ staffFrozen: false, notice: "Libéré" });
@@ -4256,20 +3589,7 @@ export class PortneufEngine {
       maxStats: () => {
         const s = useGameStore.getState();
         s.setHud({
-<<<<<<< HEAD
-          surv: {
-            ...s.surv,
-            health: 100,
-            hunger: 100,
-            thirst: 100,
-            energy: 100,
-            bodyTemp: 36.6,
-            shiver: 0,
-            alerts: [],
-          },
-=======
           surv: { ...s.surv, health: 100, hunger: 100, thirst: 100, energy: 100, bodyTemp: 36.6, shiver: 0, alerts: [] },
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
           armor: 100,
           notice: "Stats max",
         });
@@ -4403,10 +3723,6 @@ export class PortneufEngine {
         const wx = quebecSeasons.getState();
         const tel = AdminMetrics.getMetrics({ players: { size: rpNet.remotes.size + 1 }, vehicles: { size: 1 } });
         const banner = dynamicEventsService.banner();
-<<<<<<< HEAD
-        const stats = this.getStats();
-=======
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
         return [
           `${s.appearance.name} · ${s.appearance.model} · ${s.appearance.outfit}`,
           `pos ${this.px().toFixed(0)} ${this.pz().toFixed(0)} · ${this.mode}`,
@@ -4417,11 +3733,6 @@ export class PortneufEngine {
           `événements ${dynamicEventsService.getActiveEvents().length} · ${banner?.title ?? "calme"}`,
           `net ${net.clients} · AOI ${net.aoi.visible}/${rpNet.remotes.size} · spatial ${net.spatial.cells}`,
           `télémétrie ${tel.fps} fps · ${tel.memoryUsageMB} Mo · ${tel.uptimeSeconds}s`,
-<<<<<<< HEAD
-          `engine ticks ${stats.ticksTotal} · avg ${stats.avgTickMs.toFixed(2)} ms · peak ${stats.peakTickMs.toFixed(2)} ms`,
-          `hud push ${stats.hudPushes} · skip ${stats.hudSkips} · errors ${stats.errorsCaught}`,
-=======
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
           `cash ${s.cash}\u00a0$ · banque ${s.bank}\u00a0$ · ${s.wantedStars}★ · gilet ${s.armor ?? 0}%`,
           `emploi ${s.rpJob} · grade ${s.adminRole} · gang ${s.gangId ?? "—"} · firm ${s.firm?.tradeName ?? "—"}`,
           `permis ${s.licenses.join(", ") || "aucun"}`,
@@ -4792,82 +4103,6 @@ export class PortneufEngine {
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
-<<<<<<< HEAD
-
-    try {
-      this.stop();
-      input.detach();
-      this.timer.disconnect();
-
-      if (this.pendingUnloadHandler) {
-        window.removeEventListener("beforeunload", this.pendingUnloadHandler);
-        this.pendingUnloadHandler = null;
-      }
-      window.removeEventListener("resize", this.onResize);
-
-      try { persist(); } catch { /* noop */ }
-      try { quebecFM.dispose(); } catch { /* noop */ }
-      try { spatialAudio.dispose(); } catch { /* noop */ }
-      try { physics.dispose(); } catch { /* noop */ }
-      try { police.dispose(); } catch { /* noop */ }
-
-      // Dispose interiors
-      for (const room of Object.values(this.interiors)) {
-        room.group.traverse((o) => {
-          const m = o as THREE.Mesh;
-          if (m.geometry) m.geometry.dispose();
-          if (m.material) {
-            const mat = m.material as THREE.Material | THREE.Material[];
-            if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
-            else mat.dispose();
-          }
-        });
-        this.scene.remove(room.group);
-      }
-
-      // Dispose props
-      try {
-        this.props.group.traverse((o) => {
-          const m = o as THREE.Mesh;
-          if (m.geometry) m.geometry.dispose();
-          if (m.material) {
-            const mat = m.material as THREE.Material | THREE.Material[];
-            if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
-            else mat.dispose();
-          }
-        });
-        this.scene.remove(this.props.group);
-      } catch { /* noop */ }
-
-      // Dispose caddie
-      if (this.caddie) {
-        this.scene.remove(this.caddie);
-        this.caddie.traverse((o) => {
-          const m = o as THREE.Mesh;
-          if (m.geometry) m.geometry.dispose();
-          if (m.material) {
-            const mat = m.material as THREE.Material | THREE.Material[];
-            if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
-            else mat.dispose();
-          }
-        });
-        this.caddie = null;
-      }
-
-      try { this.world.dispose(); } catch { /* noop */ }
-      try { this.remotes.dispose(); } catch { /* noop */ }
-      try { tex.dispose(); } catch { /* noop */ }
-      try { this.renderer.dispose(); } catch { /* noop */ }
-
-      this.listeners.clear();
-      (window as any).__controlsTest = undefined;
-
-      this.emit("dispose");
-    } catch (err) {
-      this.engineStats.errorsCaught++;
-      console.error("[PortneufEngine] Dispose error:", err);
-    }
-=======
     this.stop();
     input.detach();
     this.timer.disconnect();
@@ -4882,7 +4117,6 @@ export class PortneufEngine {
     tex.dispose();
     this.renderer.dispose();
     delete window.__controlsTest;
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   }
 }
 

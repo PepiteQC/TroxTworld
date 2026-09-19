@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import * as THREE from 'three';
-import { buildBuilding, matLib, geoLib, QC_PALETTE } from '../QuebecArchitecture';
+import { buildBuilding, matLib, geoLib, QC_PALETTE } from '../buildings/architecture/QuebecArchitecture';
 import type { VillageProfile } from '../VillageProfiles';
 
 // ─────────────────────────────────────────────────────────────────────────

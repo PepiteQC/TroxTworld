@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
-import { matLib } from "./materials";
+import { matLib } from "../../materials";
 
 export type GunId = "ar15" | "shotgun" | "pistol";
 

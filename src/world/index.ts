@@ -17,7 +17,7 @@ export { Walker as AnimatedCharacterController } from "../../game/walker";
 export { CharacterAnimationManager, CharacterAnimationManager as AnimatedCharacterMixer } from "../../game/characterAnim";
 export { CreatorOverlay as CharacterViewer, CreatorOverlay as CharacterCreator } from "../../game/creator";
 export { PortneufApp as TroxTWorld, PortneufApp as default } from "../../game/Game";
-export { BuilderOverlay as TroxTMOD3D } from "../../game/buildui";
+export { BuilderOverlay as TroxTMOD3D } from "../game/ui/buildui";
 export { applyGesture, RP_GESTURES, type RpGesture } from "../../game/gestures";
 export { CAMERA_CYCLE, CAMERA_LABEL, type CameraMode } from "../../game/store";
 export {

@@ -1,12 +1,12 @@
 import { buildSqdcInterior as createSqdcInterior } from "./sqdc";
-import { buildBathroom } from "./bathroom";
+import { buildBathroom } from "../../bathroom";
 import * as THREE from "three";
-import { matLib, QC_PALETTE } from "./materials";
-import { tex } from "./textures";
+import { matLib, QC_PALETTE } from "../../materials";
+import { tex } from "./architecture/materiaux/textures";
 import type { InteriorKind } from "./city";
-import { buildHotelTvSetup, type HotelTvSetup } from "./hotelTv";
-import { buildBoutiqueInterior, type BoutiqueGarment } from "./boutique";
-import { buildDepanneurInterior, type DepAisleHot } from "./depanneur";
+import { buildHotelTvSetup, type HotelTvSetup } from "../hotel/hotelTv";
+import { buildBoutiqueInterior, type BoutiqueGarment } from "../../boutique";
+import { buildDepanneurInterior, type DepAisleHot } from "../../depanneur";
 import {
   baseboard,
   ceilingLight,
@@ -29,10 +29,10 @@ import {
   brickFireplace,
   drapeCurtain,
   woolSofa,
-} from "./luxury";
-import { mountLoft } from "./loft";
-import { buildBathSink, buildFridge, buildKitchenSink, buildMinibar, buildStove, buildToilet, buildWasher } from "./props3d";
-import { buildWorkbench, hasReno, type DoorSlot, type HouseState } from "./house";
+} from "../hotel/luxury";
+import { mountLoft } from "../hotel/loft";
+import { buildBathSink, buildFridge, buildKitchenSink, buildMinibar, buildStove, buildToilet, buildWasher } from "./architecture/materiaux/props3d";
+import { buildWorkbench, hasReno, type DoorSlot, type HouseState } from "../maison/house";
 import {
   buildFurnace,
   buildHydroPanel,
@@ -42,7 +42,7 @@ import {
   heatById,
   heatWorks,
   setHeatGlow,
-} from "./utilities";
+} from "../../utilities";
 
 export interface WallBox {
   minX: number;
@@ -1079,4 +1079,3 @@ export function resolveWalls(x: number, z: number, walls: WallBox[], radius = 0.
   }
   return { x: nx, z: nz };
 }
-

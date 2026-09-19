@@ -177,6 +177,20 @@ export function buildLanesForCurve(curve: RoadCurve): Lane[] {
 
 export const ALL_LANES: Lane[] = ROUTE_138_CURVES.flatMap(buildLanesForCurve);
 
+export const route138 = {
+  buildVisualMesh(): THREE.Group {
+    const group = new THREE.Group();
+    for (const curve of ROUTE_138_CURVES) {
+      const line = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(curve.points),
+        new THREE.LineBasicMaterial({ color: 0x4b5563 }),
+      );
+      group.add(line);
+    }
+    return group;
+  },
+};
+
 export function getCurveDef(id: string): RoadCurve | undefined {
   return ROUTE_138_CURVES.find((c) => c.id === id);
 }

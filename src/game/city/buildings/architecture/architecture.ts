@@ -1,10 +1,10 @@
 ﻿import * as THREE from "three";
-import { matLib, QC_PALETTE, WALL_COLORS, ROOF_COLORS } from "./materials";
-import { makeRng } from "./rng";
-import { buildGlassLeaf, buildHouseFrontDoor, type SwingDoor } from "./door";
-import { finishMap, tex } from "./textures";
-import { commerceMat } from "./commerceMats";
-import { buildPoliceLightbar } from "./lightbar";
+import { matLib, QC_PALETTE, WALL_COLORS, ROOF_COLORS } from "../../../materials";
+import { makeRng } from "../../../rng";
+import { buildGlassLeaf, buildHouseFrontDoor, type SwingDoor } from "../access-control/doors/door";
+import { finishMap, tex } from "./materiaux/textures";
+import { commerceMat } from "./materiaux/commerceMats";
+import { buildPoliceLightbar } from "../../schema/lightbar";
 
 function gableRoof(width: number, depth: number, height: number, color: number, overhang = 0.45) {
   const g = new THREE.Group();
@@ -99,15 +99,9 @@ export function buildMaisonCanadienne(seed = 1, lit = 0): THREE.Group {
   awning.rotation.x = -0.08;
   g.add(awning);
 
-<<<<<<< HEAD:src/game/city/buildings/architecture/architecture.ts
-  const door = buildHouseFrontDoor(0.95, 2.05);
-  door.position.set(0, 0.62, depth / 2 + 0.04);
-  g.add(door);
-=======
   const doorResult = buildHouseFrontDoor(0.95, 2.05);
   doorResult.group.position.set(0, 0.62, depth / 2 + 0.04);
     // g.add(door); // Optionnel ou géré via d.open
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/architecture.ts
 
   for (const x of [-width * 0.28, width * 0.28]) {
     const w = windowPane(1.05, 1.2, rng() < lit);

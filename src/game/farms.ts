@@ -19,13 +19,16 @@
  */
 
 import * as THREE from "three";
-import { buildGrange, buildMaisonCanadienne } from "./architecture";
-import { getGeo } from "./geo";
+import { buildGrange, buildMaisonCanadienne } from "./city/buildings/architecture/architecture";
+import { getGeo } from "./city/environment/geo";
 import { matLib } from "./materials";
 import { getTerrainHeight, pushOffRoad, RANG_2E_Z, RIVER_RANGS, nearestRoadHit } from "./worlddata";
-import { attachScenicHeat } from "./utilities";
-import { addWantedPoints } from "./rp";
+import { attachScenicHeat } from "../utils/utilities";
+import { addWantedPoints } from "./police";
+
+export const farmMapMarks: Array<{ x: number; z: number; label?: string }> = [];
 import { itemById, ShopItemId, getSellPrice, bagValue } from "./commerce";
+export { cropFromSeed, countyFarmLayout, farmClearings, fieldPrompt, legalFarmsteads, mountFarms, nearestField, seizeField, tickFields, workField } from "./city/environment/campagne/farms";
 
 // ==========================================
 // 🌾 1. TYPES & CONSTANTES
@@ -1946,47 +1949,3 @@ function localOffset(plot: FieldPlot, x: number, z: number): { lx: number; lz: n
 
 // Instance globale du gestionnaire de fermes
 export const farmManager = new FarmManager();
-
-// ==========================================
-// 📤 EXPORTS
-// ==========================================
-
-export {
-  // Types
-  CropId,
-  FieldStage,
-  Season,
-  WeatherCondition,
-  SoilType,
-  CropSpec,
-  FieldPlot,
-  FarmTool,
-  FieldWorkResult,
-  FarmEvent,
-  WeatherData,
-
-  // Constantes
-  CROPS,
-  SEASON_WEATHER,
-  SOIL_QUALITIES,
-
-  // Fonctions
-  cropFromSeed,
-  countyFarmLayout,
-  legalFarmsteads,
-  farmClearings,
-  farmMapMarks,
-  fieldPrompt,
-  workField,
-  tickFields,
-  seizeField,
-  soilColor,
-  cropTint,
-  localOffset,
-
-  // Classe
-  FarmManager,
-
-  // Instance globale
-  farmManager,
-};

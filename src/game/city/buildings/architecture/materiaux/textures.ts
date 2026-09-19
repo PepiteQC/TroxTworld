@@ -13,15 +13,12 @@
  */
 
 import * as THREE from "three";
-import { wireCsm } from "./csm";
-import { usePbr, type QcMat } from "./materials";
-<<<<<<< HEAD:src/game/city/buildings/architecture/materiaux/textures.ts
-=======
+import { wireCsm } from "../../../../csm";
+import { usePbr, type QcMat } from "../../../../materials";
 
 // ═══════════════════════════════════════════════════════════
 // CATALOGUE DES IDENTIFIANTS HD
 // ═══════════════════════════════════════════════════════════
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/textures.ts
 
 export type TexId =
   // --- Intérieurs & Bases ---
@@ -156,9 +153,6 @@ class TextureLibrary {
   
   private maps = new Map<TexId, THREE.Texture>();
   private mats = new Map<string, QcMat>();
-<<<<<<< HEAD:src/game/city/buildings/architecture/materiaux/textures.ts
-  private clones = new Map<TexId, THREE.Texture[]>();
-=======
   private clones = new Map<string, THREE.Texture>(); 
   private failed = new Set<TexId>();
   
@@ -167,26 +161,11 @@ class TextureLibrary {
   private loadCount = 0;
   private failCount = 0;
   
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/textures.ts
   aniso = 4;
   private maxTextureSize = 2048;
 
-<<<<<<< HEAD:src/game/city/buildings/architecture/materiaux/textures.ts
-  attach(renderer: THREE.WebGLRenderer) {
-    const max = renderer.capabilities.getMaxAnisotropy();
-    const mobile = Math.min(window.innerWidth, window.innerHeight) < 720;
-    this.aniso = Math.max(1, Math.min(mobile ? 4 : 16, max || 1));
-    this.pot = mobile ? 1024 : 2048;
-    this.maps.forEach((t) => {
-      t.anisotropy = this.aniso;
-    });
-    this.clones.forEach((list) => {
-      for (const t of list) t.anisotropy = this.aniso;
-    });
-=======
   constructor() {
     this.createPlaceholder();
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/textures.ts
   }
 
   private createPlaceholder() {
@@ -303,22 +282,6 @@ class TextureLibrary {
       loadedTex.dispose();
       this.loadCount++;
     };
-<<<<<<< HEAD:src/game/city/buildings/architecture/materiaux/textures.ts
-    const w = img.width || 0;
-    const h = img.height || 0;
-    const pot = this.pot;
-    const alreadyOk = w > 0 && h > 0 && w <= pot && h <= pot;
-    if (alreadyOk) {
-      commit(img);
-      return;
-    }
-    if (typeof createImageBitmap === "function") {
-      void createImageBitmap(img, {
-        resizeWidth: pot,
-        resizeHeight: pot,
-        resizeQuality: "high",
-      }).then(commit).catch(() => commit(img));
-=======
     
     const w = img.width || 0;
     const h = img.height || 0;
@@ -327,7 +290,6 @@ class TextureLibrary {
     
     if (fitsRequirements) {
       applyToGPU(img);
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/textures.ts
       return;
     }
     
@@ -372,64 +334,6 @@ class TextureLibrary {
     return clone;
   }
 
-<<<<<<< HEAD:src/game/city/buildings/architecture/materiaux/textures.ts
-  mat(
-    id: TexId,
-    repeatX: number,
-    repeatY: number,
-    roughness = 0.7,
-    metalness = 0,
-  ): QcMat {
-    const pbr = usePbr(roughness, metalness);
-    const key = `${pbr ? "s" : "l"}_${id}_${repeatX}_${repeatY}_${roughness}_${metalness}`;
-    const hit = this.mats.get(key);
-    if (hit) return hit;
-    const map = this.tile(id, repeatX, repeatY);
-    const mat = pbr
-      ? new THREE.MeshStandardMaterial({
-          map,
-          roughness,
-          metalness,
-          color: 0xffffff,
-        })
-      : new THREE.MeshLambertMaterial({
-          map,
-          color: 0xffffff,
-        });
-    this.mats.set(key, mat);
-    wireCsm(mat);
-    return mat;
-  }
-
-  cloth(
-    albedo: TexId,
-    nrm: TexId | null,
-    repeatX: number,
-    repeatY: number,
-    roughness = 0.88,
-    tint = 0xffffff,
-    bump = 0.7,
-  ): QcMat {
-    const pbr = usePbr(roughness, 0);
-    const key = `cloth_${pbr ? "s" : "l"}_${albedo}_${nrm}_${repeatX}_${repeatY}_${roughness}_${tint}_${bump}`;
-    const hit = this.mats.get(key);
-    if (hit) return hit;
-    const map = this.tile(albedo, repeatX, repeatY);
-    const mat = pbr
-      ? new THREE.MeshStandardMaterial({
-          map,
-          color: tint,
-          roughness,
-          metalness: 0,
-        })
-      : new THREE.MeshLambertMaterial({
-          map,
-          color: tint,
-        });
-    if (nrm && pbr) {
-      mat.normalMap = this.tile(nrm, repeatX, repeatY);
-      mat.normalScale = new THREE.Vector2(bump, bump);
-=======
   // ─── BUILDERS DE MATÉRIAUX STANDARDS & PBR ─────────────────
 
   mat(id: TexId, repeatX: number, repeatY: number, roughness = 0.7, metalness = 0): QcMat {
@@ -523,44 +427,12 @@ class TextureLibrary {
 
     if (alpha) {
       material.alphaMap = this.tile(alpha, repeatX, repeatY);
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/textures.ts
     }
 
     this.mats.set(key, material);
     return material;
   }
 
-<<<<<<< HEAD:src/game/city/buildings/architecture/materiaux/textures.ts
-  pbr(
-    albedo: TexId,
-    nrm: TexId | null,
-    repeatX: number,
-    repeatY: number,
-    roughness = 0.9,
-    metalness = 0,
-    tint = 0xffffff,
-    bump = 0.85,
-  ): QcMat {
-    const pbr = usePbr(roughness, metalness);
-    const key = `pbr_${pbr ? "s" : "l"}_${albedo}_${nrm}_${repeatX}_${repeatY}_${roughness}_${metalness}_${tint}_${bump}`;
-    const hit = this.mats.get(key);
-    if (hit) return hit;
-    const map = this.tile(albedo, repeatX, repeatY);
-    const mat = pbr
-      ? new THREE.MeshStandardMaterial({
-          map,
-          color: tint,
-          roughness,
-          metalness,
-        })
-      : new THREE.MeshLambertMaterial({
-          map,
-          color: tint,
-        });
-    if (nrm && pbr) {
-      mat.normalMap = this.tile(nrm, repeatX, repeatY);
-      mat.normalScale = new THREE.Vector2(bump, bump);
-=======
   /**
    * Matériau CarPaint HD (Reflets prononcés, vernis).
    */
@@ -580,7 +452,6 @@ class TextureLibrary {
     if (nrm) {
       material.normalMap = this.tile(nrm, repeatX, repeatY);
       material.normalScale = new THREE.Vector2(0.5, 0.5); // Normales polies
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/textures.ts
     }
 
     this.mats.set(key, material);

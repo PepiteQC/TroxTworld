@@ -41,9 +41,9 @@
  * ═══════════════════════════════════════════════════════════════════
  */
 
-import { netEmit, netOn } from "./net";
-import { getWantedLevel } from "./police";
-import { getCurrentSeason } from "./seasons";
+import { netEmit, netOn } from "../game/net";
+import { getWantedLevel } from "../game/police";
+import { getCurrentSeason } from "../game/seasons";
 
 // ═══════════════════════════════════════════════════════════
 // TYPES & STRUCTURES DE DONNÉES

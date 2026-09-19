@@ -8,7 +8,7 @@ import { itemById } from "./commerce";
 import type { DepAisleHot } from "./depanneur";
 import { spawnShopFood } from "./food";
 import { matLib, QC_PALETTE } from "./materials";
-import { buildDiningTable } from "./props3d";
+import { buildDiningTable } from "./city/buildings/architecture/materiaux/props3d";
 
 export const CASSE_OPEN_FROM = 11;
 export const CASSE_OPEN_TO = 23;

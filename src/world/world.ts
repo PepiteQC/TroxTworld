@@ -232,29 +232,18 @@ export class PortneufWorld {
     this.ambient = new THREE.AmbientLight(0xd4e3e8, 0.18);
     this.scene.add(this.group, this.hemi, this.ambient);
     createSunCsm(camera, this.scene);
-<<<<<<< HEAD:src/world/world.ts
-    this.scene.fog = new THREE.FogExp2(0x8aa0a8, 0.00155);
-    this.scene.background = new THREE.Color(0x7a9aaa);
-=======
     // Brouillard volumétrique réaliste sur les collines des Laurentides (0x879fb5)
     this.scene.fog = new THREE.FogExp2(0x879fb5, 0.00125);
     this.scene.background = new THREE.Color(0x879fb5);
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
   }
 
   build() {
     this.buildTerrain();
     this.buildRiver();
     this.buildLakes();
-<<<<<<< HEAD:src/world/world.ts
-    for (const road of ROADS) {
-      const div =
-        road.kind === "ramp" ? 14 : road.kind === "highway" ? 48 : road.kind === "village" || road.kind === "rural" ? 36 : 28;
-=======
     for (let i = 0; i < ROADS.length; i++) {
       const road = ROADS[i];
       const div = road.kind === "ramp" ? 14 : road.kind === "highway" ? 48 : road.kind === "village" || road.kind === "rural" ? 36 : 28;
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
       this.group.add(buildRoadRibbon(road, div));
       const line = buildCenterLine(road, road.kind === "village" ? 36 : 50);
       if (line) this.group.add(line);
@@ -262,12 +251,8 @@ export class PortneufWorld {
         this.group.add(buildRoadSidewalks(road, road.id.startsWith("rue_") ? 22 : 18));
       }
     }
-<<<<<<< HEAD:src/world/world.ts
-    for (const j of ROAD_JUNCTIONS) {
-=======
     for (let i = 0; i < ROAD_JUNCTIONS.length; i++) {
       const j = ROAD_JUNCTIONS[i];
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
       this.group.add(buildIntersectionPad(j.x, j.z, j.size));
     }
     this.buildForests();
@@ -571,24 +556,16 @@ export class PortneufWorld {
             yaw: spot.yaw,
             prompt: `Entrer · ${caisseNameFor(v.name)}`,
           });
-<<<<<<< HEAD:src/world/world.ts
-          for (const a of built.atms) {
-=======
           for (let j = 0; j < built.atms.length; j++) {
             const a = built.atms[j];
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
             const p = worldOffset(spot, spot.yaw, a.x, a.z);
             this.atms.push({ id: a.id, name: caisseNameFor(v.name), x: p.x, z: p.z });
           }
         }
 
-<<<<<<< HEAD:src/world/world.ts
-        for (const lot of villageHouseLots(v)) {
-=======
         const lots = villageHouseLots(v);
         for (let j = 0; j < lots.length; j++) {
           const lot = lots[j];
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
           const house = buildMaisonCanadienne(v.population + Math.round(lot.x + lot.z), 0);
           const rural = v.population < 2800 || v.industry === "agriculture" || v.industry === "foresterie" || v.industry === "acericole";
           attachScenicHeat(house, scenicHeat(Math.round(lot.x * 13 + lot.z), rural), lot.yaw);
@@ -655,12 +632,8 @@ export class PortneufWorld {
     this.placeOnGround(buildPelle(), tools.x - 7, tools.z + 1, 0.2);
     this.placeOnGround(buildRateau(), tools.x - 9, tools.z - 2, -0.4);
 
-<<<<<<< HEAD:src/world/world.ts
-    for (const a of ATM_SPOTS) {
-=======
     for (let i = 0; i < ATM_SPOTS.length; i++) {
       const a = ATM_SPOTS[i];
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
       if (a.id !== "atm_sq") continue;
       const p = pushOffRoad(a.x, a.z, 7);
       this.placeOnGround(buildAtm(), p.x, p.z, 0.2);
@@ -672,10 +645,6 @@ export class PortneufWorld {
       this.deeds.push({ ...d, x: p.x, z: p.z });
     }
     this.houses = mountHouses(this.group, this.deeds);
-<<<<<<< HEAD:src/world/world.ts
-    for (const h of this.houses) this.lodNodes.push({ obj: h.group, x: h.x, z: h.z, r: 420 });
-    for (const c of CRIME_SPOTS) {
-=======
     for (let i = 0; i < this.houses.length; i++) {
       const h = this.houses[i];
       this.lodNodes.push({ obj: h.group, x: h.x, z: h.z, r: 420 });
@@ -699,7 +668,6 @@ export class PortneufWorld {
     }
     for (let i = 0; i < CRIME_SPOTS.length; i++) {
       const c = CRIME_SPOTS[i];
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
       this.placeOnGround(buildCrimeCorner(), c.x, c.z, 0.1);
       this.crimes.push(c);
     }
@@ -771,12 +739,8 @@ export class PortneufWorld {
       this.doors.push(...city.doors);
       this.swingDoors.push(...city.swings);
       this.cityTextures.push(...city.textures);
-<<<<<<< HEAD:src/world/world.ts
-      for (const d of city.doors) {
-=======
       for (let j = 0; j < city.doors.length; j++) {
         const d = city.doors[j];
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
         if (d.kind !== "caisse") continue;
         this.caisses.push({
           id: d.id,
@@ -830,9 +794,6 @@ export class PortneufWorld {
     this.group.add(buildIntersectionPad(x261, 54, 10.5));
     this.group.add(buildIntersectionPad(x261, ROAD_138_Z, 12.5));
 
-<<<<<<< HEAD:src/world/world.ts
-    const pen = buildPrisonComplex();
-=======
     const slabW = 135;
     const slabD = 135;
     const slabH = 14; 
@@ -862,7 +823,6 @@ export class PortneufWorld {
         if (tree) this.placeOnGround(tree, tx, tz, Math.random() * Math.PI * 2);
       }
     }
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
     this.placeOnGround(pen.group, PRISON.x, PRISON.z, 0, 720);
     this.prison = pen;
     const doorX = PRISON.x + pen.door.x;
@@ -1188,14 +1148,9 @@ export class PortneufWorld {
   nearestCaisse(x: number, z: number, max = 9): (typeof this.caisses)[number] | null {
     let best: (typeof this.caisses)[number] | null = null;
     let bestD = max;
-<<<<<<< HEAD:src/world/world.ts
-    for (const c of this.caisses) {
-      const dist = Math.hypot(x - c.x, z - c.z);
-=======
     for (let i = 0; i < this.caisses.length; i++) {
       const c = this.caisses[i];
       const dist = Math.sqrt((x - c.x)**2 + (z - c.z)**2);
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
       if (dist < bestD) {
         best = c;
         bestD = dist;
@@ -1376,31 +1331,14 @@ export class PortneufWorld {
     if (this.prison) animatePrison(this.prison, elapsed, dt, this.night);
     tickInjured(this.hurtGroup, dt, 0);
     if (this.streetGroup) tickStreet(this.streetGroup, elapsed);
-<<<<<<< HEAD:src/world/world.ts
-    for (const c of this.caisses) animateCaisse(c.mesh, elapsed);
-    this.tickFarmRaid(dt, elapsed);
-    tickHerd(this.herd, dt, elapsed);
-=======
     for (let i = 0; i < this.caisses.length; i++) animateCaisse(this.caisses[i].mesh, elapsed);
     this.tickFarmRaid(dt, elapsed);
     tickHerd(this.herd, dt, elapsed);
     
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
     const wx = quebecSeasons.getState();
     this.weatherFx?.apply(wx);
     this.weatherFx?.tick(dt, player, !this.group.visible);
     this.plows?.tick(dt, elapsed, wx, player);
-<<<<<<< HEAD:src/world/world.ts
-    this.worldItems.tick(elapsed);
-    tickSugar(this.sugar, elapsed);
-
-    if (this.river && player.z > 10) {
-      this.river.position.y = -1.15 + Math.sin(elapsed * 0.7) * 0.1;
-    }
-    for (const boat of this.animBoats) {
-      boat.rotation.z = Math.sin(elapsed * 0.9 + boat.position.x) * 0.03;
-      boat.position.y = 0.25 + Math.sin(elapsed * 0.7) * 0.06;
-=======
     
     this.worldItems.tick(elapsed);
     tickSugar(this.sugar as any, elapsed);
@@ -1423,28 +1361,9 @@ export class PortneufWorld {
     }
     for (let i = 0; i < this.animSails.length; i++) {
       this.animSails[i].rotation.x += dt * 0.35;
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
     }
-    for (const sails of this.animSails) sails.rotation.x += dt * 0.35;
 
     const chaseBudget = wantedStars <= 0 ? 0 : Math.min(8, 1 + wantedStars);
-<<<<<<< HEAD:src/world/world.ts
-    if (chaseBudget > 0) {
-      const cops = this.traffic.filter((c) => c.isPolice);
-      cops.sort((a, b) => {
-        const da = Math.hypot(a.mesh.position.x - player.x, a.mesh.position.z - player.z);
-        const db = Math.hypot(b.mesh.position.x - player.x, b.mesh.position.z - player.z);
-        return da - db;
-      });
-      cops.forEach((c, i) => {
-        c.chasing = i < chaseBudget;
-      });
-    } else {
-      for (const car of this.traffic) car.chasing = false;
-    }
-
-    for (const car of this.traffic) {
-=======
     let activeChasers = 0;
 
     for (let i = 0; i < this.traffic.length; i++) {
@@ -1462,7 +1381,6 @@ export class PortneufWorld {
         car.chasing = false;
       }
 
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
       const road = car.road;
       const len = car.roadLen;
 
@@ -1490,17 +1408,11 @@ export class PortneufWorld {
       const dist2 = dx0 * dx0 + dz0 * dz0;
       const far = dist2 > 160000;
       const mid = dist2 > 22000;
-<<<<<<< HEAD:src/world/world.ts
-      car.t += (car.dir * (far ? car.targetSpeed : car.speed) * dt) / Math.max(1, len);
-      if (car.t > 1) car.t -= 1;
-      if (car.t < 0) car.t += 1;
-=======
       
       car.t += (car.dir * (far ? car.targetSpeed : car.speed) * dt) / Math.max(1, len);
       if (car.t > 1) car.t -= 1;
       if (car.t < 0) car.t += 1;
       
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
       if (far) {
         if (car.mesh.visible) car.mesh.visible = false;
         continue;
@@ -1510,12 +1422,8 @@ export class PortneufWorld {
       if (!mid) {
         let gap = 400;
         let deltaV = 0;
-<<<<<<< HEAD:src/world/world.ts
-        for (const other of this.traffic) {
-=======
         for (let j = 0; j < this.traffic.length; j++) {
           const other = this.traffic[j];
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
           if (other === car || other.roadId !== car.roadId || other.dir !== car.dir) continue;
           const raw = car.dir > 0 ? other.t - car.t : car.t - other.t;
           const ahead = raw > 0 ? raw : raw + 1;
@@ -1528,14 +1436,6 @@ export class PortneufWorld {
         const accel = idmAccel(car.speed, car.targetSpeed, gap, deltaV);
         car.speed = Math.max(1.2, Math.min(car.targetSpeed * 1.15, car.speed + accel * dt));
       }
-<<<<<<< HEAD:src/world/world.ts
-      const s = sampleRoad(road, car.t);
-      const x = s.x + -s.tz * car.offset;
-      const z = s.z + s.tx * car.offset;
-      car.mesh.position.set(x, getTerrainHeight(x, z) + 0.35, z);
-      car.mesh.lookAt(x + s.tx * car.dir, car.mesh.position.y, z + s.tz * car.dir);
-      if (car.bars.length) this.flashBars(car.bars, elapsed, false);
-=======
       
       const s = sampleRoad(road, car.t);
       const x = s.x + -s.tz * car.offset;
@@ -1545,7 +1445,6 @@ export class PortneufWorld {
       car.mesh.lookAt(x + s.tx * car.dir, car.mesh.position.y, z + s.tz * car.dir);
       
       if (car.bars.length > 0) this.flashBars(car.bars, elapsed, false);
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
       if (!mid) car.lightbar?.tick(elapsed, this.barOpts(true, false));
     }
 
@@ -1563,15 +1462,10 @@ export class PortneufWorld {
     const hours = this.sky?.hours ?? (16.5 + elapsed / 90) % 24;
     this.peds.update(dt, player, hours);
     this.blendZoneFog(player.x, player.z);
-<<<<<<< HEAD:src/world/world.ts
-    const phase = QuebecPoliceSirens.getSyncPhase();
-    for (const g of this.parkedSq) {
-=======
     
     const phase = QuebecPoliceSirens.getSyncPhase();
     for (let i = 0; i < this.parkedSq.length; i++) {
       const g = this.parkedSq[i];
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
       const dx = g.position.x - player.x;
       const dz = g.position.z - player.z;
       if (dx * dx + dz * dz > 22000) continue;
@@ -1608,13 +1502,8 @@ export class PortneufWorld {
 
   private flashBars(bars: THREE.Mesh[], elapsed: number, chase: boolean) {
     const on = chase ? elapsed % 0.22 < 0.11 : elapsed % 0.6 < 0.3;
-<<<<<<< HEAD:src/world/world.ts
-    for (const obj of bars) {
-      const mat = obj.material as QcMat;
-=======
     for (let i = 0; i < bars.length; i++) {
       const mat = bars[i].material as QcMat;
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
       mat.emissive.setHex(on ? 0x1d4ed8 : 0xb91c1c);
       mat.emissiveIntensity = chase ? 2.2 : 0.85;
     }
@@ -1623,15 +1512,6 @@ export class PortneufWorld {
   private tickLod(player: THREE.Vector3) {
     const px = player.x;
     const pz = player.z;
-<<<<<<< HEAD:src/world/world.ts
-    for (const n of this.lodNodes) {
-      const vis = Math.hypot(px - n.x, pz - n.z) < n.r;
-      if (n.obj.visible !== vis) n.obj.visible = vis;
-    }
-    for (const chunk of this.forestChunks) {
-      const c = chunk.userData.center as THREE.Vector3;
-      const d = Math.hypot(px - c.x, pz - c.z);
-=======
     for (let i = 0; i < this.lodNodes.length; i++) {
       const n = this.lodNodes[i];
       const vis = Math.sqrt((px - n.x)**2 + (pz - n.z)**2) < n.r;
@@ -1641,19 +1521,14 @@ export class PortneufWorld {
       const chunk = this.forestChunks[i];
       const c = chunk.userData.center as THREE.Vector3;
       const d = Math.sqrt((px - c.x)**2 + (pz - c.z)**2);
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
       const vis = d < 720;
       if (chunk.visible !== vis) chunk.visible = vis;
       const shadow = d < 150;
       if (chunk.userData.shadow !== shadow) {
         chunk.userData.shadow = shadow;
-<<<<<<< HEAD:src/world/world.ts
-        for (const child of chunk.children) {
-=======
         const children = chunk.children;
         for (let j = 0; j < children.length; j++) {
           const child = children[j];
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
           if ((child as THREE.InstancedMesh).isInstancedMesh) child.castShadow = shadow;
         }
       }
@@ -1670,16 +1545,6 @@ export class PortneufWorld {
     this.liveRoots.push(this.wildlife.group, this.hurtGroup, this.peds.group);
     if (this.streetGroup) this.liveRoots.push(this.streetGroup);
     if (this.prison) this.liveRoots.push(this.prison.group);
-<<<<<<< HEAD:src/world/world.ts
-    for (const car of this.traffic) this.liveRoots.push(car.mesh);
-    for (const boat of this.animBoats) this.liveRoots.push(boat);
-    for (const sails of this.animSails) this.liveRoots.push(sails);
-    for (const leaf of this.leaves) this.liveRoots.push(leaf.mesh);
-    for (const s of this.herd) this.liveRoots.push(s.mesh);
-    for (const b of this.sugar) {
-      for (const t of b.taps) this.liveRoots.push(t.sapMesh);
-      for (const puff of b.evap.steam) this.liveRoots.push(puff);
-=======
     
     for (let i = 0; i < this.traffic.length; i++) this.liveRoots.push(this.traffic[i].mesh);
     for (let i = 0; i < this.animBoats.length; i++) this.liveRoots.push(this.animBoats[i]);
@@ -1691,20 +1556,14 @@ export class PortneufWorld {
       for (let j = 0; j < b.taps.length; j++) this.liveRoots.push(b.taps[j].sapMesh);
       const puffs = (b as any).evap?.steam ?? [];
       for (let j = 0; j < puffs.length; j++) this.liveRoots.push(puffs[j]);
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
     }
   }
 
   private freezeStatic() {
     this.group.updateMatrixWorld(true);
     const live = new Set<THREE.Object3D>();
-<<<<<<< HEAD:src/world/world.ts
-    for (const root of this.liveRoots) {
-      root.traverse((o) => live.add(o));
-=======
     for (let i = 0; i < this.liveRoots.length; i++) {
       this.liveRoots[i].traverse((o) => live.add(o));
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
     }
     this.group.traverse((o) => {
       if (live.has(o)) return;
@@ -1747,10 +1606,7 @@ export class PortneufWorld {
     this.night = snap.night;
     this.applySky(snap);
     applySun(hours, snap.sunIntensity, snap.sunColor, snap.night, this.group.visible);
-<<<<<<< HEAD:src/world/world.ts
-=======
     
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
     this.group.traverse((obj) => {
       if (obj.userData.isStreetlight) {
         const mat = (obj as THREE.InstancedMesh).material as QcMat;
@@ -1765,24 +1621,16 @@ export class PortneufWorld {
         if (mat.emissive) mat.emissiveIntensity = 0.15 + snap.lamp * 1.4;
       }
     });
-<<<<<<< HEAD:src/world/world.ts
-    for (const c of this.caisses) setCaisseNight(c.mesh, snap.night);
-=======
     
     for (let i = 0; i < this.caisses.length; i++) {
       setCaisseNight(this.caisses[i].mesh, snap.night);
     }
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
   }
 
   setWeather(kind: "clear" | "rain" | "snow" | "fog" | "storm" | "blizzard") {
     const wx = quebecSeasons.getState();
     const skyKind =
-<<<<<<< HEAD:src/world/world.ts
-      wx.condition === "tempete_neige" || wx.condition === "poudrerie" && wx.windSpeedKmH > 50
-=======
       wx.condition === "tempete_neige" || (wx.condition === "poudrerie" && wx.windSpeedKmH > 50)
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
         ? "blizzard"
         : kind === "blizzard"
           ? "blizzard"
@@ -1816,10 +1664,7 @@ export class PortneufWorld {
     fog.color.setHex(s.fog);
     this.scene.background = new THREE.Color(s.bg);
     if (this.river) (this.river.material as THREE.MeshLambertMaterial).color.setHex(s.river);
-<<<<<<< HEAD:src/world/world.ts
-=======
     
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
     if (this.weather === "fog") {
       fog.density = s.night ? 0.0042 : 0.0034;
     } else if (this.weather === "rain") {
@@ -1834,12 +1679,9 @@ export class PortneufWorld {
     }
   }
 
-<<<<<<< HEAD:src/world/world.ts
-=======
   // ==========================================
   // HOLLOW BOXES (MURS CREUX POUR COMMERCES)
   // ==========================================
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
   private collectSolids() {
     const box = (id: string, x: number, z: number, hx: number, hy: number, hz: number, yaw = 0) => {
       this.solids.push({
@@ -1853,10 +1695,6 @@ export class PortneufWorld {
         yaw,
       });
     };
-<<<<<<< HEAD:src/world/world.ts
-    for (const s of this.shops) box(s.id, s.x, s.z, 5.2, 3.2, 6.8, s.yaw);
-    for (const h of this.houses) {
-=======
 
     /**
      * Génère une boîte creuse (3 murs) laissant l'avant ouvert pour franchir les portes.
@@ -1889,15 +1727,10 @@ export class PortneufWorld {
     
     for (let i = 0; i < this.houses.length; i++) {
       const h = this.houses[i];
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
       const hx = Math.max(2.4, (h.body.maxX - h.body.minX) / 2);
       const hz = Math.max(2.4, (h.body.maxZ - h.body.minZ) / 2);
       box(h.deedId, (h.body.minX + h.body.maxX) / 2, (h.body.minZ + h.body.maxZ) / 2, hx, 3.2, hz, h.yaw);
     }
-<<<<<<< HEAD:src/world/world.ts
-    for (const f of this.firms) box(f.id, f.x, f.z, 6, 3.5, 7, f.yaw);
-    for (const c of this.caisses) box(c.id, c.x, c.z, 5, 3.4, 6, c.yaw);
-=======
     
     for (let i = 0; i < this.firms.length; i++) {
       const f = this.firms[i];
@@ -1909,7 +1742,6 @@ export class PortneufWorld {
       hollowShopBox(c.id, c.x, c.z, 10, 3.4, 12, c.yaw);
     }
     
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158:src/game/world.ts
     box("prison", PRISON.x, PRISON.z, 28, 8, 36, 0);
     box("papeterie", PAPETERIE.x, PAPETERIE.z, 16, 8, 22, 0.08);
     box("sq", SQ_JAIL.x, SQ_JAIL.z, 7, 4, 8, 0.2);

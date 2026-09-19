@@ -143,23 +143,6 @@ export class P2PRoom {
     if (this.pingTimer) clearInterval(this.pingTimer);
 
     for (const slot of this.peers.values()) {
-<<<<<<< HEAD
-      this.teardownSlot(slot);
-    }
-    this.peers.clear();
-    this.signalQueues.clear();
-
-    // Signalement de départ au serveur relais (Beacon / keepalive)
-    try {
-      void fetch("/api/rtc", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ op: "leave", room: this.opts.room, peer: this.opts.selfId }),
-        keepalive: true,
-      }).catch(() => {});
-    } catch {
-      // Ignorer lors de la fermeture de fenêtre
-=======
       if (slot.state?.readyState === "open") {
         try {
           slot.state.send(wire);
@@ -182,7 +165,6 @@ export class P2PRoom {
           /* channel closing */
         }
       }
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
     }
   }
 

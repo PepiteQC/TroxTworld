@@ -235,26 +235,12 @@ const RAW_FLEET: readonly RawVehicleDef[] = [
     engineSound: "premier_idle", hornSound: "horn_standard", exhaustTone: "mid"
   },
   {
-<<<<<<< HEAD
-    id: "sq",
-    name: "Intercepteur SQ",
-    hint: "Gyrophare SQ · H pour les codes",
-    price: 14200,
-    maxSpeed: 46,
-    accel: 20.5,
-    grip: 1.12,
-    mass: 1,
-    caisse: false,
-    pro: false,
-    build: () => buildPolice(true),
-=======
     id: "granger", name: "Granger", brand: "Declasse", category: "suv",
     massKg: 2400, maxSpeedKmh: 165, power: 55, torque: 70, grip: 62,
     braking: 58, handling: 52, suspension: 75, driftBias: 30,
     seats: 6, fuelCapacityL: 80, trunkSlots: 16,
     maxBodyHealth: 1500, maxEngineHealth: 1100,
     engineSound: "granger_idle", hornSound: "horn_truck", exhaustTone: "low"
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
   },
   {
     id: "buffalo", name: "Buffalo S", brand: "Bravado", category: "muscle",

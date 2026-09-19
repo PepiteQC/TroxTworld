@@ -3,6 +3,7 @@
  */
 import * as THREE from "three";
 import type { RoadCurve } from "./types";
+export { SpatialHash, createOptimalSpatialHash, mergeSpatialHashes } from "../../../spatial";
 
 interface CurveEntry {
   curve: RoadCurve;

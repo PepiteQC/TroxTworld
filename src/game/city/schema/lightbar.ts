@@ -4,7 +4,7 @@
  * Le trafic n'a que les meshes (pas de lumière par voiture).
  */
 import * as THREE from "three";
-import { wireCsm } from "./csm";
+import { wireCsm } from "../../csm";
 
 export type LightbarPattern = "code1_advisor" | "code2_visual" | "code3_emergency" | "pursuit_hyper";
 export type AdvisorDir = "left" | "right" | "split" | "off";

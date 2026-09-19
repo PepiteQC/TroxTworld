@@ -511,15 +511,6 @@ function optimizeScene(scene: THREE.Group): void {
 
 export async function loadGltf(url: string, options: LoadOptions = {}): Promise<THREE.Group> {
   await warmMeshopt();
-<<<<<<< HEAD
-  const gltf = await loader.loadAsync(url);
-  const scene = gltf.scene;
-  if (gltf.animations?.length) scene.animations = gltf.animations;
-  scene.userData.gltf = readInfo(gltf, url);
-  markShared(scene);
-  cheapenTree(scene);
-  return scene;
-=======
 
   // Check cache
   const cached = cache.get(url);
@@ -560,7 +551,6 @@ export async function loadAsset(id: string, options: LoadOptions = {}): Promise<
   }
 
   return loadGltf(url, { ...options, priority: meta.priority });
->>>>>>> 40ca88498f1da4389cc3b6d228bfb6917f394158
 }
 
 export const loadGlb = loadGltf;

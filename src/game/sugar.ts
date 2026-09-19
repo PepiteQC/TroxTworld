@@ -15,8 +15,8 @@
  */
 
 import * as THREE from "three";
-import { buildCabaneSucre } from "./architecture";
-import { getGeo } from "./geo";
+import { buildCabaneSucre } from "./city/buildings/architecture/architecture";
+import { getGeo } from "./city/environment/geo";
 import { matLib } from "./materials";
 import { getTerrainHeight } from "./worlddata";
 import { quebecSeasons, type QuebecSeason } from "./seasons";
@@ -1604,7 +1604,6 @@ export const tickSugar = (elapsed: number, deltaTime: number) =>
   _sugarSystem.tick(elapsed, deltaTime);
 
 export const SugarSystemInstance = _sugarSystem;
-
 
 
 

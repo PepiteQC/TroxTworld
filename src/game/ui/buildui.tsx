@@ -1,7 +1,7 @@
 import { Hammer, X } from "lucide-react";
-import { PROP_CATALOG } from "./builder";
-import type { PortneufEngine } from "./engine";
-import { persist, useGameStore } from "./store";
+import { PROP_CATALOG } from "../builder";
+import type { PortneufEngine } from "../engine";
+import { persist, useGameStore } from "../store";
 
 export function BuilderOverlay({ engine }: { engine: PortneufEngine | null }) {
   const type = useGameStore((s) => s.buildType);

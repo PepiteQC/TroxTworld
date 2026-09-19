@@ -18,10 +18,10 @@
  */
 
 import * as THREE from "three";
-import { loadGlb } from "./gltf";
+import { loadGlb } from "../../gltf";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
-import type { QcMat } from "./materials";
-import { matLib } from "./materials";
+import type { QcMat } from "../../materials";
+import { matLib } from "../../materials";
 
 // ═══════════════════════════════════════════════════════════
 // TYPES — VARIANTES & CONFIGURATION

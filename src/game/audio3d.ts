@@ -234,3 +234,6 @@ class SpatialAudio {
 }
 
 export const spatialAudio = new SpatialAudio();
+export function playSound(_name: string): void {
+  void spatialAudio.unlock();
+}
